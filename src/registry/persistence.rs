@@ -3,7 +3,8 @@
 //! `save()` and `record_include_relationships()` are async, using `tokio::fs`
 //! for non-blocking disk writes. `load_persisted_state()` remains sync since
 //! it's called from `BundleRegistry::new()` (construction, before any async
-//! runtime context is needed).
+//! runtime context is needed). `load_persisted_state_async()` is the async
+//! counterpart, used by `BundleRegistry::new_async()`.
 
 use super::types::BundleState;
 use super::BundleRegistry;
@@ -170,8 +171,7 @@ impl BundleRegistry {
     ///
     /// Remains sync because it's called from `BundleRegistry::new()`, which
     /// is a synchronous constructor (called before the async runtime is
-    /// needed). Converting the constructor to async would require changing
-    /// the public API significantly.
+    /// needed). For async contexts, use `load_persisted_state_async()`.
     pub(super) fn load_persisted_state(&mut self) {
         let registry_path = self.home.join("registry.json");
         if !registry_path.exists() {
@@ -186,6 +186,47 @@ impl BundleRegistry {
         let data: serde_json::Value = match serde_json::from_str(&content) {
             Ok(d) => d,
             Err(_) => return,
+        };
+
+        if let Some(bundles) = data.get("bundles").and_then(|v| v.as_object()) {
+            let map = self.bundles.get_mut().unwrap_or_else(|e| e.into_inner());
+            for (name, bundle_data) in bundles {
+                map.insert(name.clone(), BundleState::from_dict(name, bundle_data));
+            }
+        }
+    }
+
+    /// Async version of [`load_persisted_state`](Self::load_persisted_state).
+    ///
+    /// Uses `tokio::fs` for non-blocking file I/O. Logs warnings on I/O and
+    /// parse errors (unlike the sync version which silently swallows them).
+    /// Returns empty state on any error (self-healing behavior matching Python).
+    pub(super) async fn load_persisted_state_async(&mut self) {
+        let registry_path = self.home.join("registry.json");
+
+        let content = match tokio::fs::read_to_string(&registry_path).await {
+            Ok(c) => c,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return,
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to read registry file {}: {}",
+                    registry_path.display(),
+                    e
+                );
+                return;
+            }
+        };
+
+        let data: serde_json::Value = match serde_json::from_str(&content) {
+            Ok(d) => d,
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to parse registry JSON {}: {}",
+                    registry_path.display(),
+                    e
+                );
+                return;
+            }
         };
 
         if let Some(bundles) = data.get("bundles").and_then(|v| v.as_object()) {

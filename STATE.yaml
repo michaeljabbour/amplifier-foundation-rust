@@ -13,7 +13,7 @@
 phase: 22
 phase_name: "Wave 22 -- Async MentionResolver, async registry constructor, concurrent validate"
 epoch: 23
-next_action: "Implement F-074-async-mention-resolver"
+next_action: "Implement F-075-async-registry-constructor"
 blockers: []
 
 architecture_spec:
@@ -739,17 +739,20 @@ features:
   F-074-async-mention-resolver:
     name: "Convert MentionResolver trait to async_trait, BaseMentionResolver to async with tokio::fs"
     module: "mentions, bundle"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-073-async-load-agent-metadata"]
     started_at: "2025-01-30T00:00:00Z"
+    completed_at: "2025-01-30T00:30:00Z"
+    commit: "b8a6b6f"
 
   F-075-async-registry-constructor:
     name: "Add BundleRegistry::new_async() with async load_persisted_state"
     module: "registry"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-073-async-load-agent-metadata"]
+    started_at: "2025-01-30T00:30:00Z"
 
   F-076-concurrent-validate:
     name: "Use futures::join_all in validate_cached_paths for concurrent metadata checks"
@@ -768,6 +771,6 @@ wave_gate:
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 73
-  last_updated: "2025-01-30T00:00:00Z"
+  total_features_completed: 74
+  last_updated: "2025-01-30T00:30:00Z"
   last_session: "session-027-wave22-async-mention-resolver"

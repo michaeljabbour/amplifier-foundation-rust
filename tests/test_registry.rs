@@ -2233,3 +2233,91 @@ async fn test_record_include_relationships_still_saves_immediately() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// Async constructor (F-075)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_new_async_loads_persisted_state() {
+    let tmp = tempdir().unwrap();
+    let home = tmp.path().to_path_buf();
+
+    // Write state with sync constructor + save
+    {
+        let mut registry = BundleRegistry::new(home.clone());
+        register_one(&mut registry, "alpha", "file:///alpha");
+        register_one(&mut registry, "beta", "file:///beta");
+        registry.save().await;
+    }
+
+    // Load with async constructor
+    let registry = BundleRegistry::new_async(home).await;
+    let names = registry.list_registered();
+    assert!(names.contains(&"alpha".to_string()));
+    assert!(names.contains(&"beta".to_string()));
+    assert_eq!(names.len(), 2);
+}
+
+#[tokio::test]
+async fn test_new_async_nonexistent_home_returns_empty() {
+    let tmp = tempdir().unwrap();
+    let home = tmp.path().join("does_not_exist");
+
+    let registry = BundleRegistry::new_async(home).await;
+    assert!(
+        registry.list_registered().is_empty(),
+        "async constructor with nonexistent home should produce empty registry"
+    );
+}
+
+#[tokio::test]
+async fn test_new_async_corrupt_json_returns_empty() {
+    let tmp = tempdir().unwrap();
+    let home = tmp.path().to_path_buf();
+
+    // Write corrupt JSON to registry.json
+    fs::create_dir_all(&home).unwrap();
+    fs::write(home.join("registry.json"), "NOT VALID JSON {{{").unwrap();
+
+    let registry = BundleRegistry::new_async(home).await;
+    assert!(
+        registry.list_registered().is_empty(),
+        "async constructor with corrupt JSON should self-heal to empty registry"
+    );
+}
+
+#[tokio::test]
+async fn test_new_async_matches_sync_new() {
+    // Verify async constructor produces identical state to sync constructor.
+    // Uses to_dict() for structural equality (covers all 12 BundleState fields).
+    let tmp = tempdir().unwrap();
+    let home = tmp.path().to_path_buf();
+
+    // Seed state with rich data (not just name/URI)
+    {
+        let mut registry = BundleRegistry::new(home.clone());
+        register_one(&mut registry, "my-bundle", "file:///my-bundle");
+        register_one(&mut registry, "child-a", "file:///child-a");
+        registry.get_state("my-bundle").local_path = Some("/tmp/cached".to_string());
+        registry.get_state("my-bundle").version = Some("2.0.0".to_string());
+        registry.get_state("my-bundle").is_root = false;
+        registry.record_include_relationships_deferred("my-bundle", &["child-a".to_string()]);
+        registry.save().await;
+    }
+
+    let sync_reg = BundleRegistry::new(home.clone());
+    let async_reg = BundleRegistry::new_async(home).await;
+
+    assert_eq!(sync_reg.list_registered(), async_reg.list_registered());
+
+    // Compare full state via to_dict() for structural equality (serde_json::Value has PartialEq)
+    assert_eq!(
+        sync_reg.find_state("my-bundle").unwrap().to_dict(),
+        async_reg.find_state("my-bundle").unwrap().to_dict(),
+    );
+    assert_eq!(
+        sync_reg.find_state("child-a").unwrap().to_dict(),
+        async_reg.find_state("child-a").unwrap().to_dict(),
+    );
+}

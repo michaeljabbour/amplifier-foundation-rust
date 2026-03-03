@@ -50,6 +50,21 @@ impl BundleRegistry {
         registry
     }
 
+    /// Async constructor that uses non-blocking I/O to load persisted state.
+    ///
+    /// Prefer this over [`new`](Self::new) when constructing within an async
+    /// context (e.g., inside a `tokio::spawn` task or an async handler) to
+    /// avoid blocking the runtime with synchronous file I/O.
+    pub async fn new_async(home: PathBuf) -> Self {
+        let mut registry = BundleRegistry {
+            home,
+            bundles: std::sync::RwLock::new(IndexMap::new()),
+            cache: std::sync::Mutex::new(HashMap::new()),
+        };
+        registry.load_persisted_state_async().await;
+        registry
+    }
+
     /// Register bundles by name→URI mapping.
     /// Does NOT persist -- caller must call save().
     pub fn register(&mut self, bundles: &HashMap<String, String>) {
