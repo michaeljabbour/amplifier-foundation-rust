@@ -9,7 +9,6 @@ use amplifier_foundation::tracing_utils::generate_sub_session_id;
 // ═══════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_format_with_agent_name() {
     let result = generate_sub_session_id(Some("researcher"), None, None);
     let re = Regex::new(r"^[0-9a-f]{16}-[0-9a-f]{16}_researcher$").unwrap();
@@ -20,7 +19,6 @@ fn test_format_with_agent_name() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_default_agent_name() {
     let result = generate_sub_session_id(None, None, None);
     assert!(
@@ -30,7 +28,6 @@ fn test_default_agent_name() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_sanitizes_agent_name() {
     let result = generate_sub_session_id(Some("My Agent!"), None, None);
     assert!(
@@ -40,7 +37,6 @@ fn test_sanitizes_agent_name() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_root_sub_session_has_zero_parent() {
     let result = generate_sub_session_id(Some("test"), None, None);
     assert!(
@@ -50,7 +46,6 @@ fn test_root_sub_session_has_zero_parent() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_extracts_parent_span_from_parent_session() {
     // Generate a parent session ID (root level).
     let parent_id = generate_sub_session_id(Some("parent"), None, None);
@@ -77,7 +72,6 @@ fn test_extracts_parent_span_from_parent_session() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_derives_parent_span_from_trace_id() {
     let trace_id = "12345678901234567890123456789012";
     let result = generate_sub_session_id(Some("test"), None, Some(trace_id));
@@ -92,7 +86,6 @@ fn test_derives_parent_span_from_trace_id() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_unique_child_spans() {
     let re = Regex::new(r"^[0-9a-f]{16}-([0-9a-f]{16})_").unwrap();
     let mut spans = HashSet::new();
@@ -118,7 +111,6 @@ fn test_unique_child_spans() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_empty_agent_name_uses_default() {
     let result = generate_sub_session_id(Some(""), None, None);
     assert!(
@@ -128,7 +120,6 @@ fn test_empty_agent_name_uses_default() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_hyphenated_agent_name_preserved() {
     let result = generate_sub_session_id(Some("zen-architect"), None, None);
     assert!(

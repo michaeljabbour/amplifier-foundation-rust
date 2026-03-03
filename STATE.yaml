@@ -125,9 +125,10 @@ features:
   F-010-tracing-utils:
     name: "Implement tracing_utils module (generate_sub_session_id)"
     module: "tracing_utils"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/modules/tracing-utils.md"
     depends_on: ["F-003-test-port-wave1"]
+    started_at: "2025-01-16T03:00:00Z"
   F-011-spawn:
     name: "Implement spawn module (ProviderPreference, apply_provider_preferences)"
     module: "spawn"
