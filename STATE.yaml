@@ -13,7 +13,7 @@
 phase: 6
 phase_name: "Wave 6 -- Hardening + Completeness"
 epoch: 7
-next_action: "Implement F-026 (IndexMap agents), F-027 (to_dict roundtrip), F-028 (dead code cleanup + trivial stubs)"
+next_action: "Wave 6 COMPLETE. 298 tests passing, 0 clippy warnings, cargo fmt clean. Consider: implement remaining stubs (load_mentions, SimpleSourceResolver, updates), PyO3 bindings"
 blockers: []
 
 architecture_spec:
@@ -291,21 +291,24 @@ features:
   F-028-dead-code-cleanup:
     name: "Delete dead compose.rs stub + implement trivial stubs (capabilities, dedup, utils)"
     module: "bundle, session, mentions"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-025-integration-tests"]
     started_at: "2025-01-17T02:50:00Z"
+    completed_at: "2025-01-17T03:10:00Z"
+    commit: "0737b6f"
 
 wave_gate:
   current_wave: 6
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
-  approval_status: "pending"
-  notes: "Wave 6: Hardening -- deterministic ordering, roundtrip correctness, stub cleanup"
+  approval_status: "approved"
+  notes: "Wave 6 COMPLETE: 298 tests (265 unit + 33 integration), 0 clippy warnings, cargo fmt clean, 3 stubs implemented"
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 27
-  last_updated: "2025-01-17T02:50:00Z"
+  total_features_completed: 28
+  last_updated: "2025-01-17T03:10:00Z"
+  last_session: "session-011-wave6-complete"
   last_session: "session-011-wave6-start"

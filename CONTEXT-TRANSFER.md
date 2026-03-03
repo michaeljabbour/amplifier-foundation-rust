@@ -6,6 +6,57 @@
 
 ---
 
+## Session 011 -- Wave 6 COMPLETE (F-026, F-027, F-028)
+
+### Work Completed
+- **F-026-indexmap-agents** (cf9299f): Replaced `HashMap<String, Value>` with `IndexMap<String, Value>` for `Bundle.agents` and `HashMap<String, PathBuf>` with `IndexMap<String, PathBuf>` for `Bundle.context`. This ensures deterministic ordering matching Python dict insertion-order semantics. Updated `parse_agents()`, `parse_context()`, `Bundle::new()`. Added doc comment to `compose()` Strategy 3 noting that `IndexMap::insert` preserves original key position (matches `dict.update()`). 4 new integration tests: agent insertion order, context insertion order, compose agent ordering, compose context ordering.
+- **F-027-to-dict-roundtrip** (c266dd0): Fixed `to_dict()` to produce output compatible with `from_dict()`. All fields (providers, tools, hooks, session, spawn, agents, context, includes) now nested under the `"bundle"` key. Added session, spawn, agents, context, includes serialization that was entirely missing. Context paths serialized as strings via `path.display()`. Doc comment documents roundtrip contract: what survives (all from_dict-readable fields) and what doesn't (instruction, pending_context, base_path, extra, source_uri). Replaced old `test_to_dict_structure` (documented limitation) with `test_to_dict_from_dict_roundtrip` (full content roundtrip assertions) and `test_to_dict_roundtrip_minimal`.
+- **F-028-dead-code-cleanup** (0737b6f): Replaced dead `compose.rs` free-function stub (`todo!()` panic trap) with comment, made module private. Implemented `get_working_dir`/`set_working_dir` in `session/capabilities.rs` (JSON value ops with null coercion). Implemented `ContentDeduplicator` in `mentions/dedup.rs` (SHA-256 hash-based duplicate detection using `HashSet<String>`). Implemented `format_directory_listing` in `mentions/utils.rs` (dirs-first sorting, DIR/FILE labels, symlink-aware via `!is_dir()`). Added `format_directory_listing` re-export to `lib.rs`. 12 new tests.
+
+### Wave 6 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 298 passing (265 unit + 33 integration), 0 ignored, 0 failed
+- MSRV: 1.80 (unchanged from Wave 5)
+- New re-exports: `format_directory_listing` added to lib.rs
+
+### Design Decisions Made
+- **IndexMap for agents and context, HashMap for the rest**: `agents` is serialized in `to_mount_plan()` output YAML, so ordering matters for reproducible diffs. `context` ordering matters for system prompt assembly. `source_base_paths` and `pending_context` are internal-only lookup maps, so HashMap is fine. `BundleRegistry.bundles` could benefit from IndexMap for deterministic `registry.json` output, but left as HashMap for now (noted as follow-up).
+- **to_dict nests everything under "bundle:" key**: The Rust `from_dict()` reads all fields from `data["bundle"]` (Session 008 decision). Python's `from_dict()` reads some fields from top level. The Rust `to_dict()` now matches what Rust `from_dict()` expects, making the Rust ecosystem internally consistent. This intentionally diverges from Python's DiskCache.set() schema.
+- **to_dict does not serialize instruction, pending_context, base_path, extra, source_uri**: These are either set by from_dict to fixed values (instruction=None), internal state (base_path, source_base_paths), or should be resolved before serializing (pending_context). The doc comment documents this explicitly.
+- **Empty Mapping treated as absent in to_dict**: `is_null_or_empty_mapping()` check means `session: {}` is not serialized. On roundtrip, this becomes `Value::Null`. Documented as semantically equivalent, not a bug.
+- **compose.rs made private (mod, not pub mod)**: The free function `compose(_base, _overlay)` was a dead stub from early design. The real 5-strategy compose lives as `Bundle::compose()` in `mod.rs`. Making the module private removes it from the public API surface.
+- **ContentDeduplicator.is_duplicate() is a mutating predicate**: It both checks and tracks in one call (`!seen.insert(hash)`). Python has separate `is_seen()` (pure query) and `add_file()` (mutating). The Rust API is simpler but conflates the two operations. The doc comment warns about this.
+- **format_directory_listing uses !is_dir() not is_file()**: This ensures symlinks-to-directories are listed as DIR (follows Python's `path.is_dir()` which follows symlinks). `is_file()` returns false for symlinks on some platforms.
+- **set_working_dir coerces null to object**: If capabilities JSON is Value::Null (uninitialized), it's promoted to an empty object before insertion. This prevents silent data loss.
+
+### Antagonistic Review Issues Found & Fixed
+- F-026: Added compose ordering tests (agents and context) -- reviewer correctly identified missing coverage for compose path
+- F-026: Added doc comment to compose() Strategy 3 about key position preservation
+- F-027: Strengthened roundtrip assertions to compare full content (not just length) for providers/tools/hooks
+- F-027: Added context and includes to roundtrip test (were missing from test fixture)
+- F-027: Fixed doc comment to accurately describe what survives roundtrip
+- F-028: Fixed set_working_dir silent no-op on null input (was silently swallowing writes)
+- F-028: Fixed format_directory_listing symlink misclassification (was using is_file(), changed to !is_dir())
+- F-028: Made compose module private (was pub mod with zero exports)
+- F-028: Added test for set_working_dir on null input
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-027: pending_context not serialized in to_dict (should be resolved before serializing)
+- F-027: Context path roundtrip contains Windows `:` in path issue (paths with drive letters like `C:\` would be routed to pending_context). Not a concern since project targets Unix.
+- F-028: ContentDeduplicator API is more minimal than Python (missing add_file, get_unique_files, get_known_hashes). Only is_duplicate implemented -- sufficient for current use, can extend later.
+- F-028: format_directory_listing error message says "permission denied" for all read_dir errors. Could distinguish NotFound vs PermissionDenied, but Python has same behavior.
+
+### What's Next
+- All 6 waves complete. 298 tests, 0 clippy warnings, 28 features delivered.
+- Remaining `todo!()` stubs (5): `load_mentions` (mentions/loader.rs), `SimpleSourceResolver` (sources/resolver.rs), `check_bundle_status`/`update_bundle` (updates/mod.rs)
+- Consider: PyO3 bindings (Wave 7 if needed)
+- Consider: BundleRegistry.bundles → IndexMap for deterministic registry.json output
+- Consider: Extend ContentDeduplicator with add_file/get_unique_files methods
+- Consider: Implement HttpSourceHandler.resolve, GitSourceHandler.resolve
+
+---
+
 ## Session 010 -- Wave 5 COMPLETE (F-023, F-024, F-025)
 
 ### Work Completed
