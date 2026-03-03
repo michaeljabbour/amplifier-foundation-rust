@@ -2094,3 +2094,105 @@ async fn test_update_single_bypasses_cache() {
     assert!(state.loaded_at.is_some());
     assert!(state.checked_at.is_some());
 }
+
+// ---------------------------------------------------------------------------
+// Batch-save optimization (F-060)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_record_include_relationships_deferred_does_not_save() {
+    let tmp = tempdir().unwrap();
+    let home = tmp.path().to_path_buf();
+
+    // Register and record deferred relationships
+    {
+        let mut registry = BundleRegistry::new(home.clone());
+        let bundles = HashMap::from([
+            ("parent".to_string(), "file:///parent".to_string()),
+            ("child".to_string(), "file:///child".to_string()),
+        ]);
+        registry.register(&bundles);
+        registry.save(); // persist registration
+
+        let child_names = vec!["child".to_string()];
+        registry.record_include_relationships_deferred("parent", &child_names);
+        // Deferred version does NOT call save() — relationships are in memory only
+    }
+
+    // Load fresh registry — deferred relationships should NOT be persisted
+    {
+        let registry = BundleRegistry::new(home);
+        let parent = registry.find_state("parent").unwrap();
+        assert!(
+            parent.includes.is_empty(),
+            "deferred relationships should NOT be persisted to disk"
+        );
+    }
+}
+
+#[test]
+fn test_record_include_relationships_deferred_then_explicit_save() {
+    let tmp = tempdir().unwrap();
+    let home = tmp.path().to_path_buf();
+
+    // Register, deferred record, then explicit save
+    {
+        let mut registry = BundleRegistry::new(home.clone());
+        let bundles = HashMap::from([
+            ("parent".to_string(), "file:///parent".to_string()),
+            ("child1".to_string(), "file:///child1".to_string()),
+            ("child2".to_string(), "file:///child2".to_string()),
+        ]);
+        registry.register(&bundles);
+
+        // Record two sets of deferred relationships (simulates recursive includes)
+        registry.record_include_relationships_deferred("parent", &["child1".to_string()]);
+        registry.record_include_relationships_deferred("parent", &["child2".to_string()]);
+
+        // Single batch save
+        registry.save();
+    }
+
+    // Fresh registry should see all relationships
+    {
+        let registry = BundleRegistry::new(home);
+        let parent = registry.find_state("parent").unwrap();
+        assert_eq!(parent.includes, vec!["child1", "child2"]);
+
+        let child1 = registry.find_state("child1").unwrap();
+        assert_eq!(child1.included_by, vec!["parent"]);
+
+        let child2 = registry.find_state("child2").unwrap();
+        assert_eq!(child2.included_by, vec!["parent"]);
+    }
+}
+
+#[test]
+fn test_record_include_relationships_still_saves_immediately() {
+    // Backward compat: the non-deferred version still persists immediately
+    let tmp = tempdir().unwrap();
+    let home = tmp.path().to_path_buf();
+
+    {
+        let mut registry = BundleRegistry::new(home.clone());
+        let bundles = HashMap::from([
+            ("parent".to_string(), "file:///parent".to_string()),
+            ("child".to_string(), "file:///child".to_string()),
+        ]);
+        registry.register(&bundles);
+        registry.save();
+
+        registry.record_include_relationships("parent", &["child".to_string()]);
+        // record_include_relationships still calls save() internally
+    }
+
+    {
+        let registry = BundleRegistry::new(home);
+        let parent = registry.find_state("parent").unwrap();
+        assert_eq!(
+            parent.includes,
+            vec!["child"],
+            "non-deferred version should still persist immediately"
+        );
+    }
+}

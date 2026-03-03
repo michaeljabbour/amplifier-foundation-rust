@@ -371,7 +371,9 @@ impl BundleRegistry {
                 return Ok(bundle);
             }
 
-            // Record include relationships in registry state.
+            // Record include relationships in registry state (deferred — no disk write).
+            // The caller (load_single_with_chain) is responsible for calling save()
+            // once after all includes are composed, avoiding O(depth) disk writes.
             // SAFETY: No self.bundles locks are held at this point.
             let parent_name = &bundle.name;
             if !parent_name.is_empty() {
@@ -381,7 +383,7 @@ impl BundleRegistry {
                     .map(|b| b.name.clone())
                     .collect();
                 if !included_names.is_empty() {
-                    self.record_include_relationships(parent_name, &included_names);
+                    self.record_include_relationships_deferred(parent_name, &included_names);
                 }
             }
 

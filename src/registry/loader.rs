@@ -11,8 +11,18 @@ use std::path::Path;
 impl BundleRegistry {
     /// Load a single bundle from a URI.
     /// Handles file:// URIs, subdirectory detection, and includes.
+    ///
+    /// This is the public entry point that triggers a single batch save
+    /// after the entire recursive include tree has been loaded. Internal
+    /// mutations (state updates, include relationships) are deferred
+    /// until this save, avoiding O(depth) disk writes.
     pub async fn load_single(&self, uri: &str) -> crate::error::Result<Bundle> {
-        self.load_single_with_chain(uri, &HashSet::new()).await
+        let bundle = self.load_single_with_chain(uri, &HashSet::new()).await?;
+        // Single batch save after entire recursive tree completes.
+        // Persists: deferred include relationships from compose_includes,
+        // local_path/loaded_at updates from load_single_with_chain.
+        self.save();
+        Ok(bundle)
     }
 
     /// Internal: load with cycle detection chain.
@@ -97,6 +107,9 @@ impl BundleRegistry {
                 new_chain.insert(uri.to_string());
 
                 bundle = self.compose_includes(bundle, &new_chain).await?;
+                // Note: compose_includes uses record_include_relationships_deferred
+                // (no save). The public entry point load_single() is responsible
+                // for a single batch save after the entire recursive tree completes.
             }
 
             // Cache the result

@@ -593,17 +593,20 @@ features:
   F-059-registry-decompose:
     name: "Decompose registry/mod.rs (1,353 lines) into submodules"
     module: "registry"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-058-preload-namespace-bundles"]
     started_at: "2025-01-25T00:00:00Z"
+    completed_at: "2025-01-25T00:30:00Z"
+    commit: "377a411"
 
   F-060-batch-save:
     name: "Batch-save optimization for record_include_relationships"
     module: "registry"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-059-registry-decompose"]
+    started_at: "2025-01-25T00:35:00Z"
 
   F-061-prepared-bundle:
     name: "PreparedBundle struct + _build_bundles_for_resolver + _create_system_prompt_factory"

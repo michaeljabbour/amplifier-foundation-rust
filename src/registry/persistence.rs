@@ -40,13 +40,15 @@ impl BundleRegistry {
         }
     }
 
-    /// Record include relationships between a parent bundle and its children.
+    /// Record include relationships without persisting to disk.
     ///
-    /// Updates the parent's `includes` list and each child's `included_by` list,
-    /// deduplicating entries. Persists the updated state to disk.
+    /// Updates the parent's `includes` list and each child's `included_by` list
+    /// in memory only. The caller is responsible for calling `save()` when ready.
     ///
-    /// Port of Python `_record_include_relationships`.
-    pub fn record_include_relationships(&self, parent_name: &str, child_names: &[String]) {
+    /// This is the batch-optimized version — use when recording multiple
+    /// relationships in a loop (e.g., recursive include loading) followed by
+    /// a single `save()` at the end.
+    pub fn record_include_relationships_deferred(&self, parent_name: &str, child_names: &[String]) {
         {
             let mut bundles = self.bundles.write().unwrap_or_else(|e| e.into_inner());
 
@@ -70,13 +72,22 @@ impl BundleRegistry {
             }
         }
 
-        self.save();
-
         tracing::debug!(
-            "Recorded include relationships: {} includes {:?}",
+            "Recorded include relationships (deferred): {} includes {:?}",
             parent_name,
             child_names
         );
+    }
+
+    /// Record include relationships between a parent bundle and its children.
+    ///
+    /// Updates the parent's `includes` list and each child's `included_by` list,
+    /// deduplicating entries. Persists the updated state to disk immediately.
+    ///
+    /// Port of Python `_record_include_relationships`.
+    pub fn record_include_relationships(&self, parent_name: &str, child_names: &[String]) {
+        self.record_include_relationships_deferred(parent_name, child_names);
+        self.save();
     }
 
     /// Persist registry to disk as JSON.
