@@ -13,7 +13,7 @@
 phase: 5
 phase_name: "Wave 5 -- Integration + Polish"
 epoch: 6
-next_action: "Implement F-023 (cargo fmt clean), F-024 (cargo clippy clean), F-025 (integration tests)"
+next_action: "Wave 5 COMPLETE. All 281 tests passing, 0 clippy warnings, cargo fmt clean. Consider: PyO3 bindings, additional integration tests, documentation"
 blockers: []
 
 architecture_spec:
@@ -263,21 +263,23 @@ features:
   F-025-integration-tests:
     name: "Integration tests (real YAML bundle loading, roundtrip, cross-module)"
     module: "all"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-024-clippy-clean"]
     started_at: "2025-01-17T00:25:00Z"
+    completed_at: "2025-01-17T01:00:00Z"
+    commit: "66c86c4"
 
 wave_gate:
   current_wave: 5
   gate_criteria: "cargo fmt --check clean + cargo clippy --all-targets zero warnings + integration tests pass + all 265+ tests pass"
   approval_required: false
-  approval_status: "pending"
-  notes: "Wave 5 starting: 265 tests passing, 104 clippy warnings, 31 files need formatting"
+  approval_status: "approved"
+  notes: "Wave 5 COMPLETE: 281 tests (265 unit + 16 integration), 0 clippy warnings, cargo fmt clean, MSRV 1.80"
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 22
-  last_updated: "2025-01-17T00:00:00Z"
-  last_session: "session-010-wave5-start"
+  total_features_completed: 25
+  last_updated: "2025-01-17T01:00:00Z"
+  last_session: "session-010-wave5-complete"

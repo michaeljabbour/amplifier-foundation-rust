@@ -6,6 +6,70 @@
 
 ---
 
+## Session 010 -- Wave 5 COMPLETE (F-023, F-024, F-025)
+
+### Work Completed
+- **F-023-fmt-clean** (4096b48): Ran `cargo fmt` across entire codebase. 33 files changed (569 insertions, 520 deletions). `cargo fmt --check` now returns clean.
+- **F-024-clippy-clean** (8dfa507): Eliminated all 104 clippy warnings:
+  - Bumped MSRV from 1.75 to 1.80 (LazyLock stable since 1.80), eliminating 27 `incompatible_msrv` warnings
+  - Auto-fixed 68 `needless_borrows_for_generic_args` across lib + tests
+  - Fixed `unwrap` after `is_some` in `bundle/mod.rs` (changed to `if let`)
+  - Suppressed `dead_code` on unimplemented stub fields (`ContentDeduplicator.seen`, `SimpleSourceResolver.handlers`)
+  - Fixed `len_zero` and `redundant_closure` warnings
+  - `cargo clippy --all-targets` now reports 0 warnings
+- **F-025-integration-tests** (66c86c4): Added 16 cross-module integration tests in `tests/integration.rs` with 5 YAML/MD fixture files in `tests/fixtures/`:
+  - Load real YAML bundles from fixture files (full, minimal, registry-format)
+  - Load markdown bundle with frontmatter → Bundle with instruction
+  - Cross-module pipeline: YAML → from_dict → compose → to_mount_plan → validate
+  - Mount plan YAML serialization roundtrip
+  - DiskCache + SimpleCache with real mount plan data
+  - Validator with real full/minimal bundles
+  - deep_merge with real session configs
+  - Registry-style YAML loading (wrapping in {"bundle": raw})
+  - Compose sequence replacement (deep_merge replaces arrays, child wins)
+  - Compose non-commutativity (order matters)
+  - to_dict structure documentation test (known roundtrip limitation)
+
+### Wave 5 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 281 passing (265 unit + 16 integration), 0 ignored, 0 failed
+- MSRV: 1.80 (bumped from 1.75)
+- Fixtures: 5 files in tests/fixtures/ (full-bundle.yaml, child-bundle.yaml, minimal.yaml, registry-format.yaml, bundle.md)
+
+### Design Decisions Made
+- **MSRV 1.80**: Bumped from 1.75. LazyLock (used in tracing_utils, mentions/parser) is stable since 1.80. This eliminates all MSRV-related clippy warnings. No features from 1.76-1.80 are used beyond LazyLock.
+- **Dead code suppression for stubs**: `ContentDeduplicator.seen` and `SimpleSourceResolver.handlers` are fields in unimplemented stub structs (todo!() bodies). Suppressed with `#[allow(dead_code)]` rather than removing them since they'll be needed when the stubs are implemented.
+- **Registry-format vs from_dict-format YAML**: Integration tests revealed two distinct YAML formats:
+  - **from_dict format**: Everything nested under `bundle:` key (`{"bundle": {"name": ..., "providers": [...], ...}}`)
+  - **Registry format**: Fields at top level (`{"name": ..., "providers": [...], ...}`) — the registry wraps this in `{"bundle": raw}` before calling from_dict
+  - Fixture files use the appropriate format for their test path
+- **to_dict roundtrip is known broken**: `to_dict()` puts providers/tools at the TOP level, but `from_dict()` expects them under "bundle:" key. Added a test documenting this structure. Not a regression — documented in Session 008.
+- **Compose sequence replacement confirmed**: deep_merge replaces arrays entirely (child wins). Child's `allowed_paths: ["/workspace"]` replaces base's `["/home/user/projects", "/tmp"]`. Integration test verifies this critical semantic.
+- **HashMap agents non-determinism acknowledged**: `Bundle.agents` uses `HashMap<String, Value>`, so mount plan agent ordering is non-deterministic across instances. This is a known limitation from Session 008. Did NOT add a cross-instance determinism test because it would be flaky.
+
+### Antagonistic Review Issues Found & Fixed
+- Changed compose provider/tool count assertions from `>=` to exact `==` counts (was hiding potential duplicate bugs)
+- Replaced sham mount plan determinism test with compose sequence replacement test (original tested same-instance which is trivially deterministic)
+- Added compose non-commutativity test (verifying order matters)
+- Added to_dict structure documentation test (exposing known roundtrip limitation)
+- Strengthened three-way compose test to verify individual tools survive composition
+
+### Antagonistic Review Issues Noted (Not Fixed — By Design)
+- `BundleRegistry::load_yaml_bundle` and `load_markdown_bundle` are private methods, so integration tests simulate the wrapping behavior rather than calling registry methods directly
+- No error path integration tests (unit tests in test_bundle.rs cover malformed input; adding integration error tests would duplicate unit test coverage)
+- No async integration tests (registry load_single is async; current integration tests are all sync)
+
+### What's Next
+- All 5 waves complete. Project is in maintenance/extension mode.
+- Consider: PyO3 bindings (Wave 6 if needed)
+- Consider: Additional integration tests for async paths (registry.load_single)
+- Consider: Make Bundle.agents use IndexMap for deterministic mount plan ordering
+- Consider: Fix to_dict/from_dict roundtrip (align nesting structure)
+- Consider: Implement remaining stubs (ContentDeduplicator, SimpleSourceResolver, HttpSourceHandler.resolve, GitSourceHandler.resolve)
+
+---
+
 ## Session 009 -- Wave 4 COMPLETE (F-021, F-022)
 
 ### Work Completed
