@@ -1293,3 +1293,292 @@ fn test_extract_bundle_name_plain() {
     let name = extract_bundle_name("some/path@v1.0#sub");
     assert_eq!(name, "path");
 }
+
+// ===========================================================================
+// record_include_relationships tests (F-054)
+// ===========================================================================
+
+#[test]
+fn test_record_include_relationships_basic() {
+    let tmp = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
+
+    // Register parent and two children
+    let bundles = HashMap::from([
+        ("parent".to_string(), "file:///parent".to_string()),
+        ("child-a".to_string(), "file:///child-a".to_string()),
+        ("child-b".to_string(), "file:///child-b".to_string()),
+    ]);
+    registry.register(&bundles);
+
+    let child_names = vec!["child-a".to_string(), "child-b".to_string()];
+    registry.record_include_relationships("parent", &child_names);
+
+    // Parent should have both children in includes
+    let parent = registry.find_state("parent").unwrap();
+    assert_eq!(parent.includes, vec!["child-a", "child-b"]);
+
+    // Each child should have parent in included_by
+    let child_a = registry.find_state("child-a").unwrap();
+    assert_eq!(child_a.included_by, vec!["parent"]);
+
+    let child_b = registry.find_state("child-b").unwrap();
+    assert_eq!(child_b.included_by, vec!["parent"]);
+}
+
+#[test]
+fn test_record_include_relationships_dedup() {
+    let tmp = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
+
+    let bundles = HashMap::from([
+        ("parent".to_string(), "file:///parent".to_string()),
+        ("child-a".to_string(), "file:///child-a".to_string()),
+    ]);
+    registry.register(&bundles);
+
+    let child_names = vec!["child-a".to_string()];
+
+    // Call twice with the same names
+    registry.record_include_relationships("parent", &child_names);
+    registry.record_include_relationships("parent", &child_names);
+
+    // Should NOT have duplicates
+    let parent = registry.find_state("parent").unwrap();
+    assert_eq!(parent.includes, vec!["child-a"]);
+    assert_eq!(
+        parent.includes.len(),
+        1,
+        "includes should not have duplicates"
+    );
+
+    let child_a = registry.find_state("child-a").unwrap();
+    assert_eq!(child_a.included_by, vec!["parent"]);
+    assert_eq!(
+        child_a.included_by.len(),
+        1,
+        "included_by should not have duplicates"
+    );
+}
+
+#[test]
+fn test_record_include_relationships_persists() {
+    let tmp = tempdir().unwrap();
+    let home = tmp.path().to_path_buf();
+
+    // Register and record relationships
+    {
+        let mut registry = BundleRegistry::new(home.clone());
+        let bundles = HashMap::from([
+            ("parent".to_string(), "file:///parent".to_string()),
+            ("child".to_string(), "file:///child".to_string()),
+        ]);
+        registry.register(&bundles);
+        registry.save(); // persist the registration first
+
+        let child_names = vec!["child".to_string()];
+        registry.record_include_relationships("parent", &child_names);
+        // record_include_relationships calls save() internally
+    }
+
+    // Load a fresh registry from disk and verify state was persisted
+    {
+        let registry = BundleRegistry::new(home);
+
+        let parent = registry.find_state("parent").unwrap();
+        assert_eq!(
+            parent.includes,
+            vec!["child"],
+            "includes should be persisted to disk"
+        );
+
+        let child = registry.find_state("child").unwrap();
+        assert_eq!(
+            child.included_by,
+            vec!["parent"],
+            "included_by should be persisted to disk"
+        );
+    }
+}
+
+#[test]
+fn test_record_include_relationships_missing_parent() {
+    // Parent not in registry — children should still be updated
+    let tmp = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
+
+    // Only register the child, not the parent
+    let bundles = HashMap::from([("child".to_string(), "file:///child".to_string())]);
+    registry.register(&bundles);
+
+    let child_names = vec!["child".to_string()];
+    registry.record_include_relationships("nonexistent-parent", &child_names);
+
+    // Child should still get the included_by entry
+    let child = registry.find_state("child").unwrap();
+    assert_eq!(child.included_by, vec!["nonexistent-parent"]);
+
+    // Parent should not have been created
+    assert!(
+        registry.find_state("nonexistent-parent").is_none(),
+        "Missing parent should NOT be auto-created"
+    );
+}
+
+#[test]
+fn test_record_include_relationships_missing_child() {
+    // Child not in registry — parent should still be updated
+    let tmp = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
+
+    // Only register the parent, not the child
+    let bundles = HashMap::from([("parent".to_string(), "file:///parent".to_string())]);
+    registry.register(&bundles);
+
+    let child_names = vec!["nonexistent-child".to_string()];
+    registry.record_include_relationships("parent", &child_names);
+
+    // Parent should still get the includes entry
+    let parent = registry.find_state("parent").unwrap();
+    assert_eq!(parent.includes, vec!["nonexistent-child"]);
+
+    // Child should not have been created
+    assert!(
+        registry.find_state("nonexistent-child").is_none(),
+        "Missing child should NOT be auto-created"
+    );
+}
+
+// ===========================================================================
+// compose_includes enhanced tests (F-054)
+// ===========================================================================
+
+#[tokio::test]
+async fn test_compose_includes_dict_style() {
+    // compose_includes should handle {"bundle": "..."} includes via parse_include
+    let tmp = tempdir().unwrap();
+    let root = tmp.path();
+
+    // Create the parent bundle directory
+    let parent_dir = root.join("parent-bundle");
+    fs::create_dir_all(&parent_dir).unwrap();
+
+    // Create the child bundle directory
+    let child_dir = root.join("child-bundle");
+    fs::create_dir_all(&child_dir).unwrap();
+    write_simple_bundle_yaml(&child_dir, "child-bundle");
+
+    // Write parent bundle.yaml that includes the child via dict-style {"bundle": "file://..."}
+    let child_uri = format!("file://{}", child_dir.display());
+    let content = format!(
+        "name: parent-bundle\nversion: \"1.0.0\"\nincludes:\n  - bundle: \"{}\"\n",
+        child_uri
+    );
+    write_bundle_yaml(&parent_dir, &content);
+
+    let parent_uri = format!("file://{}", parent_dir.display());
+
+    let registry = BundleRegistry::new(root.to_path_buf());
+    let result = registry.load_single(&parent_uri).await;
+
+    assert!(
+        result.is_ok(),
+        "Dict-style include should load: {:?}",
+        result.err()
+    );
+    let bundle = result.unwrap();
+    // The composed bundle should have the parent's name (bundle on top wins)
+    assert_eq!(bundle.name, "parent-bundle");
+}
+
+#[tokio::test]
+async fn test_compose_includes_with_resolve() {
+    // compose_includes should resolve namespace:path includes via resolve_include_source
+    let tmp = tempdir().unwrap();
+    let root = tmp.path();
+
+    // Create the namespace root bundle
+    let ns_dir = root.join("my-namespace");
+    fs::create_dir_all(&ns_dir).unwrap();
+    write_simple_bundle_yaml(&ns_dir, "my-namespace");
+
+    // Create a skill bundle inside the namespace
+    let skill_dir = ns_dir.join("skills").join("coding");
+    fs::create_dir_all(&skill_dir).unwrap();
+    write_simple_bundle_yaml(&skill_dir, "coding");
+
+    // Create the parent bundle that uses namespace:path include
+    let parent_dir = root.join("parent-bundle");
+    fs::create_dir_all(&parent_dir).unwrap();
+
+    // The include uses namespace:path syntax
+    let content =
+        "name: parent-bundle\nversion: \"1.0.0\"\nincludes:\n  - \"my-namespace:skills/coding\"\n";
+    write_bundle_yaml(&parent_dir, content);
+
+    // Set up the registry with the namespace registered and local_path set
+    let mut registry = BundleRegistry::new(root.to_path_buf());
+    register_one(&mut registry, "my-namespace", "file:///original");
+    registry.get_state("my-namespace").local_path = Some(ns_dir.to_string_lossy().to_string());
+
+    let parent_uri = format!("file://{}", parent_dir.display());
+    let result = registry.load_single(&parent_uri).await;
+
+    assert!(
+        result.is_ok(),
+        "Namespace:path include should resolve and load: {:?}",
+        result.err()
+    );
+    let bundle = result.unwrap();
+    assert_eq!(bundle.name, "parent-bundle");
+}
+
+#[tokio::test]
+async fn test_compose_includes_registered_namespace_missing_path_is_error() {
+    // When resolve_include_source returns None for a namespace:path include
+    // where the namespace IS registered, this should be a DependencyError,
+    // not a silent skip. Matches Python behavior.
+    let tmp = tempdir().unwrap();
+    let root = tmp.path();
+
+    // Create a namespace with local_path but NO resource at the included path
+    let ns_dir = root.join("my-namespace");
+    fs::create_dir_all(&ns_dir).unwrap();
+    write_simple_bundle_yaml(&ns_dir, "my-namespace");
+
+    // Create parent bundle that includes a nonexistent path in the namespace
+    let parent_dir = root.join("parent-bundle");
+    fs::create_dir_all(&parent_dir).unwrap();
+    let content = "name: parent-bundle\nversion: \"1.0.0\"\nincludes:\n  - \"my-namespace:nonexistent/path\"\n";
+    write_bundle_yaml(&parent_dir, content);
+
+    let mut registry = BundleRegistry::new(root.to_path_buf());
+    register_one(&mut registry, "my-namespace", "file:///original");
+    registry.get_state("my-namespace").local_path = Some(ns_dir.to_string_lossy().to_string());
+
+    let parent_uri = format!("file://{}", parent_dir.display());
+    let result = registry.load_single(&parent_uri).await;
+
+    assert!(
+        result.is_err(),
+        "Registered namespace with missing path should be an error"
+    );
+    let err = result.unwrap_err();
+    match err {
+        amplifier_foundation::BundleError::DependencyError(msg) => {
+            assert!(
+                msg.contains("my-namespace"),
+                "Error should mention the namespace: {}",
+                msg
+            );
+            assert!(
+                msg.contains("nonexistent/path"),
+                "Error should mention the path: {}",
+                msg
+            );
+        }
+        other => {
+            panic!("Expected DependencyError, got: {:?}", other);
+        }
+    }
+}

@@ -367,6 +367,41 @@ impl BundleRegistry {
         }
     }
 
+    /// Record include relationships between a parent bundle and its children.
+    ///
+    /// Updates the parent's `includes` list and each child's `included_by` list,
+    /// deduplicating entries. Persists the updated state to disk.
+    ///
+    /// Port of Python `_record_include_relationships`.
+    pub fn record_include_relationships(&mut self, parent_name: &str, child_names: &[String]) {
+        // Update parent's includes list
+        if let Some(parent_state) = self.bundles.get_mut(parent_name) {
+            for child_name in child_names {
+                if !parent_state.includes.contains(child_name) {
+                    parent_state.includes.push(child_name.clone());
+                }
+            }
+        }
+
+        // Update each child's included_by list
+        let parent_owned = parent_name.to_string();
+        for child_name in child_names {
+            if let Some(child_state) = self.bundles.get_mut(child_name) {
+                if !child_state.included_by.contains(&parent_owned) {
+                    child_state.included_by.push(parent_owned.clone());
+                }
+            }
+        }
+
+        self.save();
+
+        tracing::debug!(
+            "Recorded include relationships: {} includes {:?}",
+            parent_name,
+            child_names
+        );
+    }
+
     /// Persist registry to disk as JSON.
     pub fn save(&self) {
         let _ = std::fs::create_dir_all(&self.home);
@@ -734,6 +769,22 @@ impl BundleRegistry {
     }
 
     /// Compose a bundle with its includes.
+    ///
+    /// Two-phase approach matching Python's `_compose_includes`:
+    /// - **Phase 1:** Parse and resolve all include sources (using `parse_include`
+    ///   and `resolve_include_source`)
+    /// - **Phase 2:** Load all resolved includes sequentially
+    ///
+    /// Note: Python loads includes in parallel via `asyncio.gather`. This Rust
+    /// implementation loads sequentially. Parallelism can be added later with
+    /// `futures::join_all` if needed.
+    ///
+    /// **Known limitation:** `record_include_relationships` is not called
+    /// automatically during composition because `compose_includes` takes `&self`
+    /// while `record_include_relationships` requires `&mut self`. Callers with
+    /// `&mut self` access should call `record_include_relationships` after loading
+    /// to persist the include graph. This matches the architectural constraint
+    /// that the load pipeline uses `&self` for the cache `Mutex` pattern.
     fn compose_includes<'a>(
         &'a self,
         bundle: Bundle,
@@ -742,16 +793,48 @@ impl BundleRegistry {
     {
         Box::pin(async move {
             let includes = bundle.includes.clone();
-            let mut loaded_includes: Vec<Bundle> = Vec::new();
 
+            // Phase 1: Parse and resolve all include sources
+            let mut include_sources: Vec<String> = Vec::new();
             for include in &includes {
-                let include_uri = match include.as_str() {
-                    Some(uri) => uri.to_string(),
-                    None => continue,
+                let source = match parse_include(include) {
+                    Some(s) => s,
+                    None => {
+                        tracing::debug!("Skipping unparseable include: {:?}", include);
+                        continue;
+                    }
                 };
 
+                match self.resolve_include_source(&source) {
+                    Some(uri) => include_sources.push(uri),
+                    None => {
+                        // Distinguish: namespace exists but path not found (error)
+                        // vs namespace not registered (optional skip)
+                        if source.contains(':') && !source.contains("://") {
+                            let namespace = source.split(':').next().unwrap_or("");
+                            if self.bundles.get(namespace).is_some() {
+                                return Err(crate::error::BundleError::DependencyError(
+                                    format!(
+                                        "Include resolution failed: '{}'. Namespace '{}' is registered but the path doesn't exist.",
+                                        source, namespace
+                                    ),
+                                ));
+                            }
+                        }
+                        tracing::warn!("Include skipped (unregistered namespace): {}", source);
+                    }
+                }
+            }
+
+            if include_sources.is_empty() {
+                return Ok(bundle);
+            }
+
+            // Phase 2: Load all resolved includes
+            let mut loaded_includes: Vec<Bundle> = Vec::new();
+            for include_uri in &include_sources {
                 match self
-                    .load_single_with_chain(&include_uri, loading_chain)
+                    .load_single_with_chain(include_uri, loading_chain)
                     .await
                 {
                     Ok(included_bundle) => {
@@ -761,7 +844,7 @@ impl BundleRegistry {
                         tracing::warn!("Skipping circular dependency: {}", msg);
                     }
                     Err(e) => {
-                        tracing::warn!("Failed to load include {}: {}", include_uri, e);
+                        tracing::warn!("Failed to load include '{}': {}", include_uri, e);
                     }
                 }
             }

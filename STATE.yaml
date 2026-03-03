@@ -535,17 +535,20 @@ features:
   F-053-include-resolution-helpers:
     name: "Port registry include resolution helpers (parse_include, find_resource_path, resolve_include_source, extract_bundle_name)"
     module: "registry"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-020-registry"]
     started_at: "2025-01-23T00:00:00Z"
+    completed_at: "2025-01-23T00:45:00Z"
+    commit: "e864dae"
 
   F-054-record-include-relationships:
     name: "Port record_include_relationships + enhance compose_includes with namespace resolution"
     module: "registry"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-053-include-resolution-helpers"]
+    started_at: "2025-01-23T00:50:00Z"
 
   F-055-registry-update-lifecycle:
     name: "Port BundleRegistry check_update/update lifecycle methods"
