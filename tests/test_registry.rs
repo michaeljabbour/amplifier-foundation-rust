@@ -1449,6 +1449,34 @@ fn test_record_include_relationships_missing_child() {
     );
 }
 
+#[test]
+fn test_record_include_relationships_shared_ref() {
+    // Verify record_include_relationships works with &self (shared reference),
+    // which is the key goal of the RwLock refactor (F-056).
+    let tmp = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
+
+    let bundles = HashMap::from([
+        ("parent".to_string(), "file:///parent".to_string()),
+        ("child-a".to_string(), "file:///child-a".to_string()),
+        ("child-b".to_string(), "file:///child-b".to_string()),
+    ]);
+    registry.register(&bundles);
+
+    // Call through a shared reference — the whole point of the RwLock change
+    let registry_ref: &BundleRegistry = &registry;
+    registry_ref
+        .record_include_relationships("parent", &["child-a".to_string(), "child-b".to_string()]);
+
+    // Verify relationships were recorded
+    let parent = registry.find_state("parent").unwrap();
+    assert_eq!(parent.includes, vec!["child-a", "child-b"]);
+    let child_a = registry.find_state("child-a").unwrap();
+    assert_eq!(child_a.included_by, vec!["parent"]);
+    let child_b = registry.find_state("child-b").unwrap();
+    assert_eq!(child_b.included_by, vec!["parent"]);
+}
+
 // ===========================================================================
 // compose_includes enhanced tests (F-054)
 // ===========================================================================

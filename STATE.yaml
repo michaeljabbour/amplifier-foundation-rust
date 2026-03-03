@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 15
-phase_name: "Wave 15 -- Registry namespace resolution and update lifecycle"
-epoch: 16
-next_action: "Wave 15 COMPLETE. 570 tests passing, 0 clippy warnings, cargo fmt clean. Consider: wrapping bundles in RwLock for auto record_include_relationships during load, _preload_namespace_bundles, PreparedBundle port, PyO3 bindings"
+phase: 16
+phase_name: "Wave 16 -- Registry interior mutability, auto-wiring, namespace preload"
+epoch: 17
+next_action: "Implement F-056 (RwLock refactor), F-057 (auto-record includes), F-058 (preload namespace bundles)"
 blockers: []
 
 architecture_spec:
@@ -562,16 +562,36 @@ features:
     completed_at: "2025-01-23T02:15:00Z"
     commit: "c71a7d5"
 
+  F-056-rwlock-bundles:
+    name: "Wrap BundleRegistry.bundles in RwLock for interior mutability"
+    module: "registry"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-020-registry"]
+    started_at: "2025-01-24T00:00:00Z"
+  F-057-auto-record-includes:
+    name: "Auto-call record_include_relationships from compose_includes via RwLock"
+    module: "registry"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-056-rwlock-bundles"]
+  F-058-preload-namespace-bundles:
+    name: "Port _preload_namespace_bundles for cold-start namespace resolution"
+    module: "registry"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-056-rwlock-bundles"]
+
 wave_gate:
-  current_wave: 15
+  current_wave: 16
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
-  approval_status: "approved"
-  notes: "Wave 15 COMPLETE: 570 tests, 0 clippy warnings, cargo fmt clean. Registry namespace resolution: parse_include, find_resource_path, resolve_include_source, record_include_relationships, check_update, update lifecycle."
+  approval_status: "pending"
+  notes: "Wave 16: Registry interior mutability + auto-wiring + namespace preload"
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
   total_features_completed: 55
-  last_updated: "2025-01-23T02:15:00Z"
-  last_session: "session-020-wave15-registry-ns"
+  last_updated: "2025-01-24T00:00:00Z"
+  last_session: "session-021-wave16-registry-rwlock"

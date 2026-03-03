@@ -240,7 +240,7 @@ impl BundleState {
 /// serialized output (registry.json). Insertion order is preserved.
 pub struct BundleRegistry {
     home: PathBuf,
-    bundles: IndexMap<String, BundleState>,
+    bundles: std::sync::RwLock<IndexMap<String, BundleState>>,
     cache: std::sync::Mutex<HashMap<String, Bundle>>,
 }
 
@@ -248,7 +248,7 @@ impl BundleRegistry {
     pub fn new(home: PathBuf) -> Self {
         let mut registry = BundleRegistry {
             home,
-            bundles: IndexMap::new(),
+            bundles: std::sync::RwLock::new(IndexMap::new()),
             cache: std::sync::Mutex::new(HashMap::new()),
         };
         registry.load_persisted_state();
@@ -258,12 +258,12 @@ impl BundleRegistry {
     /// Register bundles by name→URI mapping.
     /// Does NOT persist -- caller must call save().
     pub fn register(&mut self, bundles: &HashMap<String, String>) {
+        let map = self.bundles.get_mut().unwrap_or_else(|e| e.into_inner());
         for (name, uri) in bundles {
-            if let Some(existing) = self.bundles.get_mut(name) {
+            if let Some(existing) = map.get_mut(name) {
                 existing.uri = uri.clone();
             } else {
-                self.bundles
-                    .insert(name.clone(), BundleState::new(name, uri));
+                map.insert(name.clone(), BundleState::new(name, uri));
             }
         }
     }
@@ -272,21 +272,22 @@ impl BundleRegistry {
     /// Performs bidirectional relationship cleanup.
     /// Does NOT persist -- caller must call save().
     pub fn unregister(&mut self, name: &str) -> bool {
-        let state = match self.bundles.shift_remove(name) {
+        let map = self.bundles.get_mut().unwrap_or_else(|e| e.into_inner());
+        let state = match map.shift_remove(name) {
             Some(s) => s,
             None => return false,
         };
 
         // Clean up forward refs: remove name from each child's included_by
         for child_name in &state.includes {
-            if let Some(child) = self.bundles.get_mut(child_name) {
+            if let Some(child) = map.get_mut(child_name) {
                 child.included_by.retain(|n| n != name);
             }
         }
 
         // Clean up backward refs: remove name from each parent's includes
         for parent_name in &state.included_by {
-            if let Some(parent) = self.bundles.get_mut(parent_name) {
+            if let Some(parent) = map.get_mut(parent_name) {
                 parent.includes.retain(|n| n != name);
             }
         }
@@ -298,12 +299,22 @@ impl BundleRegistry {
     ///
     /// Returns the URI string if found, or `None` if not registered.
     pub fn find(&self, name: &str) -> Option<String> {
-        self.bundles.get(name).map(|state| state.uri.clone())
+        self.bundles
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(name)
+            .map(|state| state.uri.clone())
     }
 
     /// List all registered bundle names (sorted).
     pub fn list_registered(&self) -> Vec<String> {
-        let mut names: Vec<String> = self.bundles.keys().cloned().collect();
+        let mut names: Vec<String> = self
+            .bundles
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .keys()
+            .cloned()
+            .collect();
         names.sort();
         names
     }
@@ -312,27 +323,35 @@ impl BundleRegistry {
     /// Creates a default state if the name isn't registered.
     pub fn get_state(&mut self, name: &str) -> &mut BundleState {
         self.bundles
+            .get_mut()
+            .unwrap_or_else(|e| e.into_inner())
             .entry(name.to_string())
             .or_insert_with(|| BundleState::new(name, ""))
     }
 
-    /// Get all tracked states as a name → BundleState map (read-only reference).
+    /// Get all tracked states as a name → BundleState map (cloned snapshot).
     ///
     /// Matches Python's `get_state(None)` which returns `dict(self._registry)`.
-    ///
-    /// **Divergence from Python:** Returns a reference to the internal map,
-    /// not a shallow copy. Mutations require going through `get_state()`.
-    pub fn get_all_states(&self) -> &IndexMap<String, BundleState> {
-        &self.bundles
+    /// Returns a cloned snapshot of the internal map. Mutations require going
+    /// through `get_state()`.
+    pub fn get_all_states(&self) -> IndexMap<String, BundleState> {
+        self.bundles
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 
-    /// Get immutable reference to a bundle's state.
+    /// Get a cloned snapshot of a bundle's state.
     ///
     /// Returns `None` if the name isn't registered. Unlike `get_state()`,
     /// this does not create a default entry. Matches Python's
     /// `get_state(name)` which returns `self._registry.get(name)`.
-    pub fn find_state(&self, name: &str) -> Option<&BundleState> {
-        self.bundles.get(name)
+    pub fn find_state(&self, name: &str) -> Option<BundleState> {
+        self.bundles
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(name)
+            .cloned()
     }
 
     /// Clear stale `local_path` references from registry entries.
@@ -343,26 +362,30 @@ impl BundleRegistry {
     ///
     /// Persists the cleanup if any stale entries were found.
     pub fn validate_cached_paths(&mut self) {
-        let stale_names: Vec<String> = self
-            .bundles
-            .iter()
-            .filter_map(|(name, state)| {
-                if let Some(ref lp) = state.local_path {
-                    if !std::path::Path::new(lp).exists() {
-                        tracing::info!("Clearing stale cache reference for '{}'", name);
-                        return Some(name.clone());
+        let has_stale = {
+            let bundles = self.bundles.get_mut().unwrap_or_else(|e| e.into_inner());
+            let stale_names: Vec<String> = bundles
+                .iter()
+                .filter_map(|(name, state)| {
+                    if let Some(ref lp) = state.local_path {
+                        if !std::path::Path::new(lp).exists() {
+                            tracing::info!("Clearing stale cache reference for '{}'", name);
+                            return Some(name.clone());
+                        }
                     }
-                }
-                None
-            })
-            .collect();
+                    None
+                })
+                .collect();
 
-        if !stale_names.is_empty() {
             for name in &stale_names {
-                if let Some(state) = self.bundles.get_mut(name) {
+                if let Some(state) = bundles.get_mut(name) {
                     state.local_path = None;
                 }
             }
+            !stale_names.is_empty()
+        };
+
+        if has_stale {
             self.save();
         }
     }
@@ -373,22 +396,26 @@ impl BundleRegistry {
     /// deduplicating entries. Persists the updated state to disk.
     ///
     /// Port of Python `_record_include_relationships`.
-    pub fn record_include_relationships(&mut self, parent_name: &str, child_names: &[String]) {
-        // Update parent's includes list
-        if let Some(parent_state) = self.bundles.get_mut(parent_name) {
-            for child_name in child_names {
-                if !parent_state.includes.contains(child_name) {
-                    parent_state.includes.push(child_name.clone());
+    pub fn record_include_relationships(&self, parent_name: &str, child_names: &[String]) {
+        {
+            let mut bundles = self.bundles.write().unwrap_or_else(|e| e.into_inner());
+
+            // Update parent's includes list
+            if let Some(parent_state) = bundles.get_mut(parent_name) {
+                for child_name in child_names {
+                    if !parent_state.includes.contains(child_name) {
+                        parent_state.includes.push(child_name.clone());
+                    }
                 }
             }
-        }
 
-        // Update each child's included_by list
-        let parent_owned = parent_name.to_string();
-        for child_name in child_names {
-            if let Some(child_state) = self.bundles.get_mut(child_name) {
-                if !child_state.included_by.contains(&parent_owned) {
-                    child_state.included_by.push(parent_owned.clone());
+            // Update each child's included_by list
+            let parent_owned = parent_name.to_string();
+            for child_name in child_names {
+                if let Some(child_state) = bundles.get_mut(child_name) {
+                    if !child_state.included_by.contains(&parent_owned) {
+                        child_state.included_by.push(parent_owned.clone());
+                    }
                 }
             }
         }
@@ -408,8 +435,11 @@ impl BundleRegistry {
         let registry_path = self.home.join("registry.json");
 
         let mut bundles_map = serde_json::Map::new();
-        for (name, state) in &self.bundles {
-            bundles_map.insert(name.clone(), state.to_dict());
+        {
+            let bundles = self.bundles.read().unwrap_or_else(|e| e.into_inner());
+            for (name, state) in bundles.iter() {
+                bundles_map.insert(name.clone(), state.to_dict());
+            }
         }
 
         let data = serde_json::json!({
@@ -440,9 +470,9 @@ impl BundleRegistry {
         };
 
         if let Some(bundles) = data.get("bundles").and_then(|v| v.as_object()) {
+            let map = self.bundles.get_mut().unwrap_or_else(|e| e.into_inner());
             for (name, bundle_data) in bundles {
-                self.bundles
-                    .insert(name.clone(), BundleState::from_dict(name, bundle_data));
+                map.insert(name.clone(), BundleState::from_dict(name, bundle_data));
             }
         }
     }
@@ -509,13 +539,21 @@ impl BundleRegistry {
         if source.contains(':') {
             let (namespace, rel_path) = source.split_once(':')?;
 
-            let state = self.bundles.get(namespace)?;
+            // Clone needed fields from BundleState and drop the read lock
+            // before any filesystem I/O (find_resource_path does Path::exists,
+            // fs::canonicalize, etc.). This prevents holding the lock during
+            // blocking syscalls.
+            let (state_uri, state_local_path) = {
+                let bundles = self.bundles.read().unwrap_or_else(|e| e.into_inner());
+                let state = bundles.get(namespace)?;
+                (state.uri.clone(), state.local_path.clone())
+            };
 
             // Branch A: Git-based namespace (URI starts with "git+")
-            if state.uri.starts_with("git+") {
-                let base_uri = state.uri.split('#').next().unwrap_or(&state.uri);
+            if state_uri.starts_with("git+") {
+                let base_uri = state_uri.split('#').next().unwrap_or(&state_uri);
 
-                if let Some(ref local_path) = state.local_path {
+                if let Some(ref local_path) = state_local_path {
                     // local_path exists — try to find resource on disk
                     let namespace_path = Path::new(local_path);
                     let resource_path = if namespace_path.is_file() {
@@ -564,7 +602,7 @@ impl BundleRegistry {
             }
 
             // Branch B: Non-git namespace — fall back to file:// path
-            if let Some(ref local_path) = state.local_path {
+            if let Some(ref local_path) = state_local_path {
                 let namespace_path = Path::new(local_path);
                 let resource_path = if namespace_path.is_file() {
                     namespace_path
@@ -779,12 +817,9 @@ impl BundleRegistry {
     /// implementation loads sequentially. Parallelism can be added later with
     /// `futures::join_all` if needed.
     ///
-    /// **Known limitation:** `record_include_relationships` is not called
-    /// automatically during composition because `compose_includes` takes `&self`
-    /// while `record_include_relationships` requires `&mut self`. Callers with
-    /// `&mut self` access should call `record_include_relationships` after loading
-    /// to persist the include graph. This matches the architectural constraint
-    /// that the load pipeline uses `&self` for the cache `Mutex` pattern.
+    /// `record_include_relationships` now takes `&self` (using `RwLock` for
+    /// interior mutability on `bundles`) and can be called from within
+    /// `compose_includes` when auto-wiring is implemented.
     fn compose_includes<'a>(
         &'a self,
         bundle: Bundle,
@@ -812,7 +847,13 @@ impl BundleRegistry {
                         // vs namespace not registered (optional skip)
                         if source.contains(':') && !source.contains("://") {
                             let namespace = source.split(':').next().unwrap_or("");
-                            if self.bundles.get(namespace).is_some() {
+                            if self
+                                .bundles
+                                .read()
+                                .unwrap_or_else(|e| e.into_inner())
+                                .get(namespace)
+                                .is_some()
+                            {
                                 return Err(crate::error::BundleError::DependencyError(
                                     format!(
                                         "Include resolution failed: '{}'. Namespace '{}' is registered but the path doesn't exist.",
@@ -884,9 +925,19 @@ impl BundleRegistry {
     ///
     /// Port of Python `_check_update_single`.
     pub async fn check_update_single(&mut self, name: &str) -> Option<UpdateInfo> {
-        let state = self.bundles.get_mut(name)?;
         let now = chrono::Utc::now().to_rfc3339();
-        state.checked_at = Some(now.clone());
+        let found = {
+            let bundles = self.bundles.get_mut().unwrap_or_else(|e| e.into_inner());
+            if let Some(state) = bundles.get_mut(name) {
+                state.checked_at = Some(now.clone());
+                true
+            } else {
+                false
+            }
+        };
+        if !found {
+            return None;
+        }
         tracing::debug!("Checked for updates: {} (checked_at={})", name, now);
         None // stub — no actual version comparison
     }
@@ -934,32 +985,35 @@ impl BundleRegistry {
     ///
     /// Port of Python `_update_single`.
     pub async fn update_single(&mut self, name: &str) -> crate::error::Result<Bundle> {
-        // Clone the URI to release the immutable borrow before calling load_single.
-        let uri = self
-            .bundles
-            .get(name)
-            .ok_or_else(|| crate::error::BundleError::NotFound {
-                uri: format!("Bundle '{}' not registered", name),
-            })?
-            .uri
-            .clone();
+        // Clone the URI before any async work to release the borrow on self.
+        let uri = {
+            let bundles = self.bundles.get_mut().unwrap_or_else(|e| e.into_inner());
+            bundles
+                .get(name)
+                .ok_or_else(|| crate::error::BundleError::NotFound {
+                    uri: format!("Bundle '{}' not registered", name),
+                })?
+                .uri
+                .clone()
+        };
 
         // Clear cache entry to force a fresh load (Python uses refresh=True)
         if let Ok(mut cache) = self.cache.lock() {
             cache.remove(&uri);
         }
 
-        // Load the bundle. Reborrows &mut self as &self for the duration
-        // of the future; after .await the shared borrow ends and &mut self
-        // is available again for state mutation below.
+        // Load the bundle. No borrow on self.bundles across await.
         let bundle = self.load_single(&uri).await?;
 
         // Update state timestamps
         let now = chrono::Utc::now().to_rfc3339();
-        if let Some(state) = self.bundles.get_mut(name) {
-            state.version = Some(bundle.version.clone());
-            state.loaded_at = Some(now.clone());
-            state.checked_at = Some(now);
+        {
+            let bundles = self.bundles.get_mut().unwrap_or_else(|e| e.into_inner());
+            if let Some(state) = bundles.get_mut(name) {
+                state.version = Some(bundle.version.clone());
+                state.loaded_at = Some(now.clone());
+                state.checked_at = Some(now);
+            }
         }
 
         Ok(bundle)
