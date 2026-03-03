@@ -13,7 +13,7 @@
 phase: 1
 phase_name: "Wave 1 -- Leaf Modules (all sync)"
 epoch: 2
-next_action: "Implement F-008-cache"
+next_action: "Implement F-009-serialization"
 blockers: []
 
 architecture_spec:
@@ -107,16 +107,19 @@ features:
   F-008-cache:
     name: "Implement cache module (SimpleCache, DiskCache)"
     module: "cache"
-    status: "in-progress"
+    status: "done"
     spec: "specs/modules/cache.md"
     depends_on: ["F-003-test-port-wave1"]
     started_at: "2025-01-16T01:10:00Z"
+    completed_at: "2025-01-16T01:30:00Z"
+    commit: "b18db8f"
   F-009-serialization:
     name: "Implement serialization module (sanitize_for_json, sanitize_message)"
     module: "serialization"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/modules/serialization.md"
     depends_on: ["F-003-test-port-wave1"]
+    started_at: "2025-01-16T01:40:00Z"
   F-010-tracing-utils:
     name: "Implement tracing_utils module (generate_sub_session_id)"
     module: "tracing_utils"

@@ -9,7 +9,6 @@ use amplifier_foundation::serialization::{
 // ═══════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_primitives_unchanged() {
     // None -> Null
     assert_eq!(sanitize_for_json(&Value::Null), Value::Null);
@@ -31,7 +30,6 @@ fn test_primitives_unchanged() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_dict_sanitization() {
     let input = json!({"a": 1, "b": {"c": 2}});
     let result = sanitize_for_json(&input);
@@ -46,7 +44,6 @@ fn test_dict_sanitization() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_list_sanitization() {
     let input = json!([1, "two", {"three": 3}]);
     let result = sanitize_for_json(&input);
@@ -59,7 +56,6 @@ fn test_list_sanitization() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_tuple_converted_to_list() {
     // Python tuples become lists. In Rust, serde_json arrays are already
     // arrays, so we verify that an array round-trips through sanitization.
@@ -75,7 +71,6 @@ fn test_tuple_converted_to_list() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_nested_structure() {
     // Python test uses mixed dict/list nesting at level3
     let input = json!({
@@ -94,7 +89,6 @@ fn test_nested_structure() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_non_serializable_returns_none() {
     // In Python, non-serializable objects become None.
     // In Rust all serde_json::Value variants are serializable, so we test
@@ -105,7 +99,6 @@ fn test_non_serializable_returns_none() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_object_with_dict() {
     // In Python, objects with __dict__ get their dict extracted.
     // In Rust, a Value::Object (mapping) should pass through sanitization.
@@ -118,7 +111,6 @@ fn test_object_with_dict() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_max_depth_protection() {
     // Build a 100-level deep nested structure
     let mut data: Value = json!("leaf");
@@ -139,7 +131,6 @@ fn test_max_depth_protection() {
 // ═══════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_simple_message() {
     let input = json!({"role": "user", "content": "hello"});
     let result = sanitize_message(&input);
@@ -150,7 +141,6 @@ fn test_simple_message() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_extracts_thinking_text_from_dict() {
     let input = json!({
         "role": "assistant",
@@ -170,7 +160,6 @@ fn test_extracts_thinking_text_from_dict() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_extracts_thinking_text_from_object() {
     // In Python this tests an object attribute. In Rust, this is the same
     // as a nested Value::Object — verify identical behavior.
@@ -189,7 +178,6 @@ fn test_extracts_thinking_text_from_object() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_removes_content_blocks() {
     let input = json!({
         "role": "assistant",
@@ -207,7 +195,6 @@ fn test_removes_content_blocks() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_handles_non_dict_input() {
     // Non-object input should return an empty object
     let result_str = sanitize_message(&json!("just a string"));
@@ -236,7 +223,6 @@ fn test_handles_non_dict_input() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_preserves_standard_fields() {
     let input = json!({
         "role": "assistant",
@@ -257,7 +243,6 @@ fn test_preserves_standard_fields() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_result_is_serializable() {
     // Verify that sanitize_message always produces JSON-serializable output,
     // even with complex nested input.
@@ -277,7 +262,6 @@ fn test_result_is_serializable() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_filters_none_values_in_dict() {
     // Python: non-serializable values become None, and None values are filtered
     // from the dict. In Rust: null values in a dict should be filtered out
