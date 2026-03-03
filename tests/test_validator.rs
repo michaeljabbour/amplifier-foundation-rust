@@ -58,7 +58,7 @@ fn make_complete_bundle() -> Bundle {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_initial_state() {
     let result = ValidationResult::new();
     assert!(result.valid);
@@ -67,7 +67,7 @@ fn test_initial_state() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_add_error_marks_invalid() {
     let mut result = ValidationResult::new();
     result.add_error("test error");
@@ -76,7 +76,7 @@ fn test_add_error_marks_invalid() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_add_warning_keeps_valid() {
     let mut result = ValidationResult::new();
     result.add_warning("test warning");
@@ -89,7 +89,7 @@ fn test_add_warning_keeps_valid() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_validate_minimal_bundle() {
     let bundle = Bundle::new("test");
     let validator = BundleValidator::new();
@@ -98,7 +98,7 @@ fn test_validate_minimal_bundle() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_validate_missing_name() {
     let bundle = Bundle::new("");
     let validator = BundleValidator::new();
@@ -108,7 +108,7 @@ fn test_validate_missing_name() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_validate_module_entry_missing_module() {
     // Provider entry without a "module" key — should fail validation.
     // NOTE: We mutate the bundle's providers directly since Bundle::new
@@ -126,7 +126,7 @@ fn test_validate_module_entry_missing_module() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_validate_module_entry_invalid_config() {
     // Provider entry where config is a string instead of a mapping.
     // NOTE: We mutate the bundle's providers directly.
@@ -150,7 +150,7 @@ fn test_validate_module_entry_invalid_config() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_complete_bundle_is_valid() {
     let bundle = make_complete_bundle();
     let validator = BundleValidator::new();
@@ -159,7 +159,7 @@ fn test_complete_bundle_is_valid() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_missing_session_is_incomplete() {
     // Bundle with no session configured (default Null).
     let mut bundle = make_complete_bundle();
@@ -175,7 +175,7 @@ fn test_missing_session_is_incomplete() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_missing_orchestrator_is_incomplete() {
     // Session present but without an orchestrator key.
     let mut bundle = make_complete_bundle();
@@ -187,7 +187,7 @@ fn test_missing_orchestrator_is_incomplete() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_missing_context_is_incomplete() {
     // Session present but without a context key.
     let mut bundle = make_complete_bundle();
@@ -199,7 +199,7 @@ fn test_missing_context_is_incomplete() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_missing_providers_is_incomplete() {
     // Complete session but empty providers list.
     let mut bundle = make_complete_bundle();
@@ -211,7 +211,7 @@ fn test_missing_providers_is_incomplete() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_partial_bundle_is_expected_incomplete() {
     // A provider-only bundle: basic validate() passes but
     // validate_completeness() fails because session is missing.
@@ -235,7 +235,7 @@ fn test_partial_bundle_is_expected_incomplete() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_validate_completeness_or_raise_raises() {
     // An incomplete bundle should cause validate_completeness_or_raise to
     // return Err.
@@ -250,7 +250,7 @@ fn test_validate_completeness_or_raise_raises() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_validate_bundle() {
     let bundle = Bundle::new("test");
     let result = validate_bundle(&bundle);
@@ -258,7 +258,7 @@ fn test_validate_bundle() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_validate_bundle_or_raise() {
     // Empty name should fail validation; the convenience function should
     // return Err.
@@ -268,7 +268,7 @@ fn test_validate_bundle_or_raise() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_validate_bundle_completeness() {
     let bundle = make_complete_bundle();
     let result = validate_bundle_completeness(&bundle);
@@ -276,7 +276,7 @@ fn test_validate_bundle_completeness() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_validate_bundle_completeness_or_raise() {
     // Incomplete bundle (no session/providers) should return Err.
     let bundle = Bundle::new("incomplete");

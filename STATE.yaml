@@ -198,16 +198,19 @@ features:
   F-018-bundle:
     name: "Implement bundle module (Bundle struct, from_dict, compose, to_mount_plan, resolve_context_path, resolve_pending_context)"
     module: "bundle"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-005-test-port-wave3", "F-006-dicts", "F-007-paths"]
     started_at: "2025-01-16T08:00:00Z"
+    completed_at: "2025-01-16T08:30:00Z"
+    commit: "4b3a8e6"
   F-019-validator:
     name: "Implement validator module (BundleValidator, ValidationResult, convenience functions)"
     module: "bundle/validator"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-018-bundle"]
+    started_at: "2025-01-16T08:30:00Z"
   F-020-registry:
     name: "Implement registry module (BundleRegistry, persistence, find_nearest, load_single)"
     module: "registry"
@@ -225,6 +228,6 @@ wave_gate:
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 17
-  last_updated: "2025-01-16T08:00:00Z"
-  last_session: "session-008-wave3-start"
+  total_features_completed: 18
+  last_updated: "2025-01-16T08:30:00Z"
+  last_session: "session-008-wave3-bundle-validator"
