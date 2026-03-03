@@ -1,20 +1,19 @@
 use std::collections::HashMap;
-use std::fs;
 use std::path::{self, PathBuf};
 
 use super::dedup::ContentDeduplicator;
 use super::models::{ContextFile, MentionResult};
 use super::parser::parse_mentions;
-use super::utils::format_directory_listing;
+use super::utils::format_directory_listing_async;
 use super::MentionResolver;
 
 /// Resolve a path to an absolute path for consistent matching.
 ///
-/// Uses `fs::canonicalize` for existing paths (resolves symlinks), falls back
+/// Uses `std::fs::canonicalize` for existing paths (resolves symlinks), falls back
 /// to `std::path::absolute` for non-existent paths (matches Python's
 /// `Path.resolve()` which always returns an absolute path).
 fn resolve_path(p: &PathBuf) -> PathBuf {
-    fs::canonicalize(p).unwrap_or_else(|_| path::absolute(p).unwrap_or_else(|_| p.clone()))
+    std::fs::canonicalize(p).unwrap_or_else(|_| path::absolute(p).unwrap_or_else(|_| p.clone()))
 }
 
 /// Format all loaded files as XML context blocks for prepending to system prompts.
@@ -114,10 +113,6 @@ pub fn format_context_block(
 /// aggregate result containing all loaded files (including recursively
 /// discovered ones) and all failed mentions.
 ///
-/// **Note:** The function is async for API compatibility with the Python
-/// reference (which uses async `read_with_retry`). The current implementation
-/// uses synchronous file I/O internally.
-///
 /// # Arguments
 ///
 /// * `text` — Text containing @mentions.
@@ -136,13 +131,14 @@ pub async fn load_mentions(text: &str, resolver: &dyn MentionResolver) -> Mentio
 
     for mention in mentions {
         resolve_mention(
-            &mention,
+            mention,
             resolver,
             &mut dedup,
             &mut result,
             3, // max_depth (matches Python default)
             0, // current_depth
-        );
+        )
+        .await;
     }
 
     result
@@ -153,74 +149,85 @@ pub async fn load_mentions(text: &str, resolver: &dyn MentionResolver) -> Mentio
 /// Files are pushed to `result.files` in encounter order (parent before children).
 /// Deduplication prevents the same content from being loaded multiple times,
 /// which also breaks circular mention chains.
-fn resolve_mention(
-    mention: &str,
-    resolver: &dyn MentionResolver,
-    dedup: &mut ContentDeduplicator,
-    result: &mut MentionResult,
+///
+/// Uses `Box::pin` to support recursive async calls. `mention` is taken by value
+/// (`String`) so it can be moved into the heap-allocated future without lifetime
+/// conflicts on the recursive calls.
+fn resolve_mention<'a>(
+    mention: String,
+    resolver: &'a dyn MentionResolver,
+    dedup: &'a mut ContentDeduplicator,
+    result: &'a mut MentionResult,
     max_depth: usize,
     current_depth: usize,
-) {
-    // Resolve mention to path
-    let path = match resolver.resolve(mention) {
-        Some(p) => p,
-        None => {
-            result.failed.push(mention.to_string());
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'a>> {
+    Box::pin(async move {
+        // Resolve mention to path
+        let path = match resolver.resolve(&mention) {
+            Some(p) => p,
+            None => {
+                result.failed.push(mention);
+                return;
+            }
+        };
+
+        // Handle directories: generate listing as content
+        let is_dir = tokio::fs::metadata(&path)
+            .await
+            .map(|m| m.is_dir())
+            .unwrap_or(false);
+        if is_dir {
+            let content = format_directory_listing_async(&path).await;
+            if !dedup.is_duplicate(&content) {
+                result.files.push(ContextFile {
+                    path,
+                    content,
+                    mention,
+                });
+            }
             return;
         }
-    };
 
-    // Handle directories: generate listing as content
-    if path.is_dir() {
-        let content = format_directory_listing(&path);
-        if !dedup.is_duplicate(&content) {
-            result.files.push(ContextFile {
-                path,
-                content,
-                mention: mention.to_string(),
-            });
-        }
-        return;
-    }
+        // Read file
+        let content = match tokio::fs::read_to_string(&path).await {
+            Ok(c) => c,
+            Err(_) => {
+                // Opportunistic — no error for read failure
+                result.failed.push(mention);
+                return;
+            }
+        };
 
-    // Read file
-    let content = match fs::read_to_string(&path) {
-        Ok(c) => c,
-        Err(_) => {
-            // Opportunistic — no error for read failure
-            result.failed.push(mention.to_string());
+        // Check for duplicate content
+        if dedup.is_duplicate(&content) {
+            // Already seen this content, skip
             return;
         }
-    };
 
-    // Check for duplicate content
-    if dedup.is_duplicate(&content) {
-        // Already seen this content, skip
-        return;
-    }
+        // Push parent file FIRST (encounter order), then recurse into children.
+        // This ensures files appear in the order they are encountered, matching
+        // the expected reading order for context assembly.
+        let content_for_recursion = content.clone();
+        result.files.push(ContextFile {
+            path,
+            content,
+            mention,
+        });
 
-    // Push parent file FIRST (encounter order), then recurse into children.
-    // This ensures files appear in the order they are encountered, matching
-    // the expected reading order for context assembly.
-    let content_for_recursion = content.clone();
-    result.files.push(ContextFile {
-        path,
-        content,
-        mention: mention.to_string(),
-    });
-
-    // Recursively load mentions from this file (if not at max depth)
-    if current_depth < max_depth {
-        let nested_mentions = parse_mentions(&content_for_recursion);
-        for nested in nested_mentions {
-            resolve_mention(
-                &nested,
-                resolver,
-                dedup,
-                result,
-                max_depth,
-                current_depth + 1,
-            );
+        // Recursively load mentions from this file (if not at max depth)
+        if current_depth < max_depth {
+            let nested_mentions = parse_mentions(&content_for_recursion);
+            for nested in nested_mentions {
+                resolve_mention(
+                    nested,
+                    resolver,
+                    dedup,
+                    result,
+                    max_depth,
+                    current_depth + 1,
+                )
+                .await;
+            }
         }
-    }
+    })
 }
