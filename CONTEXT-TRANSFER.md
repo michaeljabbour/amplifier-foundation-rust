@@ -6,6 +6,52 @@
 
 ---
 
+## Session 002 -- Wave 0 Test Porting (F-004, F-005)
+
+### Work Completed
+- **F-004** (190f9df): 96 #[ignore = "Wave 2"] tests across 4 test files + module stubs with todo!() bodies.
+  - test_io_files.rs: 6 tests (write_with_backup)
+  - test_sources.rs: 16 tests (FileSourceHandler, HttpSourceHandler, ZipSourceHandler)
+  - test_mentions.rs: 21 tests (parse_mentions 11, BaseMentionResolver 10)
+  - test_session.rs: 53 tests (slice 14, fork 14, events 6, orphaned tools 9, summary 3, lineage 3, preview 2, list forks 2)
+  - Module stubs: io/{files,yaml,frontmatter}, sources/{mod,file,http,git,zip,resolver}, mentions/{mod,models,parser,resolver,dedup,loader,utils}, session/{mod,capabilities,events,fork,slice}
+
+- **F-005** (55f9862): 65 #[ignore = "Wave 3"] tests across 3 test files + module stubs with todo!() bodies.
+  - test_bundle.rs: 26 tests (Bundle 3, compose 5, mount_plan 2, context 3, pending_context 5, validation 8)
+  - test_registry.rs: 21 tests (find_nearest 6, unregister 7, subdirectory_loading 3, diamond/circular 5)
+  - test_validator.rs: 18 tests (ValidationResult 3, BundleValidator 4, completeness 7, convenience 4)
+  - Module stubs: bundle/{mod,compose,mount,validator}, registry/{mod,persistence,includes}, modules/{mod,state}, updates/mod
+
+### Test Counts (Actual vs Spec)
+- Wave 1: 87 (matches spec)
+- Wave 2: 96 (spec said 91; test_sources.py has 16 tests, spec estimated 11)
+- Wave 3: 65 (spec said 57; test_registry.py has 21 tests, spec estimated 13)
+- **Total: 248** (spec said 235; delta +13 from Python source having more tests than estimated)
+- Gate criteria updated to 248
+
+### Design Decisions Made
+- **SourceHandler trait**: Defined as async_trait in sources/mod.rs with can_handle (sync) and resolve (async) methods
+- **SourceStatus struct**: Defined in sources/mod.rs with uri, current_version, latest_version, has_update fields
+- **ForkResult struct**: In session/fork.rs. session_dir is Option<PathBuf> (None for in-memory forks). messages is Option<Vec<Value>> (None for on-disk forks).
+- **ValidationResult in validator.rs**: Separate from error.rs's ValidationResult. The bundle/validator.rs version has add_error/add_warning methods and valid bool. The error.rs version is simpler (just errors/warnings Vec).
+- **BundleState fields**: Mirrors Python dataclass closely -- uri, name, version, includes, included_by, is_root, root_name, explicitly_requested, app_bundle
+- **MentionResolver trait**: Defined in mentions/mod.rs. BaseMentionResolver has with_base_path and with_bundles constructors.
+- **write_with_backup**: Made sync (not async) matching Python behavior. Added write_with_backup_bytes for binary mode test.
+- **Session re-exports**: session/mod.rs re-exports all public functions from slice, events, and fork submodules.
+- **Bundle::compose**: Takes &[&Bundle] slice (composing multiple at once) matching Python's *others variadic pattern.
+- **Bundle::from_dict_with_base_path**: Separate function since Rust doesn't have default arguments. Python uses `Bundle.from_dict(data, base_path=...)`.
+- **zip dev-dependency**: Added `zip = "2"` to [dev-dependencies] for test_sources.rs to create test zip files.
+
+### Wave 0 Gate Status
+- All 5 features (F-001 through F-005) completed
+- cargo check --tests: PASSES
+- cargo test: 0 pass, 0 fail, 248 ignored
+- cargo build: PASSES
+- cargo clippy --all-targets: 0 errors (warnings only from unused variables in todo!() stubs)
+- **AWAITING HUMAN APPROVAL** to proceed to Wave 1
+
+---
+
 ## Session 001 -- Wave 0 Scaffold (F-001, F-002, F-003)
 
 ### Work Completed
