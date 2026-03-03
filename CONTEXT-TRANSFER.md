@@ -6,6 +6,66 @@
 
 ---
 
+## Session 022 -- Wave 17 COMPLETE (F-059, F-060, F-061)
+
+### Work Completed
+- **F-059-registry-decompose** (377a411): Decomposed `registry/mod.rs` (1,353 lines) into 7 focused submodules: `types.rs` (226 lines, UpdateInfo + BundleState), `helpers.rs` (132 lines, free functions), `persistence.rs` (129 lines, save/load/validate/record), `includes.rs` (399 lines, include resolution + composition), `loader.rs` (197 lines, load pipeline), `updates.rs` (119 lines, update lifecycle), `mod.rs` (144 lines, struct + CRUD + re-exports). No file over 400 lines. Lock ordering invariant documented on struct fields. Purely structural — zero behavioral changes.
+- **F-060-batch-save** (8506223): Batch-save optimization for `record_include_relationships`. Added `record_include_relationships_deferred()` that mutates state without disk persistence. Changed `compose_includes` to use deferred version. Moved single batch `save()` to `load_single` (the non-recursive public entry point), achieving O(1) saves per load instead of O(depth). Backward compat: `record_include_relationships` still delegates to deferred + immediate save for external callers. 3 new tests.
+- **F-061-prepared-bundle** (182ef87): Ported `PreparedBundle` struct + `build_bundles_for_resolver` + `create_system_prompt_factory` from Python `bundle.py:845-979`. `BundleSystemPromptFactory` implements `SystemPromptFactory` trait with dynamic re-reading of context files and @mention resolution on each call. Enhanced `BaseMentionResolver` to resolve `@namespace:path` mentions using bundles map (was returning None since F-016). All fields are owned values (no Arc needed). 11 new tests including dynamic file re-reading test.
+
+### Wave 17 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 590 passing, 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **Registry decomposition uses `pub(super)` for internal methods**: `load_single_with_chain`, `compose_includes`, `preload_namespace_bundles`, `load_from_path`, `load_persisted_state`, and `resolve_file_uri` are visible within the `registry` module tree but not publicly. All `impl BundleRegistry` blocks are spread across 5 files — Rust's orphan rules don't constrain inherent impls within the same module tree.
+- **Lock ordering invariant documented on BundleRegistry struct**: `bundles: RwLock` before `cache: Mutex`. Never hold either lock across `.await` or `self.method()` calls. This invariant is now documented since the lock is accessed from 5 different files after decomposition.
+- **Batch-save at `load_single` (public entry), not `load_single_with_chain` (recursive)**: Antagonistic review correctly identified that placing `save()` inside the recursive function would still produce O(depth) saves. Only the top-level `load_single` calls `save()` once after the entire recursive tree completes.
+- **`build_bundles_for_resolver` maps namespace → PathBuf (not Bundle)**: Python maps namespace → `Bundle(base_path=ns_base_path)`, then the resolver calls `bundle.resolve_context_path(name)`. Rust maps directly to PathBuf since `BaseMentionResolver` only needs the base path. Known limitation: doesn't check bundle's `context` dict for exact-name matches.
+- **`create_system_prompt_factory` takes `bundle` parameter (not `self.bundle`)**: Matches Python API which passes `bundle` separately. Supports spawning scenarios where the caller passes a different bundle. The `PreparedBundle.bundle` field stores the original bundle for other purposes.
+- **`BundleSystemPromptFactory` uses owned fields, not `Arc`**: Antagonistic review correctly identified that `Arc` was unnecessary — this struct is the sole owner. `Bundle`, `HashMap<String, PathBuf>`, and `PathBuf` are already `Send + Sync`.
+- **`session` parameter dropped from `create_system_prompt_factory`**: Python accepts `session: Any` but never reads it. Omitted in Rust.
+- **`BaseMentionResolver` namespace resolution: base_path only**: Enhanced from "always return None" to "base_path.join(rel_path)". Python additionally checks `bundle.context` dict first. Documented as known limitation from F-016 design.
+- **Blocking `std::fs` I/O in async `create()` method**: Pre-existing pattern in the codebase (load_mentions uses sync I/O inside async fn since Session 012). Documented as known divergence. Can use `tokio::fs` later.
+
+### Antagonistic Review Issues Found & Fixed
+- F-059: Added lock ordering invariant comment on BundleRegistry struct fields (P2)
+- F-060: Moved `save()` from `load_single_with_chain` to `load_single` — antagonistic review caught that recursive save was still O(depth) (P0)
+- F-061: Removed unnecessary `Arc` wrappers — antagonistic review caught sole-owner pattern (P2)
+- F-061: Changed `Option<&PathBuf>` to `Option<&Path>` for idiomatic Rust (P3)
+- F-061: Fixed pointless immutable-then-rebind on ContentDeduplicator (P3)
+- F-061: Added doc comment explaining why `bundle` is a parameter (not `self.bundle`) (P3)
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-059: `preload_namespace_bundles` is `pub(super)` but only called from `compose_includes` in same file — broader access for future flexibility
+- F-060: `local_path`/`loaded_at` never persisted for bundles without includes — pre-existing, `save()` only called when includes exist
+- F-060: `update_single` doesn't call `save()` for timestamp changes — pre-existing
+- F-061: Namespace resolution doesn't check bundle `context` dict — pre-existing limitation from BaseMentionResolver design (F-016)
+- F-061: Blocking `std::fs` I/O inside async context — pre-existing pattern from Session 012
+- F-061: `build_bundles_for_resolver` takes `&self` but never reads `self` fields — matches Python API for spawn support
+- F-061: Context files that disappear between `create()` calls silently skipped — matches Python's `if context_path.exists()` pattern
+
+### File Size Status
+- `src/registry/mod.rs`: 144 lines (was 1,353 — decomposed into 7 files)
+- `src/registry/includes.rs`: 399 lines (largest submodule — includes + composition)
+- `src/bundle/mod.rs`: 918 lines (approaching 1,000-line threshold — flag for future decomposition)
+
+### What's Next
+- All 17 waves complete. 590 tests, 0 clippy warnings, 61 features delivered.
+- PreparedBundle foundations ported: struct, build_bundles_for_resolver, create_system_prompt_factory
+- Remaining unported PreparedBundle functionality:
+  - `create_session` (bundle.py:981-1109) — depends on AmplifierSession from amplifier_core
+  - `spawn` (bundle.py:1111-1289) — depends on AmplifierSession from amplifier_core
+- Consider: Enhance BaseMentionResolver to check bundle context dict for namespace resolution
+- Consider: PyO3 bindings (feature flag exists, no `#[pyclass]` code)
+- Consider: Benchmarks (bundle compose, cache operations, system prompt factory)
+- Consider: Decompose `bundle/mod.rs` (918 lines, approaching threshold)
+- Consider: `tokio::fs` for async file I/O in system prompt factory
+
+---
+
 ## Session 021 -- Wave 16 COMPLETE (F-056, F-057, F-058)
 
 ### Work Completed
