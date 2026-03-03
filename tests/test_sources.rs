@@ -12,6 +12,7 @@ use amplifier_foundation::sources::file::FileSourceHandler;
 use amplifier_foundation::sources::http::HttpSourceHandler;
 use amplifier_foundation::sources::zip::ZipSourceHandler;
 use amplifier_foundation::sources::SourceHandler;
+use sha2::Digest;
 use tempfile::tempdir;
 
 // ---------------------------------------------------------------------------
@@ -451,4 +452,123 @@ async fn test_resolver_add_handler_takes_priority() {
 
     // The custom handler should have been used (returns fixed_path, not real_path)
     assert_eq!(resolved.active_path, custom_path);
+}
+
+// ===========================================================================
+// TestHttpSourceHandler — resolve (async)
+// ===========================================================================
+
+fn make_http_parsed_uri(host: &str, path: &str, subpath: &str) -> ParsedURI {
+    ParsedURI {
+        scheme: "https".to_string(),
+        host: host.to_string(),
+        path: path.to_string(),
+        ref_: String::new(),
+        subpath: subpath.to_string(),
+    }
+}
+
+#[tokio::test]
+async fn test_http_resolve_cache_hit() {
+    // Pre-populate cache so no actual HTTP request is needed.
+    let cache_dir = tempdir().expect("failed to create cache dir");
+
+    let parsed = make_http_parsed_uri("example.com", "/bundles/test-bundle.yaml", "");
+
+    // Compute expected cache filename (same logic as handler)
+    let url = "https://example.com/bundles/test-bundle.yaml";
+    let hash = format!("{:x}", sha2::Sha256::digest(url.as_bytes()));
+    let cache_key = &hash[..16];
+    let cached_file = cache_dir
+        .path()
+        .join(format!("test-bundle.yaml-{cache_key}"));
+
+    // Pre-populate the cache file
+    fs::write(&cached_file, "name: test-from-cache").expect("write cache");
+
+    let handler = HttpSourceHandler::new();
+    let resolved = handler
+        .resolve(&parsed, cache_dir.path())
+        .await
+        .expect("resolve should succeed from cache");
+
+    assert_eq!(resolved.active_path, cached_file);
+    assert_eq!(resolved.source_root, cached_file);
+    // Verify the content is our cached version
+    let content = fs::read_to_string(&resolved.active_path).expect("read");
+    assert_eq!(content, "name: test-from-cache");
+}
+
+#[tokio::test]
+async fn test_http_resolve_cache_hit_with_subpath() {
+    let cache_dir = tempdir().expect("failed to create cache dir");
+
+    let parsed = make_http_parsed_uri("example.com", "/bundles/repo.tar.gz", "foundation");
+
+    // Compute expected cache path
+    let url = "https://example.com/bundles/repo.tar.gz";
+    let hash = format!("{:x}", sha2::Sha256::digest(url.as_bytes()));
+    let cache_key = &hash[..16];
+    let cached_file = cache_dir.path().join(format!("repo.tar.gz-{cache_key}"));
+
+    // Pre-populate cache as a directory with subpath
+    fs::create_dir_all(cached_file.join("foundation")).expect("mkdir");
+    fs::write(
+        cached_file.join("foundation/bundle.yaml"),
+        "name: foundation",
+    )
+    .expect("write");
+
+    let handler = HttpSourceHandler::new();
+    let resolved = handler
+        .resolve(&parsed, cache_dir.path())
+        .await
+        .expect("resolve should succeed from cache with subpath");
+
+    assert_eq!(resolved.active_path, cached_file.join("foundation"));
+    assert_eq!(resolved.source_root, cached_file);
+}
+
+#[tokio::test]
+async fn test_http_resolve_download_failure() {
+    let cache_dir = tempdir().expect("failed to create cache dir");
+
+    // Use a URL that will definitely fail to connect
+    let parsed = make_http_parsed_uri("127.0.0.1:1", "/nonexistent.yaml", "");
+
+    let handler = HttpSourceHandler::new();
+    let result = handler.resolve(&parsed, cache_dir.path()).await;
+
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        BundleError::NotFound { uri } => {
+            assert!(uri.contains("127.0.0.1"), "error should mention the host");
+        }
+        other => panic!("Expected NotFound, got: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn test_http_resolve_empty_path_uses_download_filename() {
+    let cache_dir = tempdir().expect("failed to create cache dir");
+
+    let parsed = make_http_parsed_uri("example.com", "/", "");
+
+    // Compute expected cache filename for path="/"
+    let url = "https://example.com/";
+    let hash = format!("{:x}", sha2::Sha256::digest(url.as_bytes()));
+    let cache_key = &hash[..16];
+    // Path::new("/").file_name() returns None, so filename should be "download"
+    let cached_file = cache_dir.path().join(format!("download-{cache_key}"));
+
+    // Pre-populate cache
+    fs::write(&cached_file, "name: root-download").expect("write");
+
+    let handler = HttpSourceHandler::new();
+    let resolved = handler
+        .resolve(&parsed, cache_dir.path())
+        .await
+        .expect("resolve should succeed");
+
+    assert_eq!(resolved.active_path, cached_file);
 }

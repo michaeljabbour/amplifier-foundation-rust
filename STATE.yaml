@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 7
-phase_name: "Wave 7 -- Remaining Stubs"
-epoch: 8
-next_action: "Wave 7 COMPLETE. 329 tests passing, 0 clippy warnings, cargo fmt clean. All todo!() stubs except git.rs/http.rs resolve replaced. Consider: implement GitSourceHandler.resolve, HttpSourceHandler.resolve, PyO3 bindings"
+phase: 8
+phase_name: "Wave 8 -- Source Handler Resolve + API Completion"
+epoch: 9
+next_action: "Implementing F-032 HttpSourceHandler.resolve"
 blockers: []
 
 architecture_spec:
@@ -325,6 +325,26 @@ features:
     started_at: "2025-01-17T05:00:00Z"
     completed_at: "2025-01-17T05:30:00Z"
     commit: "f60a05e"
+
+  F-032-http-resolve:
+    name: "Implement HttpSourceHandler.resolve (HTTP download to cache with reqwest)"
+    module: "sources"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-017-sources"]
+    started_at: "2025-01-17T06:00:00Z"
+  F-033-git-resolve:
+    name: "Implement GitSourceHandler.resolve (git clone to cache via subprocess)"
+    module: "sources"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-017-sources"]
+  F-034-dedup-registry:
+    name: "ContentDeduplicator full Python API + BundleRegistry IndexMap"
+    module: "mentions, registry"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-028-dead-code-cleanup", "F-020-registry"]
 
 wave_gate:
   current_wave: 7
