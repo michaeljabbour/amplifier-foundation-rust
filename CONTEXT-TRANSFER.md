@@ -6,6 +6,72 @@
 
 ---
 
+## Session 016 -- Wave 11 COMPLETE (F-041, F-042, F-043)
+
+### Work Completed
+- **F-041-format-context-block** (18016a8): Ported `format_context_block` from Python mentions/loader.py. Pure function that formats deduplicated context files as XML `<context_file>` blocks for system prompt assembly. Takes `&ContentDeduplicator` + optional `HashMap<String, PathBuf>` mention-to-path mapping. Builds reverse lookup for @mention → resolved path attribution. Uses `std::path::absolute()` fallback (MSRV 1.80) for consistent path resolution across existing and non-existing paths. Sorts mentions per-path for deterministic output (HashMap iteration safety). Documents XML injection parity with Python (no escaping). Re-exported in `lib.rs`. 7 new tests including real-file canonicalize test.
+- **F-042-module-resolver** (643930e): Ported `BundleModuleSource` + `BundleModuleResolver` from Python bundle.py (lines 711-842). `BundleModuleSource` is a thin PathBuf wrapper. `BundleModuleResolver` maps module_id → PathBuf with sync `resolve()` (HashMap lookup only) and async `async_resolve()` (with lazy activation via `ModuleActivate` trait). Double-checked locking pattern with `tokio::sync::Mutex<()>` serializes lazy activations to prevent duplicate downloads. Uses `std::sync::Mutex` with poison recovery for the paths map (works in both sync and async contexts). `ModuleActivate` trait abstracts the activation interface. Manual `Debug` impl (dyn trait prevents derive). Sorted available modules in error messages. Error chaining: activation failures preserve source error. 13 new tests including concurrent activation deduplication test.
+- **F-043-module-activator** (bc4c657): Ported `ModuleActivator` from Python modules/activator.py. Concrete implementation of `ModuleActivate` trait. Resolves URIs via `SimpleSourceResolver`, optionally installs dependencies via `uv pip install` subprocess (tokio::process::Command), tracks activation state via `InstallStateManager`. `activate_all()` uses `futures::join_all` for parallel activation. `activate_bundle_package()` installs bundle's own pyproject.toml. Session-scoped dedup: same name+URI only activated once. All Mutexes use poison recovery. No sys.path manipulation (Rust-specific). Added `SimpleSourceResolver::with_base_path_and_cache_dir` constructor. 10 new tests.
+
+### Wave 11 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 440 passing, 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **format_context_block uses std::path::absolute fallback**: `fs::canonicalize` fails for non-existent paths. Python's `Path.resolve()` always returns absolute. `std::path::absolute()` (stable since 1.79, MSRV is 1.80) resolves against cwd without requiring path existence. Consistent path resolution on both sides of the HashMap lookup.
+- **format_context_block sorts mentions per-path**: Python dicts preserve insertion order, but Rust HashMap doesn't. Mentions for the same path are sorted alphabetically to ensure deterministic output.
+- **format_context_block does NOT escape XML**: Matches Python behavior. Paths with `"` or content with `</context_file>` could break XML parsing. Documented as known parity issue.
+- **BundleModuleResolver uses std::sync::Mutex (not tokio::sync::Mutex) for paths**: Enables both sync `resolve()` and async `async_resolve()` without requiring tokio runtime for sync callers. Lock is held only briefly (HashMap operations), never across await points.
+- **BundleModuleResolver uses tokio::sync::Mutex<()> as activation_lock**: Separate from paths lock. Serializes the entire lazy activation operation (resolve + insert) to prevent duplicate activations. Same pattern as Python's `asyncio.Lock()`.
+- **Mutex poison recovery everywhere**: All `lock().unwrap_or_else(|e| e.into_inner())` to prevent cascade panics in multi-threaded server contexts. Python has no equivalent concern.
+- **BundleModuleResolver error type: BundleError::LoadError (not ModuleNotFoundError)**: Python uses a dedicated `ModuleNotFoundError`. Rust uses `BundleError::LoadError` to avoid adding a new enum variant. Error messages contain module name and available modules list. Callers can string-match if needed.
+- **ModuleActivator activation error chains source error**: When `activator.activate()` fails in `async_resolve`, the original error is preserved via `BundleError::LoadError { source: Some(Box::new(e)) }`. This enables `Error::source()` chains and downcasting.
+- **Python's profile_hint parameter intentionally dropped**: Deprecated in Python (marked for v2.0 removal). Rust API only has `source_hint`. Documented in module-level doc comment.
+- **BundleModuleResolver available_modules() sorted**: Error messages list available modules alphabetically for deterministic, testable output. Python dicts are ordered but error messages would have arbitrary order.
+- **ModuleActivator no sys.path**: Rust has no equivalent of Python's sys.path import mechanism. Callers use the returned PathBuf to locate module source.
+- **ModuleActivator install_dependencies hardcodes `uv pip install`**: This is a Python-ecosystem tool. The `install_deps=false` flag allows skipping for non-Python modules or when deps are pre-installed. Future: could be made configurable via a trait.
+- **ModuleActivator.cache_dir marked #[allow(dead_code)]**: Kept for API parity with Python. Currently consumed by resolver and install_state at construction, but not used after. Could be useful for cache invalidation methods.
+- **SimpleSourceResolver::with_base_path_and_cache_dir added**: New constructor combining both base_path and cache_dir. Needed by ModuleActivator which requires both.
+
+### Antagonistic Review Issues Found & Fixed
+- F-041: Changed `fs::canonicalize` fallback from `path.clone()` to `std::path::absolute()` (reviewer caught relative/absolute mismatch)
+- F-041: Added real-file test using tempdir (reviewer caught zero-coverage of canonicalize success path)
+- F-041: Added mention sorting per-path for deterministic output (reviewer caught HashMap non-determinism)
+- F-041: Strengthened test assertions from substring to structural (reviewer caught weak assertions)
+- F-041: Added XML injection doc comment (reviewer caught missing documentation of known limitation)
+- F-042: Changed from `lock().unwrap()` to `lock().unwrap_or_else(|e| e.into_inner())` at all 6 sites (reviewer caught cascade panic risk)
+- F-042: Added error chaining in activation failure path (reviewer caught discarded source error)
+- F-042: Added `available_modules()` sorting (reviewer caught non-deterministic error messages)
+- F-042: Added manual Debug impl (reviewer caught missing Debug on public type)
+- F-042: Added concurrent activation deduplication test (reviewer caught untested double-checked locking)
+- F-042: Added profile_hint migration note to doc comments (reviewer caught silent breaking change)
+- F-042: Changed `p.display().to_string()` to `p.to_string_lossy().into_owned()` (reviewer caught display vs roundtrip semantics)
+- F-043: Fixed MutexGuard held across await point (compiler caught it — dropped guard before await)
+- F-043: Added activate_bundle_package no-pyproject and nonexistent path tests
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-041: format_context_block clones all content via get_unique_files() — pre-existing design of ContentDeduplicator, not introduced here
+- F-042: No dedicated ModuleNotFoundError variant — using BundleError::LoadError to avoid breaking enum change
+- F-042: Profile_hint parameter dropped without compat shim — Python deprecated it for v2.0 removal
+- F-043: install_dependencies hardcodes `uv pip install` — matches Python behavior, configurable install deferred
+- F-043: No tests for successful subprocess install (would require `uv` to be installed in test environment)
+- F-043: activate_all uses join_all (concurrent but not parallel in single-threaded tokio) — matches Python's asyncio.gather semantics
+
+### What's Next
+- All 11 waves complete. 440 tests, 0 clippy warnings, 43 features delivered.
+- Remaining unported Python functionality:
+  - `PreparedBundle` (bundle.py:845-1289) — session lifecycle controller. Depends on AmplifierRuntime traits being concrete (amplifier_core::AmplifierSession). Major: create_session, spawn, _build_bundles_for_resolver, _create_system_prompt_factory.
+- Consider: PyO3 bindings (feature flag exists, no `#[pyclass]`/`#[pymodule]` code)
+- Consider: Concrete `SourceHandlerWithStatus` impl on GitSourceHandler (git ls-remote)
+- Consider: Wire `SourceHandlerWithStatus` into `check_bundle_status`/`update_bundle`
+- Consider: Benchmarks (bundle compose, cache operations, fingerprint computation)
+- Consider: Integration test for ModuleActivator with real git clone
+- Consider: Remove or repurpose unused `ModelResolutionResult` struct
+
+---
+
 ## Session 015 -- Wave 10 COMPLETE (F-038, F-039, F-040)
 
 ### Work Completed

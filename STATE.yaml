@@ -13,7 +13,7 @@
 phase: 11
 phase_name: "Wave 11 -- Advanced Module Infrastructure (ModuleActivator, BundleModuleResolver, format_context_block)"
 epoch: 12
-next_action: "Implement F-041 (format_context_block), F-042 (BundleModuleSource + BundleModuleResolver), F-043 (ModuleActivator)"
+next_action: "Wave 11 COMPLETE. 440 tests passing, 0 clippy warnings, cargo fmt clean. Consider: PreparedBundle port, PyO3 bindings, format_context_block integration into load_mentions, concrete SourceHandlerWithStatus impl"
 blockers: []
 
 architecture_spec:
@@ -435,21 +435,23 @@ features:
   F-043-module-activator:
     name: "Port ModuleActivator (async module activation with abstracted install mechanism)"
     module: "modules"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-035-install-state", "F-029-source-resolver"]
     started_at: "2025-01-19T03:15:00Z"
+    completed_at: "2025-01-19T04:00:00Z"
+    commit: "bc4c657"
 
 wave_gate:
   current_wave: 11
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
-  approval_status: "in-progress"
-  notes: "Wave 11: Advanced module infrastructure. format_context_block, BundleModuleResolver, ModuleActivator."
+  approval_status: "approved"
+  notes: "Wave 11 COMPLETE: 440 tests, 0 clippy warnings, cargo fmt clean. format_context_block, BundleModuleSource/BundleModuleResolver, ModuleActivator."
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 40
-  last_updated: "2025-01-19T01:15:00Z"
-  last_session: "session-015-wave10-api-parity"
+  total_features_completed: 43
+  last_updated: "2025-01-19T04:00:00Z"
+  last_session: "session-016-wave11-module-infra"
