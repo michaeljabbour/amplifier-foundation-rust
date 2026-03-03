@@ -130,11 +130,11 @@ pub trait SourceHandler: Send + Sync {
 /// forced re-download ([`update`](Self::update)) on top of the base
 /// [`SourceHandler`] trait.
 ///
-/// **Forward-declared protocol:** This trait defines the interface for handlers
-/// that can check for updates (e.g., git via `ls-remote`, HTTP via `HEAD`+`ETag`).
-/// No concrete implementations exist yet — the existing `check_bundle_status()`
-/// and `update_bundle()` in the `updates` module use a simpler hardcoded dispatch.
-/// Handlers will implement this trait as update support is added.
+/// **Implementations:** [`GitSourceHandler`](git::GitSourceHandler) implements this
+/// trait using `git ls-remote` for status checking and cache removal + re-clone for
+/// updates. The `check_bundle_status()` and `update_bundle()` functions in the
+/// `updates` module dispatch to this trait for git URIs. HTTP and file handlers
+/// do not yet implement this trait.
 ///
 /// **Return type divergence:** Python's `update()` returns `Path`; Rust returns
 /// `Result<ResolvedSource>`. This matches the Rust `SourceHandler::resolve()`

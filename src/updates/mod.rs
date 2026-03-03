@@ -1,5 +1,8 @@
-use crate::paths::uri::parse_uri;
-use crate::sources::SourceStatus;
+use std::path::{Path, PathBuf};
+
+use crate::paths::uri::{get_amplifier_home, parse_uri};
+use crate::sources::git::GitSourceHandler;
+use crate::sources::{SourceHandler, SourceHandlerWithStatus, SourceStatus};
 
 /// Status of a bundle and all its sources.
 ///
@@ -78,6 +81,15 @@ impl BundleStatus {
     }
 }
 
+/// Default cache directory for source handlers.
+///
+/// Uses the same path as [`SimpleSourceResolver::new`](crate::sources::resolver::SimpleSourceResolver::new):
+/// `~/.amplifier/cache/bundles`. This ensures that status checks and updates
+/// operate on the same cache directory as the resolver.
+fn default_cache_dir() -> PathBuf {
+    get_amplifier_home().join("cache").join("bundles")
+}
+
 /// Check update status for a bundle source URI.
 ///
 /// This is a MECHANISM that has no side effects — it only checks
@@ -87,21 +99,29 @@ impl BundleStatus {
 /// the entire bundle component tree, the Rust version takes a single URI
 /// and returns status for that one source. This is intentionally simpler.
 ///
-/// Currently supported:
+/// Supported source types:
 /// - `file://` and local paths: always reported as up to date
-/// - `git+https://`: reported as unknown (git status checking not yet implemented)
-/// - `https://`, `http://`: reported as unknown
+/// - `git+https://`, `git+http://`: dispatched to [`GitSourceHandler::get_status`]
+///   which uses `git ls-remote` to check for updates
+/// - `https://`, `http://`: reported as unknown (HTTP status checking not yet implemented)
 ///
 /// # Arguments
 ///
 /// * `uri` — Source URI to check.
+/// * `cache_dir` — Optional cache directory. Defaults to `~/.amplifier/cache`.
 ///
 /// # Returns
 ///
 /// A [`BundleStatus`] with the status of the URI.
-pub async fn check_bundle_status(uri: &str) -> crate::error::Result<BundleStatus> {
+pub async fn check_bundle_status(
+    uri: &str,
+    cache_dir: Option<&Path>,
+) -> crate::error::Result<BundleStatus> {
     let parsed = parse_uri(uri);
     let uri_owned = uri.to_string();
+    let cache = cache_dir
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(default_cache_dir);
 
     let source_status = if parsed.is_file() {
         // Local files are always "current"
@@ -113,13 +133,19 @@ pub async fn check_bundle_status(uri: &str) -> crate::error::Result<BundleStatus
             ..Default::default()
         }
     } else {
-        // Git, HTTP, and other remote sources: can't check without
-        // implementing the respective handlers' get_status methods
-        SourceStatus {
-            uri: uri_owned.clone(),
-            has_update: None,
-            summary: "Update checking not supported for this source type".to_string(),
-            ..Default::default()
+        // Try dispatching to a handler that supports status checking
+        let git_handler = GitSourceHandler::new();
+
+        if git_handler.can_handle(&parsed) {
+            git_handler.get_status(&parsed, &cache).await?
+        } else {
+            // HTTP and other remote sources: no status handler yet
+            SourceStatus {
+                uri: uri_owned.clone(),
+                has_update: None,
+                summary: "Update checking not supported for this source type".to_string(),
+                ..Default::default()
+            }
         }
     };
 
@@ -135,29 +161,40 @@ pub async fn check_bundle_status(uri: &str) -> crate::error::Result<BundleStatus
 /// This is a MECHANISM that has side effects — it removes cached
 /// versions and re-downloads fresh content.
 ///
-/// Currently supported:
+/// Supported source types:
 /// - `file://` and local paths: no-op (nothing to update for local files)
-/// - `git+https://`: not yet implemented (returns error)
+/// - `git+https://`, `git+http://`: dispatched to [`GitSourceHandler::update`]
+///   which removes the cache and re-clones
 /// - `https://`, `http://`: not yet implemented (returns error)
 ///
 /// # Arguments
 ///
 /// * `uri` — Source URI to update.
+/// * `cache_dir` — Optional cache directory. Defaults to `~/.amplifier/cache`.
 ///
 /// # Errors
 ///
 /// Returns [`BundleError::LoadError`](crate::error::BundleError::LoadError)
-/// if the source type does not support updating. A dedicated `UpdateError`
-/// variant could be added when git/http update support is implemented.
-pub async fn update_bundle(uri: &str) -> crate::error::Result<()> {
+/// if the source type does not support updating.
+pub async fn update_bundle(uri: &str, cache_dir: Option<&Path>) -> crate::error::Result<()> {
     let parsed = parse_uri(uri);
+    let cache = cache_dir
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(default_cache_dir);
 
     if parsed.is_file() {
         // Local files: nothing to update
         return Ok(());
     }
 
-    // Git, HTTP, and other remote sources: not yet implemented
+    let git_handler = GitSourceHandler::new();
+    if git_handler.can_handle(&parsed) {
+        // Delegate to GitSourceHandler::update (nuke and reclone)
+        git_handler.update(&parsed, &cache).await?;
+        return Ok(());
+    }
+
+    // HTTP and other remote sources: not yet implemented
     Err(crate::error::BundleError::LoadError {
         reason: format!(
             "Update not yet implemented for URI scheme '{}': {uri}",

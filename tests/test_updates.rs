@@ -137,7 +137,9 @@ fn test_bundle_status_partial_eq() {
 #[tokio::test]
 async fn test_check_bundle_status_file_uri() {
     // check_bundle_status only parses the URI, it doesn't touch the filesystem
-    let status = check_bundle_status("file:///some/path").await.unwrap();
+    let status = check_bundle_status("file:///some/path", None)
+        .await
+        .unwrap();
 
     assert_eq!(status.bundle_name, "file:///some/path");
     assert_eq!(status.bundle_source, Some("file:///some/path".to_string()));
@@ -149,24 +151,52 @@ async fn test_check_bundle_status_file_uri() {
 #[tokio::test]
 async fn test_check_bundle_status_local_path() {
     // Absolute paths are also file-type
-    let status = check_bundle_status("/some/local/path").await.unwrap();
+    let status = check_bundle_status("/some/local/path", None).await.unwrap();
     assert_eq!(status.sources[0].has_update, Some(false));
 }
 
 #[tokio::test]
 async fn test_check_bundle_status_git_uri() {
-    // Git status checking isn't implemented yet, so it returns unknown
-    let status = check_bundle_status("git+https://github.com/org/bundle@main")
-        .await
-        .unwrap();
+    // Git URIs now dispatch to GitSourceHandler.get_status().
+    // With an unreachable host, remote check fails → has_update is None.
+    let cache_dir = tempfile::tempdir().expect("failed to create cache dir");
+    let status = check_bundle_status(
+        "git+https://127.0.0.1:1/org/bundle@main",
+        Some(cache_dir.path()),
+    )
+    .await
+    .unwrap();
 
     assert_eq!(status.sources.len(), 1);
+    // Remote check fails → None (unknown)
     assert_eq!(status.sources[0].has_update, None);
 }
 
 #[tokio::test]
+async fn test_check_bundle_status_git_pinned() {
+    // Git URI with a pinned ref → no remote check, has_update = false.
+    // Uses unreachable host to ensure no real network call even if
+    // is_pinned() has a bug (defense in depth).
+    let cache_dir = tempfile::tempdir().expect("failed to create cache dir");
+    let status = check_bundle_status(
+        "git+https://127.0.0.1:1/org/bundle@v1.0.0",
+        Some(cache_dir.path()),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(status.sources.len(), 1);
+    assert_eq!(status.sources[0].has_update, Some(false));
+    assert!(
+        status.sources[0].summary.contains("Pinned"),
+        "pinned ref should say Pinned: {}",
+        status.sources[0].summary
+    );
+}
+
+#[tokio::test]
 async fn test_check_bundle_status_http_uri() {
-    let status = check_bundle_status("https://example.com/bundle.yaml")
+    let status = check_bundle_status("https://example.com/bundle.yaml", None)
         .await
         .unwrap();
 
@@ -181,28 +211,34 @@ async fn test_check_bundle_status_http_uri() {
 #[tokio::test]
 async fn test_update_bundle_file_uri() {
     // File URIs have nothing to update (always local)
-    let result = update_bundle("file:///some/bundle").await;
+    let result = update_bundle("file:///some/bundle", None).await;
     assert!(result.is_ok());
 }
 
 #[tokio::test]
 async fn test_update_bundle_local_path() {
     // Local paths also nothing to update
-    let result = update_bundle("/some/local/path").await;
+    let result = update_bundle("/some/local/path", None).await;
     assert!(result.is_ok());
 }
 
 #[tokio::test]
 async fn test_update_bundle_git_uri() {
-    // Git update isn't implemented, should return error
-    let result = update_bundle("git+https://github.com/org/bundle@main").await;
+    // Git update now dispatches to GitSourceHandler.update().
+    // With an unreachable host, the clone fails → returns error.
+    let cache_dir = tempfile::tempdir().expect("failed to create cache dir");
+    let result = update_bundle(
+        "git+https://127.0.0.1:1/org/bundle@main",
+        Some(cache_dir.path()),
+    )
+    .await;
     assert!(result.is_err());
 }
 
 #[tokio::test]
 async fn test_update_bundle_http_uri() {
     // HTTP update isn't implemented, should return error
-    let result = update_bundle("https://example.com/bundle.yaml").await;
+    let result = update_bundle("https://example.com/bundle.yaml", None).await;
     assert!(result.is_err());
 }
 
@@ -369,20 +405,28 @@ fn test_source_status_error_field() {
 
 #[tokio::test]
 async fn test_check_bundle_status_populates_summary() {
-    let status = check_bundle_status("file:///some/path").await.unwrap();
+    let status = check_bundle_status("file:///some/path", None)
+        .await
+        .unwrap();
     assert!(!status.sources[0].summary.is_empty());
 }
 
 #[tokio::test]
 async fn test_check_bundle_status_file_is_cached() {
-    let status = check_bundle_status("file:///some/path").await.unwrap();
+    let status = check_bundle_status("file:///some/path", None)
+        .await
+        .unwrap();
     assert!(status.sources[0].is_cached);
 }
 
 #[tokio::test]
-async fn test_check_bundle_status_unknown_not_cached() {
-    let status = check_bundle_status("git+https://example.com/repo@main")
-        .await
-        .unwrap();
+async fn test_check_bundle_status_git_not_cached() {
+    let cache_dir = tempfile::tempdir().expect("failed to create cache dir");
+    let status = check_bundle_status(
+        "git+https://127.0.0.1:1/org/repo@main",
+        Some(cache_dir.path()),
+    )
+    .await
+    .unwrap();
     assert!(!status.sources[0].is_cached);
 }
