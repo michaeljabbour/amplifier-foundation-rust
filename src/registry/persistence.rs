@@ -184,6 +184,31 @@ impl BundleRegistry {
         }
     }
 
+    /// Apply parsed JSON content to the registry's bundle map.
+    ///
+    /// Shared implementation used by both `load_persisted_state` (sync) and
+    /// `load_persisted_state_async` (async). The I/O differs between the two
+    /// callers, but parsing and insertion logic is identical.
+    ///
+    /// Returns:
+    /// - `Ok(())` if bundles were applied (including zero bundles from `{}`).
+    /// - `Err(None)` if the "bundles" key is absent or not an object (valid
+    ///   JSON, just no bundle data — not an error condition).
+    /// - `Err(Some(e))` if JSON parsing failed (corrupt content).
+    fn apply_persisted_content(&mut self, content: &str) -> Result<(), Option<serde_json::Error>> {
+        let data: serde_json::Value = serde_json::from_str(content).map_err(Some)?;
+
+        if let Some(bundles) = data.get("bundles").and_then(|v| v.as_object()) {
+            let map = self.bundles.get_mut().unwrap_or_else(|e| e.into_inner());
+            for (name, bundle_data) in bundles {
+                map.insert(name.clone(), BundleState::from_dict(name, bundle_data));
+            }
+            Ok(())
+        } else {
+            Err(None)
+        }
+    }
+
     /// Load persisted state from registry.json.
     ///
     /// Remains sync because it's called from `BundleRegistry::new()`, which
@@ -200,23 +225,15 @@ impl BundleRegistry {
             Err(_) => return,
         };
 
-        let data: serde_json::Value = match serde_json::from_str(&content) {
-            Ok(d) => d,
-            Err(_) => return,
-        };
-
-        if let Some(bundles) = data.get("bundles").and_then(|v| v.as_object()) {
-            let map = self.bundles.get_mut().unwrap_or_else(|e| e.into_inner());
-            for (name, bundle_data) in bundles {
-                map.insert(name.clone(), BundleState::from_dict(name, bundle_data));
-            }
-        }
+        // Silently swallow all errors (pre-existing behavior, matches Python).
+        let _ = self.apply_persisted_content(&content);
     }
 
     /// Async version of [`load_persisted_state`](Self::load_persisted_state).
     ///
     /// Uses `tokio::fs` for non-blocking file I/O. Logs warnings on I/O and
     /// parse errors (unlike the sync version which silently swallows them).
+    /// Missing "bundles" key is treated as valid (not an error).
     /// Returns empty state on any error (self-healing behavior matching Python).
     pub(super) async fn load_persisted_state_async(&mut self) {
         let registry_path = self.home.join("registry.json");
@@ -234,22 +251,17 @@ impl BundleRegistry {
             }
         };
 
-        let data: serde_json::Value = match serde_json::from_str(&content) {
-            Ok(d) => d,
-            Err(e) => {
+        match self.apply_persisted_content(&content) {
+            Ok(()) => {}
+            Err(None) => {
+                // Valid JSON but no "bundles" key — not an error (e.g., {"version": 1}).
+            }
+            Err(Some(e)) => {
                 tracing::warn!(
                     "Failed to parse registry JSON {}: {}",
                     registry_path.display(),
                     e
                 );
-                return;
-            }
-        };
-
-        if let Some(bundles) = data.get("bundles").and_then(|v| v.as_object()) {
-            let map = self.bundles.get_mut().unwrap_or_else(|e| e.into_inner());
-            for (name, bundle_data) in bundles {
-                map.insert(name.clone(), BundleState::from_dict(name, bundle_data));
             }
         }
     }

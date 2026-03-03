@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 22
-phase_name: "Wave 22 -- Async MentionResolver, async registry constructor, concurrent validate"
-epoch: 23
-next_action: "Wave 22 COMPLETE. 606 tests passing, 0 clippy warnings, cargo fmt clean. All mentions/resolver I/O now async, registry has async constructor, validate_cached_paths uses concurrent metadata checks. Consider: PyO3 bindings, benchmarks, extract shared parse logic in persistence.rs"
+phase: 23
+phase_name: "Wave 23 -- DRY persistence, pyo3 abi3 fix, criterion benchmarks"
+epoch: 24
+next_action: "Implementing Wave 23: F-077 DRY persistence load, F-078 pyo3 abi3 fix + pymodule scaffold, F-079 criterion benchmarks"
 blockers: []
 
 architecture_spec:
@@ -766,16 +766,38 @@ features:
     completed_at: "2025-01-30T01:30:00Z"
     commit: "25bdbc1"
 
+  F-077-dry-persistence-load:
+    name: "Extract shared parse logic between sync/async load_persisted_state into helper"
+    module: "registry"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-075-async-registry-constructor"]
+    started_at: "2025-01-31T00:00:00Z"
+
+  F-078-pyo3-abi3-fix:
+    name: "Fix pyo3 abi3 compatibility for Python 3.14+ and add basic pymodule scaffold"
+    module: "root"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: []
+
+  F-079-criterion-benchmarks:
+    name: "Add criterion benchmarks for core operations (deep_merge, from_dict, compose, to_mount_plan)"
+    module: "all"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: []
+
 wave_gate:
-  current_wave: 22
+  current_wave: 23
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
-  approval_status: "approved"
-  notes: "Wave 22 COMPLETE: 606 tests (all passing), 0 clippy warnings, cargo fmt clean. MentionResolver async, async registry constructor, concurrent validate_cached_paths."
+  approval_status: "in-progress"
+  notes: "Wave 23 in progress: DRY persistence, pyo3 abi3 fix, criterion benchmarks."
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
   total_features_completed: 76
-  last_updated: "2025-01-30T01:30:00Z"
-  last_session: "session-027-wave22-async-mention-resolver"
+  last_updated: "2025-01-31T00:00:00Z"
+  last_session: "session-028-wave23-dry-pyo3-benchmarks"

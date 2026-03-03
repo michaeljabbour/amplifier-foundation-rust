@@ -2371,3 +2371,88 @@ async fn test_new_async_matches_sync_new() {
         async_reg.find_state("child-a").unwrap().to_dict(),
     );
 }
+
+// ---------------------------------------------------------------------------
+// DRY persistence: shared parse logic (F-077)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_empty_bundles_object_loads_as_empty() {
+    // Verifies shared parse logic handles valid JSON with empty bundles.
+    // Both sync and async should produce identical empty registries.
+    let tmp = tempdir().unwrap();
+    let home = tmp.path().to_path_buf();
+    fs::create_dir_all(&home).unwrap();
+    fs::write(
+        home.join("registry.json"),
+        r#"{"version": 1, "bundles": {}}"#,
+    )
+    .unwrap();
+
+    let sync_reg = BundleRegistry::new(home.clone());
+    let async_reg = BundleRegistry::new_async(home).await;
+
+    assert!(sync_reg.list_registered().is_empty());
+    assert!(async_reg.list_registered().is_empty());
+}
+
+#[tokio::test]
+async fn test_missing_bundles_key_loads_as_empty() {
+    // Verifies shared parse logic handles valid JSON without "bundles" key.
+    let tmp = tempdir().unwrap();
+    let home = tmp.path().to_path_buf();
+    fs::create_dir_all(&home).unwrap();
+    fs::write(home.join("registry.json"), r#"{"version": 1}"#).unwrap();
+
+    let sync_reg = BundleRegistry::new(home.clone());
+    let async_reg = BundleRegistry::new_async(home).await;
+
+    assert!(sync_reg.list_registered().is_empty());
+    assert!(async_reg.list_registered().is_empty());
+}
+
+#[tokio::test]
+async fn test_sync_async_identical_for_corrupt_json() {
+    // Both sync and async constructors should self-heal to empty on corrupt JSON.
+    let tmp = tempdir().unwrap();
+    let home = tmp.path().to_path_buf();
+    fs::create_dir_all(&home).unwrap();
+    fs::write(home.join("registry.json"), "{{invalid json").unwrap();
+
+    let sync_reg = BundleRegistry::new(home.clone());
+    let async_reg = BundleRegistry::new_async(home).await;
+
+    assert!(sync_reg.list_registered().is_empty());
+    assert!(async_reg.list_registered().is_empty());
+}
+
+#[tokio::test]
+async fn test_bundles_wrong_type_loads_as_empty() {
+    // Verifies shared parse logic handles "bundles" key that is not an object.
+    // e.g., "bundles": "oops" or "bundles": null or "bundles": 42
+    for content in &[
+        r#"{"version": 1, "bundles": "oops"}"#,
+        r#"{"version": 1, "bundles": null}"#,
+        r#"{"version": 1, "bundles": 42}"#,
+        r#"{"version": 1, "bundles": [1, 2, 3]}"#,
+    ] {
+        let tmp = tempdir().unwrap();
+        let home = tmp.path().to_path_buf();
+        fs::create_dir_all(&home).unwrap();
+        fs::write(home.join("registry.json"), content).unwrap();
+
+        let sync_reg = BundleRegistry::new(home.clone());
+        let async_reg = BundleRegistry::new_async(home).await;
+
+        assert!(
+            sync_reg.list_registered().is_empty(),
+            "sync should be empty for: {}",
+            content
+        );
+        assert!(
+            async_reg.list_registered().is_empty(),
+            "async should be empty for: {}",
+            content
+        );
+    }
+}
