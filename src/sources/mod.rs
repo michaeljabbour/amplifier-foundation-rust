@@ -183,5 +183,3 @@ pub trait SourceResolver: Send + Sync {
     /// if the URI cannot be resolved by any handler.
     async fn resolve(&self, uri: &str) -> crate::error::Result<ResolvedSource>;
 }
-
-

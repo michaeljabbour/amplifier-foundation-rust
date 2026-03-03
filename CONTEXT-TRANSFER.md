@@ -6,6 +6,81 @@
 
 ---
 
+## Session 015 -- Wave 10 COMPLETE (F-038, F-039, F-040)
+
+### Work Completed
+- **F-038-update-info** (9fa7304): Ported `UpdateInfo` dataclass from Python's `registry.py`. 4-field struct (name, current_version, available_version, uri) for bundle-level update notifications. Derives `Serialize`/`Deserialize`/`Hash`/`Eq` for JSON serialization and `HashSet` usage. Doc comment clarifies relationship to `SourceStatus` (source-level vs bundle-level). Re-exported in `lib.rs`. 8 new tests (integration + reexport).
+- **F-039-source-status-enrichment** (aa73c62): Enriched `SourceStatus` with all Python `SourceStatus` fields: `is_cached`, `cached_at`, `cached_ref`, `cached_commit`, `remote_ref`, `remote_commit`, `error`, `summary`. Added `Default` derive for backward-compatible construction via `..Default::default()`. Added `new(uri)` constructor. Added `is_pinned()` method matching Python behavior (case-insensitive hex SHA detection via `.lower()` parity). Added `Serialize`/`Deserialize`. Documented Rust-only fields (`current_version`, `latest_version`) and `uri` vs `source_uri` naming difference. Updated `check_bundle_status` to populate `summary` and `is_cached` fields. 18 new tests including `is_pinned` edge cases.
+- **F-040-source-protocol-traits** (10a41ab): Ported Python's `SourceHandlerWithStatusProtocol` and `SourceResolverProtocol` as Rust traits. `SourceHandlerWithStatus` extends `SourceHandler` with `get_status()` (non-destructive) and `update()` (forced re-download). `SourceResolver` is the higher-level URI-to-path trait, implemented by `SimpleSourceResolver`. Both re-exported in `lib.rs`. 7 new tests.
+
+### Wave 10 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 410 passing, 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **UpdateInfo derives Serialize/Deserialize/Hash**: Unlike `BundleState` (which hand-rolls to_dict/from_dict), `UpdateInfo` uses serde derives. Update-check results are likely to be serialized to JSON for CLI output or logging. `Hash` derives freely from `Eq` + all-String fields, enabling `HashSet<UpdateInfo>` for dedup.
+- **UpdateInfo is a data-only struct with no consumers yet**: No function in the crate currently returns `UpdateInfo`. It's the result type for the planned `BundleRegistry::check_for_updates()` method. Documented as "currently a data-only struct" in doc comment.
+- **UpdateInfo.available_version is String (not Option<String>)**: Unlike `SourceStatus.has_update` which can be unknown, `UpdateInfo` represents a *confirmed* update — the version is always known.
+- **SourceStatus enrichment preserves backward compatibility**: New fields use `Default` derive so existing construction sites (`SourceStatus { uri: ..., has_update: ..., ..Default::default() }`) compile without changes. New `SourceStatus::new(uri)` constructor added for future code.
+- **SourceStatus.uri kept (not renamed to source_uri)**: Python uses `source_uri`; Rust uses `uri` for consistency with `BundleState.uri` and other Rust types. Documented in field doc comment. Suggested adding `#[serde(rename = "source_uri")]` if cross-language serialization is needed.
+- **SourceStatus.cached_at is String, not chrono::DateTime**: Avoids forcing a chrono dependency on consumers. Documented trade-off in field doc comment.
+- **SourceStatus.current_version / latest_version documented as Rust-only**: These fields have no Python equivalent. Doc comments mark them as Rust-only additions and point to `cached_commit`/`remote_commit` as the Python equivalents.
+- **is_pinned() uses case-insensitive hex detection**: Python's `.lower()` normalizes before checking. Rust uses `is_ascii_hexdigit()` (which matches both cases). Antagonistic review correctly identified that the initial implementation rejected uppercase SHAs, which was a bug.
+- **is_pinned() treats empty string as not pinned**: `Some("")` returns `false` — Python's `if not self.cached_ref:` treats empty string as falsy.
+- **SourceHandlerWithStatus.update() returns ResolvedSource**: Python returns `Path`. Rust returns `ResolvedSource` for consistency with `SourceHandler::resolve()`. Documented as intentional divergence.
+- **SourceHandlerWithStatus is a forward-declared protocol**: No concrete implementations exist yet. The existing `check_bundle_status()`/`update_bundle()` use simpler hardcoded dispatch. Handlers will implement this trait as update support is added.
+- **SourceResolver trait formalized**: `SimpleSourceResolver` already had the `resolve(uri)` method. Now it also `impl SourceResolver`, enabling use as `&dyn SourceResolver`.
+
+### Antagonistic Review Issues Found & Fixed
+- F-038: Added `Serialize`/`Deserialize` derives (reviewer: "inconsistent with ProviderPreference which has serde derives")
+- F-038: Added `Hash` derive (reviewer: "Eq without Hash is a half-commitment")
+- F-038: Expanded doc-test to assert all 4 fields (reviewer: "doc-test only exercises 2/4 fields")
+- F-038: Added doc comment explaining relationship to SourceStatus (reviewer: "undefined relationship is confusing")
+- F-039: Fixed `is_pinned()` to accept uppercase SHAs (reviewer correctly identified Python `.lower()` behavior)
+- F-039: Fixed test `test_source_status_not_pinned_uppercase_sha` to assert `true` (was asserting buggy behavior)
+- F-039: Added mixed-case SHA, empty string, and bare "v" edge case tests
+- F-039: Added `SourceStatus::new(uri)` constructor (reviewer: "Default enables empty uri construction")
+- F-039: Added `Serialize`/`Deserialize` derives on SourceStatus
+- F-039: Documented `cached_at` as String trade-off and `uri` vs `source_uri` naming
+- F-039: Documented `current_version`/`latest_version` as Rust-only fields
+- F-040: Documented `update()` return type divergence from Python (ResolvedSource vs Path)
+- F-040: Documented traits as forward-declared protocols (no implementations yet)
+- F-040: Renamed compile-time tests to be honest about what they test
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-038: `UpdateInfo` is a dead struct with no consumers — documented as planned for `BundleRegistry::check_for_updates()`
+- F-039: `SourceStatus::default()` allows empty `uri` — mitigated by `SourceStatus::new()` constructor
+- F-040: `SourceHandlerWithStatus` has zero implementors — forward-declared protocol, will be implemented as update support is added
+- F-040: `check_bundle_status`/`update_bundle` don't dispatch through new traits — simpler hardcoded dispatch predates the trait, acceptable for current functionality level
+- F-040: Some tests are compile-time checks rather than behavioral tests — acknowledged in test names
+
+### Python __all__ Parity Status
+After Wave 10, the Rust crate exports equivalents for **all 61** Python `__all__` items:
+- ✅ `UpdateInfo` (F-038, was missing)
+- ✅ `SourceResolverProtocol` → `SourceResolver` trait (F-040, was missing)
+- ✅ `SourceHandlerWithStatusProtocol` → `SourceHandlerWithStatus` trait (F-040, was missing)
+- ✅ `SourceHandlerProtocol` → `SourceHandler` trait (existed)
+- ✅ `MentionResolverProtocol` → `MentionResolver` trait (existed)
+- ✅ `CacheProviderProtocol` → `CacheProvider` trait (existed)
+- ✅ `BundleNotFoundError` etc. → `BundleError::NotFound` etc. variants (existed)
+- ✅ All 54 other items (existed since Session 009+)
+
+### What's Next
+- All 10 waves complete. 410 tests, 0 clippy warnings, 40 features delivered.
+- Python `__all__` parity: 100% (all 61 items have Rust equivalents)
+- Remaining unported Python functionality (no tests, not in __all__):
+  - `ModuleActivator` (modules/activator.py) — async module activation via subprocess. Depends on `uv` tooling. No Python tests.
+  - `BundleModuleResolver/BundleModuleSource` (bundle.py:711-842) — maps module IDs to paths. Depends on ModuleActivator.
+  - `PreparedBundle` (bundle.py:845-1289) — session lifecycle controller. Depends on AmplifierRuntime traits being concrete.
+- Consider: PyO3 bindings (feature flag exists, no `#[pyclass]`/`#[pymodule]` code)
+- Consider: Concrete `SourceHandlerWithStatus` impl on GitSourceHandler (git ls-remote status checking)
+- Consider: Benchmarks (bundle compose, cache operations, fingerprint computation)
+- Consider: Wire `SourceHandlerWithStatus` into `check_bundle_status`/`update_bundle`
+
+---
+
 ## Session 014 -- Wave 9 COMPLETE (F-035, F-036, F-037)
 
 ### Work Completed

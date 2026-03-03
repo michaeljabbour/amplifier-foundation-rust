@@ -1346,7 +1346,9 @@ async fn test_source_resolver_via_trait() {
     let dyn_resolver: &dyn SourceResolver = &resolver;
 
     // Non-existent file should return NotFound
-    let result = dyn_resolver.resolve("file:///nonexistent/path/to/bundle").await;
+    let result = dyn_resolver
+        .resolve("file:///nonexistent/path/to/bundle")
+        .await;
     assert!(result.is_err());
 }
 
