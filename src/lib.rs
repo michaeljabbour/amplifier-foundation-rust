@@ -143,6 +143,9 @@ pub use spawn::{
 // -- Updates --
 pub use updates::{check_bundle_status, update_bundle, BundleStatus};
 
+// -- Module resolution --
+pub use bundle::module_resolver::{BundleModuleResolver, BundleModuleSource, ModuleActivate};
+
 // -- Modules --
 pub use modules::state::InstallStateManager;
 

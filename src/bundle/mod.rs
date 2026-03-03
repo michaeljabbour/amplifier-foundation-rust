@@ -1,4 +1,5 @@
 mod compose;
+pub mod module_resolver;
 pub mod mount;
 pub mod validator;
 
@@ -6,7 +7,6 @@ pub mod validator;
 // AmplifierRuntime/AmplifierSession (declared in src/runtime.rs).
 // Implement when the runtime layer is concrete enough to support them.
 //
-// - module_resolver: BundleModuleResolver, BundleModuleSource (maps module IDs to paths)
 // - prepared: PreparedBundle (session lifecycle controller -- create_session, spawn)
 // - prompt: System prompt factory (async closure for live @mention re-resolution)
 

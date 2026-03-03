@@ -3,12 +3,19 @@
 //! Ported from Python test_bundle.py -- 26 tests across 6 groups.
 //! All tests are Wave 3 (ignored until implementations land).
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
+use async_trait::async_trait;
 use serde_yaml_ng::{Mapping, Value};
 use tempfile::tempdir;
 
+use amplifier_foundation::bundle::module_resolver::{
+    BundleModuleResolver, BundleModuleSource, ModuleActivate,
+};
 use amplifier_foundation::bundle::Bundle;
 
 // ---------------------------------------------------------------------------
@@ -773,4 +780,247 @@ fn test_missing_lists_pass() {
     assert!(bundle.providers.is_empty());
     assert!(bundle.tools.is_empty());
     assert!(bundle.hooks.is_empty());
+}
+
+// ---------------------------------------------------------------------------
+// BundleModuleSource
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_bundle_module_source_resolve() {
+    let path = PathBuf::from("/modules/tool-bash");
+    let source = BundleModuleSource::new(path.clone());
+    assert_eq!(source.resolve(), &path);
+}
+
+// ---------------------------------------------------------------------------
+// BundleModuleResolver
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_bundle_module_resolver_resolve_found() {
+    let mut paths = HashMap::new();
+    paths.insert("tool-bash".to_string(), PathBuf::from("/modules/tool-bash"));
+    paths.insert("tool-web".to_string(), PathBuf::from("/modules/tool-web"));
+
+    let resolver = BundleModuleResolver::new(paths, None);
+    let source = resolver.resolve("tool-bash", None).unwrap();
+    assert_eq!(source.resolve(), Path::new("/modules/tool-bash"));
+}
+
+#[test]
+fn test_bundle_module_resolver_resolve_not_found() {
+    let paths = HashMap::new();
+    let resolver = BundleModuleResolver::new(paths, None);
+    let result = resolver.resolve("nonexistent", None);
+    assert!(result.is_err());
+    let err_msg = format!("{}", result.unwrap_err());
+    assert!(err_msg.contains("nonexistent"));
+    assert!(err_msg.contains("not found"));
+}
+
+#[test]
+fn test_bundle_module_resolver_resolve_error_lists_available() {
+    let mut paths = HashMap::new();
+    paths.insert("tool-bash".to_string(), PathBuf::from("/modules/tool-bash"));
+
+    let resolver = BundleModuleResolver::new(paths, None);
+    let result = resolver.resolve("missing-tool", None);
+    assert!(result.is_err());
+    let err_msg = format!("{}", result.unwrap_err());
+    // Error should list available modules
+    assert!(err_msg.contains("tool-bash"));
+}
+
+#[test]
+fn test_bundle_module_resolver_get_module_source_found() {
+    let mut paths = HashMap::new();
+    paths.insert("tool-bash".to_string(), PathBuf::from("/modules/tool-bash"));
+
+    let resolver = BundleModuleResolver::new(paths, None);
+    let result = resolver.get_module_source("tool-bash");
+    assert!(result.is_some());
+    assert!(result.unwrap().contains("tool-bash"));
+}
+
+#[test]
+fn test_bundle_module_resolver_get_module_source_not_found() {
+    let paths = HashMap::new();
+    let resolver = BundleModuleResolver::new(paths, None);
+    assert_eq!(resolver.get_module_source("missing"), None);
+}
+
+// Mock activator for async_resolve tests
+struct MockActivator {
+    result_path: PathBuf,
+}
+
+#[async_trait]
+impl ModuleActivate for MockActivator {
+    async fn activate(
+        &self,
+        _module_name: &str,
+        _source_uri: &str,
+    ) -> amplifier_foundation::Result<PathBuf> {
+        Ok(self.result_path.clone())
+    }
+}
+
+struct FailingActivator;
+
+#[async_trait]
+impl ModuleActivate for FailingActivator {
+    async fn activate(
+        &self,
+        module_name: &str,
+        _source_uri: &str,
+    ) -> amplifier_foundation::Result<PathBuf> {
+        Err(amplifier_foundation::BundleError::LoadError {
+            reason: format!("Failed to activate {}", module_name),
+            source: None,
+        })
+    }
+}
+
+#[tokio::test]
+async fn test_bundle_module_resolver_async_resolve_fast_path() {
+    let mut paths = HashMap::new();
+    paths.insert("tool-bash".to_string(), PathBuf::from("/modules/tool-bash"));
+
+    let resolver = BundleModuleResolver::new(paths, None);
+    let result = resolver.async_resolve("tool-bash", None).await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().resolve(), Path::new("/modules/tool-bash"));
+}
+
+#[tokio::test]
+async fn test_bundle_module_resolver_async_resolve_lazy_activation() {
+    let paths = HashMap::new();
+    let activator = Arc::new(MockActivator {
+        result_path: PathBuf::from("/activated/tool-new"),
+    });
+
+    let resolver = BundleModuleResolver::new(paths, Some(activator));
+    let result = resolver
+        .async_resolve("tool-new", Some("git+https://example.com/tool-new"))
+        .await;
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().resolve(), Path::new("/activated/tool-new"));
+
+    // After activation, sync resolve should also work
+    let sync_result = resolver.resolve("tool-new", None);
+    assert!(sync_result.is_ok());
+}
+
+#[tokio::test]
+async fn test_bundle_module_resolver_async_resolve_no_activator() {
+    let paths = HashMap::new();
+    let resolver = BundleModuleResolver::new(paths, None);
+    let result = resolver
+        .async_resolve("missing", Some("git+https://example.com"))
+        .await;
+    assert!(result.is_err());
+    let err_msg = format!("{}", result.unwrap_err());
+    assert!(err_msg.contains("no activator"));
+}
+
+#[tokio::test]
+async fn test_bundle_module_resolver_async_resolve_no_hint() {
+    let paths = HashMap::new();
+    let activator = Arc::new(MockActivator {
+        result_path: PathBuf::from("/activated/tool"),
+    });
+    let resolver = BundleModuleResolver::new(paths, Some(activator));
+    let result = resolver.async_resolve("missing", None).await;
+    assert!(result.is_err());
+    let err_msg = format!("{}", result.unwrap_err());
+    assert!(err_msg.contains("no source hint"));
+}
+
+#[tokio::test]
+async fn test_bundle_module_resolver_async_resolve_activation_failure() {
+    let paths = HashMap::new();
+    let activator: Arc<dyn ModuleActivate> = Arc::new(FailingActivator);
+    let resolver = BundleModuleResolver::new(paths, Some(activator));
+    let result = resolver
+        .async_resolve("failing-tool", Some("git+https://example.com"))
+        .await;
+    assert!(result.is_err());
+    let err_msg = format!("{}", result.unwrap_err());
+    assert!(err_msg.contains("activation failed"));
+}
+
+// Counting activator for concurrency tests
+struct CountingActivator {
+    call_count: Arc<AtomicUsize>,
+    result_path: PathBuf,
+}
+
+#[async_trait]
+impl ModuleActivate for CountingActivator {
+    async fn activate(
+        &self,
+        _module_name: &str,
+        _source_uri: &str,
+    ) -> amplifier_foundation::Result<PathBuf> {
+        self.call_count.fetch_add(1, Ordering::SeqCst);
+        // Small delay to simulate real work and increase chance of contention
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        Ok(self.result_path.clone())
+    }
+}
+
+#[tokio::test]
+async fn test_bundle_module_resolver_concurrent_activation_deduplicates() {
+    let call_count = Arc::new(AtomicUsize::new(0));
+    let activator: Arc<dyn ModuleActivate> = Arc::new(CountingActivator {
+        call_count: call_count.clone(),
+        result_path: PathBuf::from("/activated/tool-x"),
+    });
+
+    let resolver = Arc::new(BundleModuleResolver::new(HashMap::new(), Some(activator)));
+
+    // Spawn 10 tasks all requesting the same unactivated module
+    let mut handles = vec![];
+    for _ in 0..10 {
+        let r = resolver.clone();
+        handles.push(tokio::spawn(async move {
+            r.async_resolve("tool-x", Some("git+https://example.com/tool-x"))
+                .await
+        }));
+    }
+
+    let results: Vec<_> = futures::future::join_all(handles).await;
+
+    // All 10 tasks should succeed
+    for result in &results {
+        let inner = result.as_ref().unwrap();
+        assert!(
+            inner.is_ok(),
+            "Expected Ok, got: {:?}",
+            inner.as_ref().err()
+        );
+        assert_eq!(
+            inner.as_ref().unwrap().resolve(),
+            Path::new("/activated/tool-x")
+        );
+    }
+
+    // Activation should have been called exactly ONCE (double-checked locking works)
+    assert_eq!(
+        call_count.load(Ordering::SeqCst),
+        1,
+        "Activation should be called exactly once, but was called {} times",
+        call_count.load(Ordering::SeqCst)
+    );
+}
+
+#[test]
+fn test_bundle_module_resolver_debug() {
+    let mut paths = HashMap::new();
+    paths.insert("tool-bash".to_string(), PathBuf::from("/modules/tool-bash"));
+    let resolver = BundleModuleResolver::new(paths, None);
+    let debug_str = format!("{:?}", resolver);
+    assert!(debug_str.contains("BundleModuleResolver"));
+    assert!(debug_str.contains("tool-bash"));
 }
