@@ -140,6 +140,9 @@ pub use spawn::{apply_provider_preferences, ModelResolutionResult, ProviderPrefe
 // -- Updates --
 pub use updates::{check_bundle_status, update_bundle, BundleStatus};
 
+// -- Modules --
+pub use modules::state::InstallStateManager;
+
 // -- Runtime traits --
 pub use runtime::{
     AmplifierRuntime, AmplifierSession, ApprovalSystem, ContextManager, Coordinator, DisplaySystem,
