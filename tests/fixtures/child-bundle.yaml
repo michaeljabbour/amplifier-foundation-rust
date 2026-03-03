@@ -1,0 +1,29 @@
+bundle:
+  name: test-child-bundle
+  version: 3.0.0
+  description: A child bundle that extends the full bundle
+
+  providers:
+    - module: provider-anthropic
+      config:
+        model: claude-sonnet-4-20250514
+        max_tokens: 16384
+    - module: provider-google
+      config:
+        model: gemini-2.5-pro
+
+  tools:
+    - module: tool-filesystem
+      config:
+        allowed_paths:
+          - /workspace
+    - module: tool-search
+      config:
+        engine: duckduckgo
+
+  session:
+    orchestrator:
+      module: loop-streaming
+      config:
+        extended_thinking: false
+        stream: true

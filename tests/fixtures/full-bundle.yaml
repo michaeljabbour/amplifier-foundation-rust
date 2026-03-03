@@ -1,0 +1,61 @@
+bundle:
+  name: test-full-bundle
+  version: 2.1.0
+  description: A complete bundle for integration testing
+
+  session:
+    orchestrator:
+      module: loop-streaming
+      config:
+        extended_thinking: true
+        max_tokens: 200000
+    context:
+      module: context-simple
+      config:
+        max_tokens: 300000
+        compact_threshold: 0.8
+    debug: true
+
+  providers:
+    - module: provider-anthropic
+      config:
+        model: claude-sonnet-4-20250514
+        max_tokens: 8192
+    - module: provider-openai
+      config:
+        model: gpt-4o
+        max_tokens: 4096
+
+  tools:
+    - module: tool-filesystem
+      config:
+        allowed_paths:
+          - /home/user/projects
+          - /tmp
+    - module: tool-bash
+      config:
+        timeout: 30
+    - module: tool-web
+
+  hooks:
+    - module: hook-shell
+      config:
+        events:
+          - before_turn
+          - after_turn
+
+  agents:
+    explorer:
+      description: Deep codebase exploration agent
+      model_preferences:
+        - provider: anthropic
+          model: claude-sonnet-4-20250514
+    builder:
+      description: Implementation agent
+      model_preferences:
+        - provider: openai
+          model: gpt-4o
+
+  spawn:
+    default_provider: anthropic
+    default_model: claude-sonnet-4-20250514
