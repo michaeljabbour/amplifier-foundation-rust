@@ -150,13 +150,14 @@ impl SystemPromptFactory for BundleSystemPromptFactory {
                 instruction_parts.push(instruction.clone());
             }
 
-            // Load and append all context files (re-read each call)
+            // Load and append all context files (re-read each call).
+            // Uses tokio::fs::read_to_string for async I/O on context files.
+            // Note: load_mentions() called below still uses blocking I/O internally
+            // (pre-existing pattern documented since Session 012). Full async migration
+            // of the mentions subsystem is tracked as future work.
             for (context_name, context_path) in &self.bundle.context {
-                if context_path.exists() {
-                    if let Ok(content) = std::fs::read_to_string(context_path) {
-                        instruction_parts
-                            .push(format!("# Context: {}\n\n{}", context_name, content));
-                    }
+                if let Ok(content) = tokio::fs::read_to_string(context_path).await {
+                    instruction_parts.push(format!("# Context: {}\n\n{}", context_name, content));
                 }
             }
 

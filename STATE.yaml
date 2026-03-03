@@ -633,17 +633,20 @@ features:
   F-063-mention-resolver-context:
     name: "Enhance BaseMentionResolver for context-dict namespace lookup"
     module: "mentions, bundle"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-061-prepared-bundle"]
     started_at: "2025-01-26T00:35:00Z"
+    completed_at: "2025-01-26T01:00:00Z"
+    commit: "6544002"
 
   F-064-async-prompt-io:
     name: "Replace blocking std::fs with tokio::fs in BundleSystemPromptFactory"
     module: "bundle"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-061-prepared-bundle"]
+    started_at: "2025-01-26T01:05:00Z"
 
 wave_gate:
   current_wave: 18
