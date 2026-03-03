@@ -99,14 +99,12 @@ fn make_complex_bundle_value() -> Value {
 // ===========================================================================
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_simple_cache_get_miss() {
     let cache = SimpleCache::new();
     assert!(cache.get("nonexistent").is_none());
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_simple_cache_set_and_get() {
     let mut cache = SimpleCache::new();
     let value = make_bundle_value("test-bundle", "1.0.0");
@@ -119,7 +117,6 @@ fn test_simple_cache_set_and_get() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_simple_cache_contains() {
     let mut cache = SimpleCache::new();
     assert!(!cache.contains("test-key"));
@@ -135,7 +132,6 @@ fn test_simple_cache_contains() {
 // ===========================================================================
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_disk_cache_requires_cache_dir() {
     let tmp = tempdir().expect("failed to create temp dir");
     let cache_dir = tmp.path().join("bundles");
@@ -147,7 +143,6 @@ fn test_disk_cache_requires_cache_dir() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_disk_cache_get_miss() {
     let tmp = tempdir().expect("failed to create temp dir");
     let cache = DiskCache::new(tmp.path());
@@ -156,7 +151,6 @@ fn test_disk_cache_get_miss() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_disk_cache_set_and_get() {
     let tmp = tempdir().expect("failed to create temp dir");
     let mut cache = DiskCache::new(tmp.path());
@@ -171,7 +165,6 @@ fn test_disk_cache_set_and_get() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_disk_cache_persists_across_instances() {
     let tmp = tempdir().expect("failed to create temp dir");
     let cache_dir = tmp.path().to_path_buf();
@@ -207,7 +200,6 @@ fn test_disk_cache_persists_across_instances() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_disk_cache_contains() {
     let tmp = tempdir().expect("failed to create temp dir");
     let mut cache = DiskCache::new(tmp.path());
@@ -221,7 +213,6 @@ fn test_disk_cache_contains() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_disk_cache_clear() {
     let tmp = tempdir().expect("failed to create temp dir");
     let mut cache = DiskCache::new(tmp.path());
@@ -245,7 +236,6 @@ fn test_disk_cache_clear() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_disk_cache_handles_complex_bundle() {
     let tmp = tempdir().expect("failed to create temp dir");
     let mut cache = DiskCache::new(tmp.path());
@@ -260,7 +250,6 @@ fn test_disk_cache_handles_complex_bundle() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_disk_cache_invalid_cache_returns_none() {
     let tmp = tempdir().expect("failed to create temp dir");
     let mut cache = DiskCache::new(tmp.path());
@@ -279,7 +268,6 @@ fn test_disk_cache_invalid_cache_returns_none() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_disk_cache_cache_key_to_path_safe_filename() {
     let tmp = tempdir().expect("failed to create temp dir");
     let cache = DiskCache::new(tmp.path());

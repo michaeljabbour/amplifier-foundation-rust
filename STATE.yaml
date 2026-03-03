@@ -13,7 +13,7 @@
 phase: 1
 phase_name: "Wave 1 -- Leaf Modules (all sync)"
 epoch: 2
-next_action: "Implement F-007-paths (in-progress)"
+next_action: "Implement F-008-cache"
 blockers: []
 
 architecture_spec:
@@ -98,16 +98,19 @@ features:
   F-007-paths:
     name: "Implement paths module (parse_uri, normalize, discovery)"
     module: "paths"
-    status: "in-progress"
+    status: "done"
     spec: "specs/modules/paths.md"
     depends_on: ["F-003-test-port-wave1"]
     started_at: "2025-01-15T12:20:00Z"
+    completed_at: "2025-01-16T01:00:00Z"
+    commit: "ae90ca4"
   F-008-cache:
     name: "Implement cache module (SimpleCache, DiskCache)"
     module: "cache"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/modules/cache.md"
     depends_on: ["F-003-test-port-wave1"]
+    started_at: "2025-01-16T01:10:00Z"
   F-009-serialization:
     name: "Implement serialization module (sanitize_for_json, sanitize_message)"
     module: "serialization"
@@ -137,6 +140,6 @@ wave_gate:
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 5
-  last_updated: "2025-01-15T12:00:00Z"
-  last_session: "session-003-wave1-start"
+  total_features_completed: 7
+  last_updated: "2025-01-16T01:00:00Z"
+  last_session: "session-004-wave1-paths-cache-serialization"
