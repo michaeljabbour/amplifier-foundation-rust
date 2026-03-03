@@ -706,7 +706,21 @@ impl BundleRegistry {
             }
 
             // Set base_path
-            bundle.base_path = Some(bundle_dir);
+            bundle.base_path = Some(bundle_dir.clone());
+
+            // Update registry state with local_path if bundle is registered.
+            // Matches Python's state.local_path = str(local_path) after loading.
+            // This enables resolve_include_source to find files on disk for
+            // namespace:path resolution.
+            if !bundle.name.is_empty() {
+                let local_str = bundle_dir.display().to_string();
+                let now = chrono::Utc::now().to_rfc3339();
+                let mut bundles = self.bundles.write().unwrap_or_else(|e| e.into_inner());
+                if let Some(state) = bundles.get_mut(&bundle.name) {
+                    state.local_path = Some(local_str);
+                    state.loaded_at = Some(now);
+                }
+            }
 
             // Handle includes recursively
             if !bundle.includes.is_empty() {
@@ -808,6 +822,137 @@ impl BundleRegistry {
 
     /// Compose a bundle with its includes.
     ///
+    /// Pre-load namespace bundles to populate their `local_path` before
+    /// resolving `namespace:path` includes.
+    ///
+    /// When processing includes with `namespace:path` syntax (e.g.,
+    /// `foundation:behaviors/logging`), we need the namespace bundle to be
+    /// loaded first so its `local_path` is available for path resolution
+    /// in `resolve_include_source`.
+    ///
+    /// This method identifies registered-but-not-yet-loaded namespaces from
+    /// the includes list and loads them. Skips namespaces whose URI is already
+    /// in the loading chain (avoids circular preload).
+    ///
+    /// Port of Python `_preload_namespace_bundles`.
+    fn preload_namespace_bundles<'a>(
+        &'a self,
+        includes: &'a [Value],
+        loading_chain: &'a HashSet<String>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + 'a>> {
+        Box::pin(async move {
+            let mut namespaces_to_load: HashSet<String> = HashSet::new();
+
+            for include in includes {
+                let source = match parse_include(include) {
+                    Some(s) => s,
+                    None => continue,
+                };
+
+                // Check for namespace:path syntax (but not URIs like git+https://)
+                if source.contains(':') && !source.contains("://") {
+                    let namespace = match source.split_once(':') {
+                        Some((ns, _)) => ns,
+                        None => continue,
+                    };
+
+                    // Look up namespace state
+                    let needs_preload = {
+                        let bundles = self.bundles.read().unwrap_or_else(|e| e.into_inner());
+                        if let Some(state) = bundles.get(namespace) {
+                            // Only preload if registered but has no local_path yet
+                            if state.local_path.is_none() {
+                                // Skip if namespace URI is already in loading chain
+                                let uri = &state.uri;
+                                let base_uri = uri.split('#').next().unwrap_or(uri);
+                                let in_chain =
+                                    loading_chain.contains(uri) || loading_chain.contains(base_uri);
+                                if in_chain {
+                                    tracing::debug!(
+                                        "Skipping preload of '{}' - already in loading chain",
+                                        namespace
+                                    );
+                                    false
+                                } else {
+                                    true
+                                }
+                            } else {
+                                false // Already has local_path
+                            }
+                        } else {
+                            false // Not registered
+                        }
+                    };
+
+                    if needs_preload {
+                        namespaces_to_load.insert(namespace.to_string());
+                    }
+                }
+            }
+
+            // Load namespace bundles to populate their local_path
+            for namespace in &namespaces_to_load {
+                // Look up the URI for this namespace
+                let uri = {
+                    let bundles = self.bundles.read().unwrap_or_else(|e| e.into_inner());
+                    bundles.get(namespace).map(|s| s.uri.clone())
+                };
+                let uri = match uri {
+                    Some(u) => u,
+                    None => continue,
+                };
+
+                tracing::debug!("Pre-loading namespace bundle: {}", namespace);
+
+                // Lightweight preload: resolve URI to path, load bundle,
+                // and update local_path — WITHOUT processing the namespace
+                // bundle's own includes (matches Python's auto_include=False).
+                match resolve_file_uri(&uri) {
+                    Ok(local_path) => match self.load_from_path(&local_path) {
+                        Ok(bundle) => {
+                            let bundle_dir = if local_path.is_file() {
+                                local_path.parent().unwrap_or(&local_path).to_path_buf()
+                            } else {
+                                local_path.clone()
+                            };
+                            // Update local_path on the registry state
+                            let local_str = bundle_dir.display().to_string();
+                            let now = chrono::Utc::now().to_rfc3339();
+                            {
+                                let mut bundles =
+                                    self.bundles.write().unwrap_or_else(|e| e.into_inner());
+                                if let Some(state) = bundles.get_mut(namespace) {
+                                    state.local_path = Some(local_str);
+                                    state.loaded_at = Some(now);
+                                }
+                            }
+                            // Also cache the bundle for subsequent load_single_with_chain
+                            if let Ok(mut cache) = self.cache.lock() {
+                                cache.insert(uri.clone(), bundle);
+                            }
+                            tracing::debug!("Pre-loaded namespace '{}' successfully", namespace);
+                        }
+                        Err(e) => {
+                            // Python raises BundleDependencyError for non-circular errors
+                            tracing::warn!(
+                                "Cannot resolve includes: namespace '{}' failed to load: {}",
+                                namespace,
+                                e
+                            );
+                        }
+                    },
+                    Err(e) => {
+                        tracing::warn!(
+                            "Cannot resolve includes: namespace '{}' URI resolution failed: {}",
+                            namespace,
+                            e
+                        );
+                    }
+                }
+            }
+        })
+    }
+
     /// Two-phase approach matching Python's `_compose_includes`:
     /// - **Phase 1:** Parse and resolve all include sources (using `parse_include`
     ///   and `resolve_include_source`)
@@ -822,6 +967,10 @@ impl BundleRegistry {
     /// (parent → children, children → parent). This was previously a
     /// documented limitation due to the `&self`/`&mut self` borrow
     /// constraint, resolved by wrapping `bundles` in `RwLock` (F-056).
+    ///
+    /// Before resolving includes, calls `preload_namespace_bundles` to ensure
+    /// namespace bundles have their `local_path` populated for path resolution
+    /// (F-058).
     fn compose_includes<'a>(
         &'a self,
         bundle: Bundle,
@@ -830,6 +979,11 @@ impl BundleRegistry {
     {
         Box::pin(async move {
             let includes = bundle.includes.clone();
+
+            // Pre-load namespace bundles to populate their local_path
+            // before resolving namespace:path includes (F-058).
+            self.preload_namespace_bundles(&includes, loading_chain)
+                .await;
 
             // Phase 1: Parse and resolve all include sources
             let mut include_sources: Vec<String> = Vec::new();

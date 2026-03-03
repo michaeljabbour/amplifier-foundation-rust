@@ -1708,6 +1708,142 @@ async fn test_compose_includes_auto_records_skips_empty_names() {
 }
 
 // ===========================================================================
+// preload_namespace_bundles tests (F-058)
+// ===========================================================================
+
+#[tokio::test]
+async fn test_preload_populates_local_path() {
+    // After loading a registered bundle, its BundleState.local_path
+    // should be populated (needed for namespace:path resolution).
+    let tmp = tempdir().unwrap();
+    let root = tmp.path();
+
+    let bundle_dir = root.join("my-ns");
+    fs::create_dir_all(&bundle_dir).unwrap();
+    write_simple_bundle_yaml(&bundle_dir, "my-ns");
+
+    let uri = format!("file://{}", bundle_dir.display());
+    let mut registry = BundleRegistry::new(root.to_path_buf());
+    register_one(&mut registry, "my-ns", &uri);
+
+    // Before loading, local_path should be None
+    assert!(
+        registry.find_state("my-ns").unwrap().local_path.is_none(),
+        "local_path should be None before loading"
+    );
+
+    // Load the bundle
+    let _bundle = registry.load_single(&uri).await.unwrap();
+
+    // After loading, local_path should be populated
+    let state = registry.find_state("my-ns").unwrap();
+    assert!(
+        state.local_path.is_some(),
+        "local_path should be populated after loading"
+    );
+    assert!(
+        state.local_path.as_ref().unwrap().contains("my-ns"),
+        "local_path should point to bundle directory. Got: {:?}",
+        state.local_path
+    );
+}
+
+#[tokio::test]
+async fn test_preload_namespace_resolves_includes() {
+    // When a parent has namespace:path includes and the namespace is registered
+    // but not yet loaded, preload_namespace_bundles should load the namespace
+    // first so the include can be resolved.
+    let tmp = tempdir().unwrap();
+    let root = tmp.path();
+
+    // Create namespace bundle with a child skill inside it
+    let ns_dir = root.join("my-namespace");
+    fs::create_dir_all(&ns_dir).unwrap();
+    write_simple_bundle_yaml(&ns_dir, "my-namespace");
+
+    // Create a skill inside the namespace
+    let skill_dir = ns_dir.join("skills");
+    fs::create_dir_all(&skill_dir).unwrap();
+    let skill_content = "name: coding-skill\nversion: \"1.0.0\"\n";
+    fs::write(skill_dir.join("coding.yaml"), skill_content).unwrap();
+
+    // Create parent bundle that includes namespace:skills/coding
+    let parent_dir = root.join("parent");
+    fs::create_dir_all(&parent_dir).unwrap();
+    let parent_content =
+        "name: parent\nversion: \"1.0.0\"\nincludes:\n  - \"my-namespace:skills/coding\"\n";
+    write_bundle_yaml(&parent_dir, parent_content);
+
+    let ns_uri = format!("file://{}", ns_dir.display());
+    let parent_uri = format!("file://{}", parent_dir.display());
+
+    let mut registry = BundleRegistry::new(root.to_path_buf());
+    register_one(&mut registry, "my-namespace", &ns_uri);
+
+    // Before loading parent, namespace has no local_path
+    assert!(registry
+        .find_state("my-namespace")
+        .unwrap()
+        .local_path
+        .is_none());
+
+    // Loading parent should trigger preload of namespace
+    let bundle = registry.load_single(&parent_uri).await.unwrap();
+    assert_eq!(bundle.name, "parent");
+
+    // After loading, namespace should now have local_path populated
+    let ns_state = registry.find_state("my-namespace").unwrap();
+    assert!(
+        ns_state.local_path.is_some(),
+        "Namespace local_path should be populated after preload. Got: {:?}",
+        ns_state.local_path
+    );
+}
+
+#[tokio::test]
+async fn test_preload_skips_already_loaded_namespace() {
+    // If namespace already has local_path set, preload should skip it entirely.
+    // Prove this by setting local_path manually on a namespace whose URI points
+    // to a nonexistent path — if preload tried to load it, it would fail and
+    // potentially clear the local_path.
+    let tmp = tempdir().unwrap();
+    let root = tmp.path();
+
+    let mut registry = BundleRegistry::new(root.to_path_buf());
+
+    // Register a namespace with a fake URI (no bundle exists there)
+    register_one(&mut registry, "fake-ns", "file:///nonexistent/path");
+
+    // Manually set local_path (simulating a previously loaded namespace)
+    {
+        let state = registry.get_state("fake-ns");
+        state.local_path = Some("/some/populated/path".to_string());
+    }
+
+    // Create a parent that uses namespace:path include syntax
+    let parent_dir = root.join("parent");
+    fs::create_dir_all(&parent_dir).unwrap();
+    let parent_content =
+        "name: parent\nversion: \"1.0.0\"\nincludes:\n  - \"fake-ns:skills/coding\"\n";
+    write_bundle_yaml(&parent_dir, parent_content);
+
+    let parent_uri = format!("file://{}", parent_dir.display());
+
+    // Loading parent should NOT trigger preload of fake-ns because it has
+    // local_path set. If preload was triggered, it would try to load
+    // file:///nonexistent/path which doesn't exist.
+    let _ = registry.load_single(&parent_uri).await;
+
+    // Verify local_path was NOT changed (preload didn't touch it)
+    let ns_state = registry.find_state("fake-ns").unwrap();
+    assert_eq!(
+        ns_state.local_path.as_deref(),
+        Some("/some/populated/path"),
+        "Namespace with existing local_path should not be re-loaded by preload"
+    );
+}
+
+// ===========================================================================
 // check_update / update lifecycle tests (F-055)
 // ===========================================================================
 

@@ -574,16 +574,19 @@ features:
   F-057-auto-record-includes:
     name: "Auto-call record_include_relationships from compose_includes via RwLock"
     module: "registry"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-056-rwlock-bundles"]
     started_at: "2025-01-24T00:35:00Z"
+    completed_at: "2025-01-24T01:00:00Z"
+    commit: "d85c127"
   F-058-preload-namespace-bundles:
     name: "Port _preload_namespace_bundles for cold-start namespace resolution"
     module: "registry"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-056-rwlock-bundles"]
+    started_at: "2025-01-24T01:05:00Z"
 
 wave_gate:
   current_wave: 16
