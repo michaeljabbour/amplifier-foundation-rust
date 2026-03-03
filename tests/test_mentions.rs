@@ -4,27 +4,28 @@ use std::fs;
 
 use amplifier_foundation::mentions::parser::parse_mentions;
 use amplifier_foundation::mentions::resolver::BaseMentionResolver;
+use serial_test::serial;
 
 // ---------------------------------------------------------------------------
 // TestParseMentions
 // ---------------------------------------------------------------------------
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_no_mentions() {
     let result = parse_mentions("Hello world");
     assert!(result.is_empty());
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_simple_mention() {
     let result = parse_mentions("Check @file.md for details");
     assert_eq!(result, vec!["@file.md"]);
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_multiple_mentions() {
     let result = parse_mentions("See @first.md and @second.md");
     let result_set: HashSet<String> = result.into_iter().collect();
@@ -34,14 +35,14 @@ fn test_multiple_mentions() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_namespaced_mention() {
     let result = parse_mentions("Follow @foundation:philosophy");
     assert_eq!(result, vec!["@foundation:philosophy"]);
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_mention_in_code_block_excluded() {
     let text = "\
 @outside.md
@@ -57,7 +58,7 @@ fn test_mention_in_code_block_excluded() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_mention_in_inline_code_excluded() {
     let text = "Use `@code.md` but also @real.md";
     let result = parse_mentions(text);
@@ -66,35 +67,35 @@ fn test_mention_in_inline_code_excluded() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_mention_with_path() {
     let result = parse_mentions("Check @docs/guide.md");
     assert_eq!(result, vec!["@docs/guide.md"]);
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_deduplication() {
     let result = parse_mentions("@file.md and @file.md again");
     assert_eq!(result, vec!["@file.md"]);
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_tilde_home_path() {
     let result = parse_mentions("Check @~/.amplifier/AGENTS.md");
     assert!(result.contains(&"@~/.amplifier/AGENTS.md".to_string()));
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_dot_directory_path() {
     let result = parse_mentions("Check @.amplifier/AGENTS.md");
     assert!(result.contains(&"@.amplifier/AGENTS.md".to_string()));
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_explicit_relative_path() {
     let result = parse_mentions("See @./subdir/file.md and @./.amplifier/AGENTS.md");
     let result_set: HashSet<String> = result.into_iter().collect();
@@ -107,7 +108,7 @@ fn test_explicit_relative_path() {
 // ---------------------------------------------------------------------------
 
 #[test]
-#[ignore = "Wave 2"]
+#[serial]
 fn test_resolve_simple_file() {
     let tmp = tempfile::tempdir().unwrap();
     let file_path = tmp.path().join("AGENTS.md");
@@ -125,7 +126,7 @@ fn test_resolve_simple_file() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+#[serial]
 fn test_resolve_dot_directory() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join(".amplifier");
@@ -148,7 +149,7 @@ fn test_resolve_dot_directory() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+#[serial]
 fn test_resolve_explicit_relative() {
     let tmp = tempfile::tempdir().unwrap();
     let file_path = tmp.path().join("AGENTS.md");
@@ -170,7 +171,7 @@ fn test_resolve_explicit_relative() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+#[serial]
 fn test_resolve_explicit_relative_subdir() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join(".amplifier");
@@ -193,7 +194,7 @@ fn test_resolve_explicit_relative_subdir() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+#[serial]
 fn test_resolve_home_tilde_path() {
     let tmp = tempfile::tempdir().unwrap();
     let fake_home = tmp.path().join("fakehome");
@@ -215,7 +216,7 @@ fn test_resolve_home_tilde_path() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+#[serial]
 fn test_resolve_home_tilde_md_fallback() {
     let tmp = tempfile::tempdir().unwrap();
     let fake_home = tmp.path().join("fakehome");
@@ -238,7 +239,7 @@ fn test_resolve_home_tilde_md_fallback() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+#[serial]
 fn test_resolve_md_extension_fallback() {
     let tmp = tempfile::tempdir().unwrap();
     let file_path = tmp.path().join("AGENTS.md");
@@ -260,7 +261,7 @@ fn test_resolve_md_extension_fallback() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+#[serial]
 fn test_resolve_not_found_returns_none() {
     let tmp = tempfile::tempdir().unwrap();
 
@@ -275,7 +276,7 @@ fn test_resolve_not_found_returns_none() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_resolve_bundle_pattern_unchanged() {
     let resolver = BaseMentionResolver::with_bundles(HashMap::new());
     let resolved = resolver.resolve("@foundation:context/file.md");
@@ -283,7 +284,7 @@ fn test_resolve_bundle_pattern_unchanged() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+#[serial]
 fn test_resolve_uses_base_path_not_cwd() {
     let tmp = tempfile::tempdir().unwrap();
     let base_dir = tmp.path().join("base");

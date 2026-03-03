@@ -170,10 +170,19 @@ features:
   F-015-io:
     name: "Implement io module (write_with_backup, write_with_backup_bytes, read_with_retry, write_with_retry, read_yaml, write_yaml, parse_frontmatter)"
     module: "io"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-004-test-port-wave2"]
     started_at: "2025-01-16T06:00:00Z"
+    completed_at: "2025-01-16T06:30:00Z"
+    commit: "dcdb3fc"
+  F-016-mentions:
+    name: "Implement mentions module (parse_mentions, BaseMentionResolver)"
+    module: "mentions"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-004-test-port-wave2"]
+    started_at: "2025-01-16T06:30:00Z"
 
 wave_gate:
   current_wave: 2
