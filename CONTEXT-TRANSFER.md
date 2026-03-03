@@ -6,6 +6,75 @@
 
 ---
 
+## Session 020 -- Wave 15 COMPLETE (F-053, F-054, F-055)
+
+### Work Completed
+- **F-053-include-resolution-helpers** (e864dae): Ported `parse_include`, `find_resource_path`, `resolve_include_source`, and enhanced `extract_bundle_name`. `parse_include` handles string and `{"bundle": "..."}` mapping values with Python `str()` coercion for non-string types. `find_resource_path` probes 6 candidate paths (bare, .yaml, .yml, .md, bundle.yaml, bundle.md). `resolve_include_source` implements three-tier resolution: URI passthrough / namespace:path (git vs file) / plain name passthrough. Git namespaces: check URI type FIRST, compute `relative_to` for subdirectory fragment, return None when resource not found locally. `extract_bundle_name` enhanced to match Python (GitHub-aware, file://-aware, strips @ref and #fragment). 32 new tests including antagonistic review additions (git namespace with local_path, is_file check, relative path computation, BundleDependencyError for registered-but-missing paths).
+- **F-054-record-include-relationships** (9051522): Ported `record_include_relationships` with bidirectional includes/included_by update, dedup, and auto-persist. Enhanced `compose_includes` with two-phase approach: Phase 1 (parse+resolve all includes using `parse_include`+`resolve_include_source`), Phase 2 (load all resolved includes). Added `BundleDependencyError` for registered-but-unresolvable namespace paths (distinguishes "namespace not registered" from "path not found"). Known limitation: `record_include_relationships` not auto-called from compose_includes due to &self/&mut self borrow constraint. 8 new tests.
+- **F-055-registry-update-lifecycle** (c71a7d5): Ported `check_update_single`, `check_update_all`, `update_single`, `update_all` lifecycle methods. `check_update_single` updates `checked_at` timestamp (stub: always returns None). `update_single` bypasses in-memory cache (clears entry before `load_single`) to force fresh disk load, then updates version/loaded_at/checked_at. Split API: `check_update_single` returns `Option<UpdateInfo>`, `check_update_all` returns `Vec<UpdateInfo>` (more idiomatic than Python's overloaded return type). 8 new tests including cache bypass verification.
+
+### Wave 15 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 570 passing, 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **`parse_include` coerces non-string bundle values**: Python's `str(bundle_ref)` converts numbers/bools to strings. Rust matches by handling `Value::Number`, `Value::Bool(true)` explicitly. `Null`, `false`, and empty strings are treated as falsy (return None).
+- **`resolve_include_source` checks URI type before local_path**: Python checks `state.uri.startswith("git+")` FIRST, then branches into git-specific or non-git logic. Antagonistic review caught that initial implementation checked local_path first (wrong: leaked cache paths as `file://` URIs for git namespaces).
+- **`resolve_include_source` uses `is_file()` check on `local_path`**: When `local_path` points to a file (e.g., `/cache/bundle.yaml`), uses parent directory for path joining. Matches Python's `namespace_path.is_file()` check.
+- **`resolve_include_source` computes `relative_to` for git URIs**: After `find_resource_path` resolves the actual file (e.g., `skills/coding.yaml`), computes relative path from namespace root for `#subdirectory=` fragment. Uses `strip_prefix` instead of Python's `relative_to`.
+- **`resolve_include_source` returns None for git namespace + local_path + missing resource**: Python explicitly returns None here (not a URI guess). Antagonistic review caught that initial implementation fell through to URI construction.
+- **Spurious `github.com` check removed from `resolve_include_source`**: Initial implementation checked `uri.contains("github.com")` alongside `uri.starts_with("git+")`. Python only checks `startswith("git+")`.
+- **`compose_includes` uses two-phase approach**: Phase 1 collects all parsed+resolved URIs. Phase 2 loads them. Matches Python's separation (though Python loads in parallel via `asyncio.gather`). Sequential loading is a documented performance divergence.
+- **`BundleDependencyError` for registered-but-unresolvable namespace**: When `resolve_include_source` returns None for a `namespace:path` include where the namespace IS registered, this is a hard error (not a silent skip). Matches Python behavior.
+- **`record_include_relationships` not auto-called from compose_includes**: `compose_includes` takes `&self` (for cache Mutex pattern) but `record_include_relationships` needs `&mut self`. Documented as known limitation. Callers with `&mut self` should call it explicitly.
+- **Split check_update API**: Python's `check_update(name=None|str)` has a messy union return type (`UpdateInfo | list[UpdateInfo] | None`). Rust splits into `check_update_single(name) -> Option<UpdateInfo>` and `check_update_all() -> Vec<UpdateInfo>` for idiomatic Rust.
+- **`update_single` clears cache before load**: Python uses `refresh=True` parameter (which is actually a stub/no-op). Rust explicitly removes the cache entry before calling `load_single` to force a fresh disk load.
+- **Timestamps use UTC RFC 3339**: `chrono::Utc::now().to_rfc3339()` produces `2025-01-22T20:30:00+00:00`. Python uses `datetime.now()` (timezone-naive local time). Documented as intentional improvement matching existing codebase pattern.
+- **Sequential check_update_all / update_all**: Python uses `asyncio.gather` for concurrency. Rust uses sequential loops. Documented as performance divergence. Can add `futures::join_all` later if needed.
+
+### Antagonistic Review Issues Found & Fixed
+- F-053: Rewrote `resolve_include_source` control flow to check URI type BEFORE local_path (review caught P0: git namespace returning file:// instead of git URI)
+- F-053: Added `return None` for git namespace + local_path + missing resource (review caught P0: fall-through to URI construction)
+- F-053: Added `is_file()` check on local_path for parent directory joining (review caught P1)
+- F-053: Added `relative_to` computation for git subdirectory paths (review caught P1: missing extension in fragment)
+- F-053: Removed spurious `github.com` check (review caught P1: not in Python)
+- F-053: Removed fabricated file:// URI fallback from registered URI (review caught P2: ghost feature)
+- F-053: Added `str()` coercion for non-string bundle values in parse_include (review caught P2)
+- F-053: Added 11 edge case tests (git+local_path, is_file, missing resource, empty namespace, etc.)
+- F-054: Fixed save/log ordering to match Python (save first, then log) (review caught P2)
+- F-054: Added BundleDependencyError for registered-but-unresolvable namespace paths (review caught P1)
+- F-054: Separated Phase 1 (parse+resolve) and Phase 2 (load) in compose_includes (review caught P1)
+- F-054: Added test for DependencyError case
+- F-055: Split check_update into check_update_single + check_update_all (review caught P0/P1: silent miss + return type erasure)
+- F-055: Added cache clearing in update_single before load_single (review caught P1: stale cache)
+- F-055: Fixed clippy warning (match → if let for single pattern)
+- F-055: Added cache bypass test (review caught missing coverage)
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-053: `extract_bundle_name` empty-name guard alters fallthrough path — acceptable for pathological inputs
+- F-053: Dead `unwrap_or("unknown")` code in extract_bundle_name — defensive, won't hurt
+- F-054: `record_include_relationships` not auto-called from compose_includes — &self/&mut self borrow constraint
+- F-054: Sequential include loading vs Python's parallel `asyncio.gather` — documented, can add later
+- F-054: Missing `_preload_namespace_bundles` equivalent — non-git namespace cold-start may silently fail
+- F-055: Sequential check_update_all/update_all vs Python's parallel gather — documented
+- F-055: check_update_all stamps identical timestamp for all bundles — diverges from Python's per-bundle timestamps
+- F-055: update_all returns HashMap (loses insertion order) vs Python's ordered dict
+
+### What's Next
+- All 15 waves complete. 570 tests, 0 clippy warnings, 55 features delivered.
+- Registry API now has: include resolution (parse_include, find_resource_path, resolve_include_source), record_include_relationships, check_update_single/all, update_single/all, extract_bundle_name
+- Remaining unported Python functionality:
+  - `_preload_namespace_bundles` — sequential pre-load for cold-start namespace resolution
+  - `record_include_relationships` auto-wiring (requires wrapping bundles in RwLock for interior mutability)
+  - `PreparedBundle` (bundle.py:845-1289) — session lifecycle controller. Depends on AmplifierRuntime traits being concrete.
+- Consider: Wrap `bundles: IndexMap` in `std::sync::RwLock` to enable interior mutability for auto-relationship recording during load
+- Consider: PyO3 bindings (feature flag exists, no `#[pyclass]`/`#[pymodule]` code)
+- Consider: Benchmarks (bundle compose, cache operations, fingerprint computation)
+
+---
+
 ## Session 019 -- Wave 14 COMPLETE (F-050, F-051, F-052)
 
 ### Work Completed
