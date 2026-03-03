@@ -40,15 +40,32 @@ impl BundleRegistry {
             return;
         }
 
-        // Phase 2: Async metadata checks (no lock held).
-        let mut stale_names = Vec::new();
-        for (name, local_path) in &candidates {
-            let exists = tokio::fs::metadata(local_path).await.is_ok();
-            if !exists {
-                tracing::info!("Clearing stale cache reference for '{}'", name);
-                stale_names.push(name.clone());
+        // Phase 2: Concurrent async metadata checks (no lock held).
+        // Uses futures::future::join_all to check all paths in parallel,
+        // avoiding sequential spawn_blocking round-trips.
+        // Safe to fan out unbounded: candidate count is bounded by registered
+        // bundles (typically < 100), and this runs once at startup.
+        let checks = candidates.iter().map(|(name, local_path)| {
+            let name = name.clone();
+            let local_path = local_path.clone();
+            async move {
+                let exists = tokio::fs::metadata(&local_path).await.is_ok();
+                (name, exists)
             }
-        }
+        });
+        let results = futures::future::join_all(checks).await;
+
+        let stale_names: Vec<String> = results
+            .into_iter()
+            .filter_map(|(name, exists)| {
+                if !exists {
+                    tracing::info!("Clearing stale cache reference for '{}'", name);
+                    Some(name)
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         if stale_names.is_empty() {
             return;

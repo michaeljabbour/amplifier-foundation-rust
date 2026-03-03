@@ -699,6 +699,56 @@ async fn test_validate_cached_paths_mixed() {
     assert!(registry.get_state("stale").local_path.is_none());
 }
 
+// Concurrent metadata check (F-076) -- many entries checked in parallel
+#[tokio::test]
+async fn test_validate_cached_paths_concurrent_many_entries() {
+    let dir = tempdir().unwrap();
+
+    // Create 10 valid paths and 10 stale paths
+    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+    for i in 0..10 {
+        let valid_path = dir.path().join(format!("valid_{}", i));
+        fs::create_dir_all(&valid_path).unwrap();
+        register_one(
+            &mut registry,
+            &format!("valid-{}", i),
+            &format!("file:///valid-{}", i),
+        );
+        registry.get_state(&format!("valid-{}", i)).local_path =
+            Some(valid_path.to_string_lossy().to_string());
+
+        register_one(
+            &mut registry,
+            &format!("stale-{}", i),
+            &format!("file:///stale-{}", i),
+        );
+        registry.get_state(&format!("stale-{}", i)).local_path =
+            Some(format!("/nonexistent/path/{}", i));
+    }
+
+    registry.validate_cached_paths().await;
+
+    // All valid should remain, all stale should be cleared
+    for i in 0..10 {
+        assert!(
+            registry
+                .get_state(&format!("valid-{}", i))
+                .local_path
+                .is_some(),
+            "valid-{} should still have local_path",
+            i
+        );
+        assert!(
+            registry
+                .get_state(&format!("stale-{}", i))
+                .local_path
+                .is_none(),
+            "stale-{} should have local_path cleared",
+            i
+        );
+    }
+}
+
 // ---------------------------------------------------------------------------
 // BundleState timestamp fields tests
 // ---------------------------------------------------------------------------

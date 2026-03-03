@@ -13,7 +13,7 @@
 phase: 22
 phase_name: "Wave 22 -- Async MentionResolver, async registry constructor, concurrent validate"
 epoch: 23
-next_action: "Implement F-075-async-registry-constructor"
+next_action: "Implement F-076-concurrent-validate"
 blockers: []
 
 architecture_spec:
@@ -749,17 +749,20 @@ features:
   F-075-async-registry-constructor:
     name: "Add BundleRegistry::new_async() with async load_persisted_state"
     module: "registry"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-073-async-load-agent-metadata"]
     started_at: "2025-01-30T00:30:00Z"
+    completed_at: "2025-01-30T01:00:00Z"
+    commit: "e134226"
 
   F-076-concurrent-validate:
     name: "Use futures::join_all in validate_cached_paths for concurrent metadata checks"
     module: "registry"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-073-async-load-agent-metadata"]
+    started_at: "2025-01-30T01:00:00Z"
 
 wave_gate:
   current_wave: 22
@@ -771,6 +774,6 @@ wave_gate:
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 74
-  last_updated: "2025-01-30T00:30:00Z"
+  total_features_completed: 75
+  last_updated: "2025-01-30T01:00:00Z"
   last_session: "session-027-wave22-async-mention-resolver"
