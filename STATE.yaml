@@ -13,7 +13,7 @@
 phase: 7
 phase_name: "Wave 7 -- Remaining Stubs"
 epoch: 8
-next_action: "Implementing F-029 (SimpleSourceResolver), F-030 (load_mentions), F-031 (updates module)"
+next_action: "Wave 7 COMPLETE. 329 tests passing, 0 clippy warnings, cargo fmt clean. All todo!() stubs except git.rs/http.rs resolve replaced. Consider: implement GitSourceHandler.resolve, HttpSourceHandler.resolve, PyO3 bindings"
 blockers: []
 
 architecture_spec:
@@ -319,22 +319,23 @@ features:
   F-031-updates-module:
     name: "Implement updates module (BundleStatus properties, check_bundle_status, update_bundle)"
     module: "updates"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-017-sources"]
     started_at: "2025-01-17T05:00:00Z"
+    completed_at: "2025-01-17T05:30:00Z"
+    commit: "f60a05e"
 
 wave_gate:
-  current_wave: 6
+  current_wave: 7
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
   approval_status: "approved"
-  notes: "Wave 6 COMPLETE: 298 tests (265 unit + 33 integration), 0 clippy warnings, cargo fmt clean, 3 stubs implemented"
+  notes: "Wave 7 COMPLETE: 329 tests, 0 clippy warnings, cargo fmt clean. SimpleSourceResolver, load_mentions, updates module implemented."
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 28
-  last_updated: "2025-01-17T03:10:00Z"
-  last_session: "session-011-wave6-complete"
-  last_session: "session-011-wave6-start"
+  total_features_completed: 31
+  last_updated: "2025-01-17T05:30:00Z"
+  last_session: "session-012-wave7-stubs"

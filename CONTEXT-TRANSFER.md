@@ -6,6 +6,69 @@
 
 ---
 
+## Session 012 -- Wave 7 COMPLETE (F-029, F-030, F-031)
+
+### Work Completed
+- **F-029-source-resolver** (a50f593): Implemented `SimpleSourceResolver` with `new()`, `with_base_path()`, `with_cache_dir()` constructors. Default handler chain: File, Git, Zip (before Http), Http — order matters for URI matching (zip+https must match before plain https). `add_handler()` inserts at front for priority override. `resolve()` does first-match dispatch with `BundleError::NotFound` fallback using raw URI (not message). Stores `base_path` field for Python parity. 6 new tests including add_handler priority override and error variant assertion.
+- **F-030-load-mentions** (b6cc53e): Implemented `load_mentions` pipeline with recursive @mention resolution. Parses mentions from text, resolves each via `&dyn MentionResolver`, reads files (sync `fs::read_to_string`), handles directories via `format_directory_listing`, deduplicates content via `ContentDeduplicator`. Recursive up to `max_depth=3`. Files pushed in encounter order (parent before children). Circular references broken by content-based dedup. Changed signature from `&BaseMentionResolver` to `&dyn MentionResolver` for flexibility. 11 new tests including circular references and ordering.
+- **F-031-updates-module** (f60a05e): Implemented `BundleStatus` with `has_updates()`, `updateable_sources()`, `up_to_date_sources()`, `unknown_sources()`, `summary()` methods matching Python properties. Changed `SourceStatus.has_update` from `bool` to `Option<bool>` for tri-state (Some(true)/Some(false)/None=unknown). `check_bundle_status(uri)` returns up-to-date for file URIs, unknown for git/http. `update_bundle(uri)` returns Ok for file, error for unsupported. Added `PartialEq` derives. 14 new tests.
+
+### Wave 7 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 329 passing, 0 ignored, 0 failed
+- MSRV: 1.80 (unchanged)
+- Remaining `todo!()`: 2 (GitSourceHandler.resolve, HttpSourceHandler.resolve — require network/git ops)
+
+### Design Decisions Made
+- **SimpleSourceResolver stores base_path for Python parity**: Even though it's consumed into FileSourceHandler, the resolver retains the field so future code can inspect it (matches Python's `self.base_path`).
+- **resolve() uses raw URI in NotFound error, not a message string**: The `BundleError::NotFound { uri }` field should contain the actual URI, not an English sentence like "No handler for URI: ...". The `Display` impl already adds "bundle not found:" context.
+- **Handler chain order is File → Git → Zip → Http**: ZipSourceHandler must come before HttpSourceHandler because `zip+https://` would otherwise match the plain `https://` handler. This matches Python's handler ordering.
+- **load_mentions returns aggregate result, not per-mention**: Python returns `list[MentionResult]` (one per top-level mention). Rust returns a single `MentionResult { files: Vec<ContextFile>, failed: Vec<String> }` aggregating ALL loaded files including recursively discovered ones. This is intentionally more useful for Rust consumers who want all context files in one pass.
+- **load_mentions uses encounter order (parent before children)**: When a file is loaded and it contains nested @mentions, the parent file is pushed to result FIRST, then children are recursively resolved. This ensures files appear in reading order for context assembly.
+- **load_mentions is async but uses sync I/O internally**: The function signature is `async` for API compatibility with the Python reference (which uses async `read_with_retry`). The current implementation uses synchronous `fs::read_to_string`. A future optimization could use `tokio::fs` or the existing `read_with_retry`.
+- **Python's `relative_to` parameter is dead code**: The Python `_resolve_mention` accepts `relative_to` but never passes it to `resolver.resolve()`. The parameter is only propagated recursively but never used. The Rust implementation omits it.
+- **load_mentions takes `&dyn MentionResolver` not `&BaseMentionResolver`**: The original stub took `&BaseMentionResolver` concretely. Changed to `&dyn MentionResolver` for trait-based dispatch, allowing callers to pass custom resolvers.
+- **Content-based dedup for directories**: Python's `ContentDeduplicator.add_file` uses path as key. Rust's `is_duplicate` uses content hash. Two different empty directories would be deduplicated in Rust but not Python. This is acceptable — same-content dedup is actually more correct for context assembly.
+- **SourceStatus.has_update changed to Option<bool>**: Breaking change from `bool` to `Option<bool>`. Python uses `None` for "unknown" status (can't determine if updates are available). The tri-state model is essential for the updates module where git status checking isn't implemented.
+- **BundleStatus field names match Python**: `bundle_name` and `bundle_source` (not `name` and `source_uri`) for cross-implementation readability.
+- **check_bundle_status takes URI, not Bundle**: This was the original stub API design. Python's version walks the Bundle's entire component tree. The Rust version is intentionally simpler — single URI in, single source status out. Documented explicitly.
+- **update_bundle uses LoadError variant**: No dedicated `UpdateError` variant exists in `BundleError`. Using `LoadError` with descriptive reason string. A dedicated variant could be added when git/http update support is implemented.
+
+### Antagonistic Review Issues Found & Fixed
+- F-029: Stored `base_path` on resolver for Python parity (reviewer caught missing field)
+- F-029: Used raw URI in NotFound error (reviewer caught double-prefix Display issue)
+- F-029: Added add_handler priority override test (reviewer caught untested core contract)
+- F-029: Added error variant assertion on no-handler test (reviewer caught weak assertion)
+- F-029: Removed `has_handler_for` from public API (reviewer caught test scaffolding in API)
+- F-030: Fixed ordering to parent-before-children (reviewer caught DFS post-order divergence)
+- F-030: Added circular reference test (reviewer identified missing coverage)
+- F-031: Matched Python field names (bundle_name, bundle_source)
+- F-031: Added PartialEq derives on BundleStatus and SourceStatus
+- F-031: Fixed summary() to use single-pass counting instead of triple Vec allocation
+- F-031: Removed unnecessary filesystem operations from tests (check_bundle_status doesn't touch disk)
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-029: `ftp://` silently misparsed by parse_uri — existing behavior, not introduced by this change
+- F-029: Four constructors (new, with_base_path, with_cache_dir, with_base_path_and_cache_dir was removed — kept 3)
+- F-030: `relative_to` parameter missing — dead code in Python too
+- F-030: async fn that does sync I/O — consistent with existing codebase patterns
+- F-030: Content-based dedup differs from Python's path-based dedup — intentional
+- F-031: check_bundle_status has fundamentally different API than Python (URI vs Bundle) — original stub design
+- F-031: LoadError used instead of dedicated UpdateError variant — sufficient for current usage
+
+### What's Next
+- All 7 waves complete. 329 tests, 0 clippy warnings, 31 features delivered.
+- Remaining `todo!()` stubs (2): GitSourceHandler.resolve, HttpSourceHandler.resolve — require actual git/network operations
+- Consider: PyO3 bindings (Wave 8 if needed)
+- Consider: Implement GitSourceHandler.resolve (git clone to cache)
+- Consider: Implement HttpSourceHandler.resolve (HTTP download to cache)
+- Consider: Add `UpdateError` variant to BundleError
+- Consider: Extend ContentDeduplicator with add_file/get_unique_files for format_context_block support
+- Consider: BundleRegistry.bundles → IndexMap for deterministic registry.json output
+
+---
+
 ## Session 011 -- Wave 6 COMPLETE (F-026, F-027, F-028)
 
 ### Work Completed
