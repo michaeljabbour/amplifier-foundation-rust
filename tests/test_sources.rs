@@ -756,3 +756,201 @@ async fn test_git_resolve_clone_failure() {
         other => panic!("Expected NotFound, got: {other:?}"),
     }
 }
+
+// ===========================================================================
+// TestGitSourceHandler — SourceHandlerWithStatus (get_status, update)
+// ===========================================================================
+
+use amplifier_foundation::sources::SourceHandlerWithStatus;
+
+#[tokio::test]
+async fn test_git_get_status_pinned_sha() {
+    // A 40-char hex SHA ref should be reported as pinned (no remote check)
+    let cache_dir = tempdir().expect("failed to create cache dir");
+    let parsed = make_git_parsed_uri(
+        "github.com",
+        "/org/repo",
+        "abcdef1234567890abcdef1234567890abcdef12",
+        "",
+    );
+
+    let handler = GitSourceHandler::new();
+    let status = handler
+        .get_status(&parsed, cache_dir.path())
+        .await
+        .expect("get_status should succeed");
+
+    assert_eq!(status.has_update, Some(false));
+    assert!(
+        status.summary.contains("Pinned"),
+        "pinned ref summary should say Pinned: {}",
+        status.summary
+    );
+}
+
+#[tokio::test]
+async fn test_git_get_status_pinned_version_tag() {
+    // A v-tag ref should be reported as pinned
+    let cache_dir = tempdir().expect("failed to create cache dir");
+    let parsed = make_git_parsed_uri("github.com", "/org/repo", "v1.2.3", "");
+
+    let handler = GitSourceHandler::new();
+    let status = handler
+        .get_status(&parsed, cache_dir.path())
+        .await
+        .expect("get_status should succeed");
+
+    assert_eq!(status.has_update, Some(false));
+    assert!(
+        status.summary.contains("Pinned"),
+        "version tag summary should say Pinned: {}",
+        status.summary
+    );
+}
+
+#[tokio::test]
+async fn test_git_get_status_not_cached() {
+    // When cache doesn't exist, and remote check fails (unreachable host),
+    // status should indicate not cached with unknown update status
+    let cache_dir = tempdir().expect("failed to create cache dir");
+    let parsed = make_git_parsed_uri("127.0.0.1:1", "/nonexistent/repo", "main", "");
+
+    let handler = GitSourceHandler::new();
+    let status = handler
+        .get_status(&parsed, cache_dir.path())
+        .await
+        .expect("get_status should succeed even on remote failure");
+
+    assert!(!status.is_cached);
+    // Unreachable host → remote check fails → has_update is None, error is set
+    assert_eq!(status.has_update, None);
+    assert!(
+        status.error.is_some(),
+        "error should be set when remote check fails"
+    );
+}
+
+#[tokio::test]
+async fn test_git_get_status_cached_with_metadata() {
+    // Pre-populate cache with valid structure and metadata
+    let cache_dir = tempdir().expect("failed to create cache dir");
+    let parsed = make_git_parsed_uri("github.com", "/org/myrepo", "main", "");
+
+    // Compute cache path
+    let git_url = "https://github.com/org/myrepo";
+    let ref_ = "main";
+    let cache_input = format!("{git_url}@{ref_}");
+    let hash = format!("{:x}", sha2::Sha256::digest(cache_input.as_bytes()));
+    let cache_key = &hash[..16];
+    let cache_path = cache_dir.path().join(format!("myrepo-{cache_key}"));
+
+    // Create valid cache structure
+    fs::create_dir_all(cache_path.join(".git")).expect("mkdir .git");
+    fs::write(cache_path.join("bundle.yaml"), "name: test").expect("write bundle");
+
+    // Write cache metadata
+    let metadata = serde_json::json!({
+        "cached_at": "2025-01-01T00:00:00Z",
+        "ref": "main",
+        "commit": "abc123def456abc123def456abc123def456abc1",
+        "git_url": git_url,
+    });
+    fs::write(
+        cache_path.join(".amplifier_cache_meta.json"),
+        serde_json::to_string_pretty(&metadata).unwrap(),
+    )
+    .expect("write metadata");
+
+    let handler = GitSourceHandler::new();
+    let status = handler
+        .get_status(&parsed, cache_dir.path())
+        .await
+        .expect("get_status should succeed");
+
+    assert!(status.is_cached);
+    assert_eq!(
+        status.cached_commit.as_deref(),
+        Some("abc123def456abc123def456abc123def456abc1")
+    );
+    assert_eq!(status.cached_ref.as_deref(), Some("main"));
+    assert_eq!(status.cached_at.as_deref(), Some("2025-01-01T00:00:00Z"));
+}
+
+#[tokio::test]
+async fn test_git_get_status_populates_uri() {
+    let cache_dir = tempdir().expect("failed to create cache dir");
+    let parsed = make_git_parsed_uri("github.com", "/org/repo", "v2.0.0", "");
+
+    let handler = GitSourceHandler::new();
+    let status = handler
+        .get_status(&parsed, cache_dir.path())
+        .await
+        .expect("get_status should succeed");
+
+    assert!(
+        status.uri.contains("github.com"),
+        "uri should contain host: {}",
+        status.uri
+    );
+}
+
+#[tokio::test]
+async fn test_git_update_removes_cache_and_reclones() {
+    // update() should remove existing cache and attempt fresh clone.
+    // With an unreachable host, it should fail with NotFound.
+    let cache_dir = tempdir().expect("failed to create cache dir");
+    let parsed = make_git_parsed_uri("127.0.0.1:1", "/nonexistent/repo", "main", "");
+
+    // Pre-populate a fake cache
+    let git_url = "https://127.0.0.1:1/nonexistent/repo";
+    let cache_input = format!("{git_url}@main");
+    let hash = format!("{:x}", sha2::Sha256::digest(cache_input.as_bytes()));
+    let cache_key = &hash[..16];
+    let cache_path = cache_dir.path().join(format!("repo-{cache_key}"));
+    fs::create_dir_all(cache_path.join(".git")).expect("mkdir .git");
+    fs::write(cache_path.join("bundle.yaml"), "name: old").expect("write bundle");
+    assert!(cache_path.exists(), "cache should exist before update");
+
+    let handler = GitSourceHandler::new();
+    let result = handler.update(&parsed, cache_dir.path()).await;
+
+    // The update should have removed the old cache, then failed to clone
+    assert!(result.is_err());
+    // Cache directory should have been removed
+    assert!(
+        !cache_path.exists(),
+        "cache should be removed after update attempt"
+    );
+}
+
+#[tokio::test]
+async fn test_git_update_no_existing_cache() {
+    // update() should work even when no cache exists — just delegates to resolve()
+    let cache_dir = tempdir().expect("failed to create cache dir");
+    let parsed = make_git_parsed_uri("127.0.0.1:1", "/org/repo", "main", "");
+
+    let handler = GitSourceHandler::new();
+    // Should fail at clone, not at cache removal
+    let result = handler.update(&parsed, cache_dir.path()).await;
+    assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn test_git_get_status_remote_check_failure_sets_error() {
+    // When remote check fails (unreachable host), error field should be set
+    let cache_dir = tempdir().expect("failed to create cache dir");
+    let parsed = make_git_parsed_uri("127.0.0.1:1", "/nonexistent/repo", "main", "");
+
+    let handler = GitSourceHandler::new();
+    let status = handler
+        .get_status(&parsed, cache_dir.path())
+        .await
+        .expect("get_status should succeed even on remote failure");
+
+    // Either error is set or has_update is None (both are acceptable for remote failure)
+    let remote_check_handled = status.error.is_some() || status.has_update.is_none();
+    assert!(
+        remote_check_handled,
+        "remote failure should set error or leave has_update as None"
+    );
+}

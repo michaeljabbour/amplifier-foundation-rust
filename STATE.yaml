@@ -13,7 +13,7 @@
 phase: 12
 phase_name: "Wave 12 -- Doctest fix, Git status handler, Update system wiring"
 epoch: 13
-next_action: "Implementing F-044 (fix doctest + cleanup dead code)"
+next_action: "Implementing F-045 (GitSourceHandler status checking)"
 blockers: []
 
 architecture_spec:
@@ -445,17 +445,20 @@ features:
   F-044-doctest-cleanup:
     name: "Fix failing ModuleActivator doctest + remove unused ModelResolutionResult"
     module: "modules, spawn"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-043-module-activator"]
     started_at: "2025-01-20T00:00:00Z"
+    completed_at: "2025-01-20T00:15:00Z"
+    commit: "8d37289"
 
   F-045-git-status-handler:
     name: "Implement SourceHandlerWithStatus on GitSourceHandler (git ls-remote status checking)"
     module: "sources"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-033-git-resolve", "F-040-source-protocol-traits"]
+    started_at: "2025-01-20T00:15:00Z"
 
   F-046-wire-status-updates:
     name: "Wire SourceHandlerWithStatus into check_bundle_status/update_bundle for git URIs"

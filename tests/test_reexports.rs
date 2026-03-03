@@ -145,7 +145,6 @@ fn test_reexport_spawn() {
 
     assert!(is_glob_pattern("claude-*"));
     assert!(!is_glob_pattern("gpt-4"));
-
 }
 
 // =============================================================================
