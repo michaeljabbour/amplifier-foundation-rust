@@ -6,6 +6,66 @@
 
 ---
 
+## Session 027 -- Wave 22 COMPLETE (F-074, F-075, F-076)
+
+### Work Completed
+- **F-074-async-mention-resolver** (b8a6b6f): Converted `MentionResolver` trait to `#[async_trait]`. `BaseMentionResolver::resolve()` now async — all 8 `path.exists()` calls replaced with `tokio::fs::metadata(&path).await.is_ok()`. Updated `resolve_mention` in `loader.rs` to `.await` the resolve call. Updated stale comment in `prepared.rs`. Updated `specs/architecture.md` [SYNC] → [ASYNC] markers. 18 tests converted from `#[test]` to `#[tokio::test]`.
+- **F-075-async-registry-constructor** (e134226): Added `BundleRegistry::new_async()` constructor with `load_persisted_state_async()` using `tokio::fs`. Eliminated redundant `metadata()` TOCTOU check (just try `read_to_string`, handle error). Added `tracing::warn!` on I/O and parse errors (improvement over sync version's silent swallowing — distinguishes NotFound from permission/disk errors). Existing sync `new()` untouched for backward compat. 4 new tests including structural equality test using `to_dict()` (covers all 12 BundleState fields).
+- **F-076-concurrent-validate** (25bdbc1): Replaced sequential `tokio::fs::metadata` checks in `validate_cached_paths` with `futures::future::join_all` for concurrent path validation. Reduces blocking thread pool round-trips from O(N) sequential to O(1) batched. Added comment documenting unbounded fan-out safety (N < 100, startup-only). 1 new test with 20 entries (10 valid + 10 stale).
+
+### Wave 22 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 606 passing (601 + 5 new), 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **MentionResolver trait now `#[async_trait]`**: This is a breaking API change. All implementors of `MentionResolver` must now provide `async fn resolve()`. The only concrete implementor is `BaseMentionResolver`. The `dyn MentionResolver` usage in `load_mentions` and the recursive `Box::pin` pattern in `resolve_mention` work correctly with `#[async_trait]`'s `Send` future bound.
+- **`tokio::fs::metadata` replaces `path.exists()` in resolver**: Semantically identical — `Path::exists()` is `fs::metadata(self).is_ok()` internally. Both return `false` on permission errors, broken symlinks, etc. No behavioral change.
+- **Per-call spawn_blocking overhead accepted over single spawn_blocking wrapper**: Each `tokio::fs::metadata` call internally uses `spawn_blocking`. With up to 2 calls per resolve (exact + .md fallback), there's 2 thread-pool round-trips per resolve. An alternative would wrap the entire resolve body in a single `spawn_blocking` (cloning self data into the closure), but the cloning overhead + code complexity outweighs the scheduling savings for typical use (1-2 mentions per call). Noted for future optimization if profiling shows bottleneck.
+- **`load_persisted_state_async` eliminates redundant metadata() check**: The sync version does `if !path.exists() { return }` then `read_to_string`. The async version just calls `read_to_string` directly — if the file doesn't exist, the Err(NotFound) case returns silently. Eliminates a TOCTOU race and saves one async syscall. Same approach as F-064 (redundant metadata removal).
+- **`load_persisted_state_async` adds `tracing::warn!` for non-NotFound errors**: I/O errors (permissions, disk failure) and JSON parse errors are logged at warn level, unlike the sync version which silently swallows all errors. NotFound is still silent (expected for fresh registries). This matches the pattern established by `save()` in F-071.
+- **Equivalence test uses `to_dict()` for structural equality**: `BundleState` doesn't derive `PartialEq`. Using `to_dict()` (which returns `serde_json::Value`, which does implement `PartialEq`) gives structural equality across all 12 fields without requiring a trait derivation change.
+- **`validate_cached_paths` uses unbounded `join_all`**: Safe because candidate count equals registered bundles (typically < 100) and this runs once at startup. If scaling becomes a concern, can switch to `futures::stream::iter(...).buffer_unordered(N)`.
+- **Log ordering change in validate_cached_paths**: Sequential version logged each stale entry as it was discovered. Concurrent version logs all stale entries in a batch after all checks complete. Functional behavior is identical; only real-time log visibility differs.
+
+### Antagonistic Review Issues Found & Fixed
+- F-074: Updated `specs/architecture.md` [SYNC] → [ASYNC] markers for mentions/mod.rs and mentions/resolver.rs (P3: stale docs)
+- F-074: Updated stale comment in `prepared.rs` about sync `path.exists()` checks (P3)
+- F-075: Removed redundant `metadata()` check before `read_to_string` — just try the read (P1: eliminates TOCTOU + saves syscall)
+- F-075: Added `tracing::warn!` on I/O and parse errors in async load (P1: was silently swallowing all errors)
+- F-075: Strengthened equivalence test from 3/12 fields to full structural equality via `to_dict()` (P2)
+- F-075: Enriched test state with includes/version/is_root fields for richer round-trip coverage (P2)
+- F-076: Added comment documenting unbounded fan-out safety rationale (nit)
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-074: Per-call `spawn_blocking` overhead (2 per resolve) vs single `spawn_blocking` wrapper — accepted for code simplicity, profile before optimizing
+- F-075: Duplicated parse logic between sync and async load — could extract `apply_persisted_content()` helper, accepted as minor duplication
+- F-075: `"version": 1` written by `save()` but never checked by either load — pre-existing, not introduced
+- F-075: No test for valid-but-empty JSON (`{}`, `{"version": 1}`) — handled by `if let Some(bundles)` guard, pre-existing gap
+- F-076: Log ordering change (batch-after vs interleaved) — documented, not functionally impactful
+- F-076: TOCTOU window slightly wider with concurrent checks — pre-existing, inherent to the three-phase approach
+
+### Remaining Blocking I/O in Async Contexts
+- `persistence.rs`: `load_persisted_state()` with `std::fs::read_to_string` — sync `BundleRegistry::new()` only (async version available via `new_async()`)
+- `write_with_backup`/`write_atomic_bytes`: sync by design (tempfile crate)
+- **RESOLVED**: `MentionResolver::resolve()` — now async via F-074
+- **RESOLVED**: `validate_cached_paths` sequential checks — now concurrent via F-076
+
+### What's Next
+- All 22 waves complete. 606 tests, 0 clippy warnings, 76 features delivered.
+- All mentions/resolver I/O now fully async. All persistence paths have async variants.
+- `validate_cached_paths` uses concurrent metadata checks.
+- Remaining sync-only I/O: `load_persisted_state` (has async alternative), `write_with_backup` (tempfile crate, sync by design).
+- Remaining unported PreparedBundle functionality:
+  - `create_session` (bundle.py:981-1109) — depends on AmplifierSession from amplifier_core
+  - `spawn` (bundle.py:1111-1289) — depends on AmplifierSession from amplifier_core
+- Consider: PyO3 bindings (feature flag exists, no `#[pyclass]` code)
+- Consider: Benchmarks (bundle compose, cache operations, system prompt factory)
+- Consider: Extract shared parse logic in persistence.rs (DRY sync/async load)
+
+---
+
 ## Session 026 -- Wave 21 COMPLETE (F-071, F-072, F-073)
 
 ### Work Completed
