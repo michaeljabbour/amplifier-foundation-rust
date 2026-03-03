@@ -504,7 +504,7 @@ fn test_get_turn_summary_invalid_turn() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_fork_session_at_turn_1() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -527,7 +527,7 @@ fn test_fork_session_at_turn_1() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_fork_session_at_turn_2() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -540,7 +540,7 @@ fn test_fork_session_at_turn_2() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_fork_session_default_is_latest() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -553,7 +553,7 @@ fn test_fork_session_default_is_latest() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_fork_session_preserves_lineage() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -575,7 +575,7 @@ fn test_fork_session_preserves_lineage() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_fork_session_preserves_parent_metadata() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -593,7 +593,7 @@ fn test_fork_session_preserves_parent_metadata() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_fork_session_with_custom_id() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -605,7 +605,7 @@ fn test_fork_session_with_custom_id() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_fork_session_with_custom_target_dir() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -623,7 +623,7 @@ fn test_fork_session_with_custom_target_dir() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_fork_session_includes_events() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -641,7 +641,7 @@ fn test_fork_session_includes_events() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_fork_session_nonexistent_session() {
     let tmp = tempdir().expect("failed to create temp dir");
     let nonexistent = tmp.path().join("does_not_exist");
@@ -651,7 +651,7 @@ fn test_fork_session_nonexistent_session() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_fork_session_invalid_turn() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -670,7 +670,7 @@ fn test_fork_session_invalid_turn() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_fork_session_in_memory_basic() {
     let msgs = simple_messages();
     let result = fork_session_in_memory(&msgs, Some(1), Some("parent_1"))
@@ -685,7 +685,7 @@ fn test_fork_session_in_memory_basic() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_fork_session_in_memory_all_turns() {
     let msgs = simple_messages();
     let result = fork_session_in_memory(&msgs, None, Some("parent_1"))
@@ -696,7 +696,7 @@ fn test_fork_session_in_memory_all_turns() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_fork_session_in_memory_handles_orphaned_tools() {
     let msgs = messages_with_orphaned_tool();
     let result = fork_session_in_memory(&msgs, Some(2), Some("parent_1"))
@@ -720,7 +720,7 @@ fn test_fork_session_in_memory_handles_orphaned_tools() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_fork_session_in_memory_empty_messages() {
     let result = fork_session_in_memory(&[], None, None)
         .expect("fork_session_in_memory failed");
@@ -738,7 +738,7 @@ fn test_fork_session_in_memory_empty_messages() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_get_fork_preview_basic() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -756,7 +756,7 @@ fn test_get_fork_preview_basic() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_get_fork_preview_invalid_turn() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -770,7 +770,7 @@ fn test_get_fork_preview_invalid_turn() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_list_session_forks_no_forks() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -780,7 +780,7 @@ fn test_list_session_forks_no_forks() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_list_session_forks_finds_forks() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -803,7 +803,7 @@ fn test_list_session_forks_finds_forks() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_get_session_lineage_root_session() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -823,7 +823,7 @@ fn test_get_session_lineage_root_session() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_get_session_lineage_forked_session() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -848,7 +848,7 @@ fn test_get_session_lineage_forked_session() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_get_session_lineage_deeply_nested_forks() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
