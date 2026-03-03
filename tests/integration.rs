@@ -684,3 +684,160 @@ fn test_to_dict_structure() {
     // (providers/tools would be lost on the second from_dict).
     // This is a known design limitation, not a bug to fix in integration tests.
 }
+
+// ============================================================================
+// Test 15: Bundle.agents preserves insertion order (IndexMap)
+// ============================================================================
+
+#[test]
+fn test_agents_preserve_insertion_order() {
+    // Parse a bundle with multiple agents -- the order in YAML should be preserved
+    let yaml = r#"
+bundle:
+  name: ordering-test
+  agents:
+    alpha:
+      description: "First agent"
+    beta:
+      description: "Second agent"
+    gamma:
+      description: "Third agent"
+    delta:
+      description: "Fourth agent"
+    epsilon:
+      description: "Fifth agent"
+"#;
+    let data: Value = serde_yaml_ng::from_str(yaml).unwrap();
+    let bundle = Bundle::from_dict(&data).unwrap();
+
+    // Agents should be in YAML insertion order
+    let agent_names: Vec<&String> = bundle.agents.keys().collect();
+    assert_eq!(
+        agent_names,
+        vec!["alpha", "beta", "gamma", "delta", "epsilon"],
+        "agents should preserve insertion order from YAML"
+    );
+
+    // Mount plan should also have deterministic agent order
+    let plan = bundle.to_mount_plan();
+    let plan_map = plan.as_mapping().unwrap();
+    let agents_section = plan_map.get("agents").unwrap().as_mapping().unwrap();
+    let plan_agent_names: Vec<&str> = agents_section.keys().filter_map(|k| k.as_str()).collect();
+    assert_eq!(
+        plan_agent_names,
+        vec!["alpha", "beta", "gamma", "delta", "epsilon"],
+        "mount plan agents should preserve insertion order"
+    );
+}
+
+// ============================================================================
+// Test 15b: Agent ordering preserved through compose
+// ============================================================================
+
+#[test]
+fn test_agents_order_preserved_through_compose() {
+    let base_yaml = r#"
+bundle:
+  name: base
+  agents:
+    alpha:
+      description: "A"
+    beta:
+      description: "B"
+    gamma:
+      description: "C"
+"#;
+    let overlay_yaml = r#"
+bundle:
+  name: overlay
+  agents:
+    beta:
+      description: "B-updated"
+    delta:
+      description: "D"
+"#;
+    let base_data: Value = serde_yaml_ng::from_str(base_yaml).unwrap();
+    let overlay_data: Value = serde_yaml_ng::from_str(overlay_yaml).unwrap();
+    let base = Bundle::from_dict(&base_data).unwrap();
+    let overlay = Bundle::from_dict(&overlay_data).unwrap();
+
+    let composed = base.compose(&[&overlay]);
+
+    // Existing keys preserve original position, new keys appended
+    // Matches Python dict.update() semantics
+    let agent_names: Vec<&String> = composed.agents.keys().collect();
+    assert_eq!(
+        agent_names,
+        vec!["alpha", "beta", "gamma", "delta"],
+        "compose should preserve base order for existing keys, append new"
+    );
+
+    // Verify beta was actually updated
+    assert_eq!(
+        composed.agents["beta"]["description"].as_str(),
+        Some("B-updated")
+    );
+}
+
+// ============================================================================
+// Test 15c: Context ordering preserved through compose with namespace
+// ============================================================================
+
+#[test]
+fn test_context_order_preserved_through_compose() {
+    let base_yaml = r#"
+bundle:
+  name: base
+  context:
+    readme: readme.md
+    guide: guide.md
+"#;
+    let overlay_yaml = r#"
+bundle:
+  name: overlay
+  context:
+    extra: extra.md
+    notes: notes.md
+"#;
+    let base_data: Value = serde_yaml_ng::from_str(base_yaml).unwrap();
+    let overlay_data: Value = serde_yaml_ng::from_str(overlay_yaml).unwrap();
+    let base = Bundle::from_dict(&base_data).unwrap();
+    let overlay = Bundle::from_dict(&overlay_data).unwrap();
+
+    let composed = base.compose(&[&overlay]);
+
+    // Base context first, then overlay context with namespace prefix
+    let context_keys: Vec<&String> = composed.context.keys().collect();
+    assert_eq!(
+        context_keys,
+        vec!["readme", "guide", "overlay:extra", "overlay:notes"],
+        "compose should preserve base context order, then append namespaced overlay"
+    );
+}
+
+// ============================================================================
+// Test 16: Bundle.context preserves insertion order (IndexMap)
+// ============================================================================
+
+#[test]
+fn test_context_preserves_insertion_order() {
+    let yaml = r#"
+bundle:
+  name: context-order-test
+  context:
+    system-prompt: system.md
+    guidelines: guidelines.md
+    examples: examples.md
+    reference: reference.md
+"#;
+    let data: Value = serde_yaml_ng::from_str(yaml).unwrap();
+    let bundle = Bundle::from_dict(&data).unwrap();
+
+    // Context entries should be in YAML insertion order
+    let context_keys: Vec<&String> = bundle.context.keys().collect();
+    assert_eq!(
+        context_keys,
+        vec!["system-prompt", "guidelines", "examples", "reference"],
+        "context should preserve insertion order from YAML"
+    );
+}

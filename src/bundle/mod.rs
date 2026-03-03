@@ -5,6 +5,7 @@ pub mod prepared;
 pub mod prompt;
 pub mod validator;
 
+use indexmap::IndexMap;
 use serde_yaml_ng::{Mapping, Value};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -29,8 +30,8 @@ pub struct Bundle {
     pub spawn: Value,
 
     // Resources
-    pub agents: HashMap<String, Value>,
-    pub context: HashMap<String, PathBuf>,
+    pub agents: IndexMap<String, Value>,
+    pub context: IndexMap<String, PathBuf>,
     pub instruction: Option<String>,
 
     // Internal
@@ -55,8 +56,8 @@ impl Bundle {
             tools: Vec::new(),
             hooks: Vec::new(),
             spawn: Value::Null,
-            agents: HashMap::new(),
-            context: HashMap::new(),
+            agents: IndexMap::new(),
+            context: IndexMap::new(),
             instruction: None,
             base_path: None,
             source_base_paths: HashMap::new(),
@@ -257,8 +258,8 @@ impl Bundle {
     fn parse_context(
         context_config: Option<&Mapping>,
         base_path: Option<&Path>,
-    ) -> (HashMap<String, PathBuf>, HashMap<String, String>) {
-        let mut resolved: HashMap<String, PathBuf> = HashMap::new();
+    ) -> (IndexMap<String, PathBuf>, HashMap<String, String>) {
+        let mut resolved: IndexMap<String, PathBuf> = IndexMap::new();
         let mut pending: HashMap<String, String> = HashMap::new();
 
         let config = match context_config {
@@ -290,8 +291,8 @@ impl Bundle {
     }
 
     /// Parse agents config into a name->value map.
-    fn parse_agents(agents_config: Option<&Value>) -> HashMap<String, Value> {
-        let mut result = HashMap::new();
+    fn parse_agents(agents_config: Option<&Value>) -> IndexMap<String, Value> {
+        let mut result = IndexMap::new();
         let config = match agents_config {
             Some(Value::Mapping(m)) => m,
             _ => return result,
@@ -448,6 +449,8 @@ impl Bundle {
             }
 
             // Strategy 3: Dict update for agents
+            // Note: IndexMap::insert keeps existing keys at their original position
+            // and appends new keys at the end. Matches Python dict.update() semantics.
             for (name, agent) in &other.agents {
                 result.agents.insert(name.clone(), agent.clone());
             }
