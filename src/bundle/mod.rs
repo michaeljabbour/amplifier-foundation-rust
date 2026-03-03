@@ -1,4 +1,4 @@
-pub mod compose;
+mod compose;
 pub mod module_resolver;
 pub mod mount;
 pub mod prepared;

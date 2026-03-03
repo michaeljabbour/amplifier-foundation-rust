@@ -282,16 +282,19 @@ features:
   F-027-to-dict-roundtrip:
     name: "Fix to_dict to produce from_dict-compatible output (roundtrip correctness)"
     module: "bundle"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-026-indexmap-agents"]
     started_at: "2025-01-17T02:25:00Z"
+    completed_at: "2025-01-17T02:45:00Z"
+    commit: "c266dd0"
   F-028-dead-code-cleanup:
     name: "Delete dead compose.rs stub + implement trivial stubs (capabilities, dedup, utils)"
     module: "bundle, session, mentions"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-025-integration-tests"]
+    started_at: "2025-01-17T02:50:00Z"
 
 wave_gate:
   current_wave: 6
@@ -303,6 +306,6 @@ wave_gate:
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 26
-  last_updated: "2025-01-17T02:25:00Z"
+  total_features_completed: 27
+  last_updated: "2025-01-17T02:50:00Z"
   last_session: "session-011-wave6-start"

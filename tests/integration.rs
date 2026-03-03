@@ -6,8 +6,9 @@
 use std::path::PathBuf;
 
 use amplifier_foundation::{
-    deep_merge, validate_bundle, validate_bundle_completeness, Bundle, BundleValidator,
-    CacheProvider, DiskCache, SimpleCache,
+    deep_merge, get_working_dir, set_working_dir, validate_bundle, validate_bundle_completeness,
+    Bundle, BundleValidator, CacheProvider, ContentDeduplicator, DiskCache, SimpleCache,
+    WORKING_DIR_CAPABILITY,
 };
 use serde_yaml_ng::Value;
 
@@ -922,5 +923,142 @@ bundle:
         context_keys,
         vec!["system-prompt", "guidelines", "examples", "reference"],
         "context should preserve insertion order from YAML"
+    );
+}
+
+// ============================================================================
+// Test 17: Session capabilities (get/set working dir)
+// ============================================================================
+
+#[test]
+fn test_get_working_dir_from_capabilities() {
+    let caps = serde_json::json!({
+        "working_dir": "/home/user/project"
+    });
+    let result = get_working_dir(&caps);
+    assert_eq!(result, Some("/home/user/project".to_string()));
+}
+
+#[test]
+fn test_get_working_dir_missing() {
+    let caps = serde_json::json!({});
+    let result = get_working_dir(&caps);
+    assert_eq!(result, None);
+}
+
+#[test]
+fn test_get_working_dir_null_value() {
+    let caps = serde_json::json!({"working_dir": null});
+    let result = get_working_dir(&caps);
+    assert_eq!(result, None);
+}
+
+#[test]
+fn test_set_working_dir() {
+    let mut caps = serde_json::json!({});
+    set_working_dir(&mut caps, "/new/dir");
+    assert_eq!(
+        caps.get(WORKING_DIR_CAPABILITY).and_then(|v| v.as_str()),
+        Some("/new/dir")
+    );
+}
+
+#[test]
+fn test_set_working_dir_overwrites() {
+    let mut caps = serde_json::json!({"working_dir": "/old"});
+    set_working_dir(&mut caps, "/new");
+    assert_eq!(
+        caps.get(WORKING_DIR_CAPABILITY).and_then(|v| v.as_str()),
+        Some("/new")
+    );
+}
+
+#[test]
+fn test_set_working_dir_on_null() {
+    let mut caps = serde_json::Value::Null;
+    set_working_dir(&mut caps, "/some/dir");
+    assert_eq!(get_working_dir(&caps), Some("/some/dir".to_string()));
+}
+
+// ============================================================================
+// Test 18: ContentDeduplicator
+// ============================================================================
+
+#[test]
+fn test_content_deduplicator_new_content() {
+    let mut dedup = ContentDeduplicator::new();
+    assert!(
+        !dedup.is_duplicate("hello world"),
+        "first time seeing content should not be duplicate"
+    );
+}
+
+#[test]
+fn test_content_deduplicator_duplicate_detection() {
+    let mut dedup = ContentDeduplicator::new();
+    assert!(!dedup.is_duplicate("content A"));
+    assert!(
+        dedup.is_duplicate("content A"),
+        "same content should be detected as duplicate"
+    );
+    assert!(
+        !dedup.is_duplicate("content B"),
+        "different content should not be duplicate"
+    );
+}
+
+#[test]
+fn test_content_deduplicator_empty_string() {
+    let mut dedup = ContentDeduplicator::new();
+    assert!(!dedup.is_duplicate(""));
+    assert!(dedup.is_duplicate(""), "empty string duplicate detection");
+}
+
+// ============================================================================
+// Test 19: format_directory_listing
+// ============================================================================
+
+#[test]
+fn test_format_directory_listing_with_files() {
+    use amplifier_foundation::mentions::utils::format_directory_listing;
+
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::write(tmp.path().join("readme.md"), "# README").unwrap();
+    std::fs::write(tmp.path().join("config.yaml"), "key: value").unwrap();
+    std::fs::create_dir(tmp.path().join("subdir")).unwrap();
+
+    let result = format_directory_listing(tmp.path());
+    assert!(result.starts_with("Directory: "));
+    assert!(result.contains("DIR"));
+    assert!(result.contains("FILE"));
+    assert!(result.contains("subdir"));
+    assert!(result.contains("readme.md"));
+    assert!(result.contains("config.yaml"));
+}
+
+#[test]
+fn test_format_directory_listing_empty() {
+    use amplifier_foundation::mentions::utils::format_directory_listing;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let result = format_directory_listing(tmp.path());
+    assert!(result.starts_with("Directory: "));
+    assert!(result.contains("(empty directory)"));
+}
+
+#[test]
+fn test_format_directory_listing_dirs_before_files() {
+    use amplifier_foundation::mentions::utils::format_directory_listing;
+
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::write(tmp.path().join("z_file.txt"), "content").unwrap();
+    std::fs::create_dir(tmp.path().join("a_dir")).unwrap();
+
+    let result = format_directory_listing(tmp.path());
+    let dir_pos = result.find("DIR").unwrap();
+    let file_pos = result.find("FILE").unwrap();
+    assert!(
+        dir_pos < file_pos,
+        "directories should come before files in listing"
     );
 }

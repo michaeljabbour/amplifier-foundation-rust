@@ -100,6 +100,7 @@ pub use mentions::dedup::ContentDeduplicator;
 pub use mentions::loader::load_mentions;
 pub use mentions::models::{ContextFile, MentionResult};
 pub use mentions::parser::parse_mentions;
+pub use mentions::utils::format_directory_listing;
 
 // -- I/O utilities --
 pub use io::files::{
