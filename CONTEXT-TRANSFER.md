@@ -6,6 +6,68 @@
 
 ---
 
+## Session 021 -- Wave 16 COMPLETE (F-056, F-057, F-058)
+
+### Work Completed
+- **F-056-rwlock-bundles** (93fde8d): Wrapped `BundleRegistry.bundles` in `std::sync::RwLock<IndexMap<String, BundleState>>` for interior mutability. `record_include_relationships` now takes `&self` instead of `&mut self` (key goal: enables calling from `compose_includes` and other `&self` contexts). `get_all_states()` returns cloned snapshot instead of reference. `find_state()` returns `Option<BundleState>` (clone). All `&mut self` methods use `.get_mut()` (bypasses lock via exclusive access). `resolve_include_source` clones needed fields and drops lock before filesystem I/O. 1 new test. Poison recovery via `unwrap_or_else(|e| e.into_inner())` at all 16 lock sites.
+- **F-057-auto-record-includes** (d85c127): `compose_includes` now automatically calls `record_include_relationships` after successfully loading includes. Collects loaded bundle names (filtering empty names) and records parent→child + child→parent relationships. Placement: after Phase 2 load, before composition (matching Python's `_compose_includes` line 672). Safety comment documents lock invariant at call site. 2 new tests.
+- **F-058-preload-namespace-bundles** (3b1a355): Ported Python's `_preload_namespace_bundles`. `load_single_with_chain` now updates `BundleState.local_path` and `loaded_at` after loading (was missing — prevented `resolve_include_source` from finding files on disk). New `preload_namespace_bundles` method scans includes for `namespace:path` syntax, finds registered-but-not-loaded namespaces, loads them with lightweight preload (no includes processing, matching Python's `auto_include=False`). Skips namespaces whose URI is in loading chain. Wired into `compose_includes` before Phase 1. 3 new tests.
+
+### Wave 16 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 576 passing, 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **`BundleRegistry.bundles` wrapped in `std::sync::RwLock`**: Enables interior mutability for `record_include_relationships(&self)`. `RwLock` chosen over `Mutex` because reads dominate (find, resolve_include_source, save). Write lock only needed for state mutation (register, unregister, record relationships, state updates). Poison recovery at all sites.
+- **`get_all_states()` returns `IndexMap` (clone) not `&IndexMap`**: Can't return references into data behind RwLock guard. This is a semver-breaking change to the return type. Performance cost is acceptable for typical registry sizes.
+- **`find_state()` returns `Option<BundleState>` (clone) not `Option<&BundleState>`**: Same reason. Tests unaffected because they already used owned patterns.
+- **`&mut self` methods use `.get_mut()` not `.write()`**: `RwLock::get_mut()` bypasses the lock when exclusive access is guaranteed by `&mut self`. More efficient and clearer about intent.
+- **`resolve_include_source` clones `uri` and `local_path` then drops lock**: Prevents holding read lock during blocking filesystem I/O (`find_resource_path` does `Path::exists()`, `fs::canonicalize`). Antagonistic review caught this P1 issue.
+- **`compose_includes` records include relationships BEFORE composition**: Matches Python ordering. Uses unmerged bundle names (after composition, includes are consumed). Guarded by `!parent_name.is_empty()` and `!included_names.is_empty()`.
+- **`preload_namespace_bundles` uses lightweight load (no includes)**: Matches Python's `auto_include=False`. Only resolves URI to local path, loads bundle, updates `BundleState.local_path`. Caches the bundle for subsequent `load_single_with_chain` calls. Does NOT process the namespace bundle's own includes.
+- **`load_single_with_chain` updates `BundleState.local_path`**: Previously missing. Python's `_load_single` always updates `state.local_path = str(local_path)` and `state.loaded_at`. Without this, `resolve_include_source` Tier 2 could never find files on disk for freshly loaded namespaces.
+- **Preload errors logged, not propagated**: Python raises `BundleDependencyError` for non-circular preload errors. Rust logs a warning and continues — the actual include resolution in Phase 1 will surface the error with better context. Documented divergence.
+- **`record_include_relationships` triggers `save()` on every call**: Matches Python behavior. Acknowledged as potential performance issue for recursive includes (O(depth) disk writes per load). Future optimization: batch-save at end of `load_single`.
+
+### Antagonistic Review Issues Found & Fixed
+- F-056: `resolve_include_source` was holding read lock during filesystem I/O — cloned needed fields and dropped lock (P1)
+- F-056: `check_update_single` had `?` inside scoped write lock block — restructured to avoid escaping block scope (P2)
+- F-056: `&mut self` methods were using `.write()` instead of `.get_mut()` — fixed all 5 sites (P2)
+- F-056: Added test proving `record_include_relationships` works via shared `&BundleRegistry` reference (P1)
+- F-057: `test_compose_includes_auto_records_skips_empty_names` was vacuous (dead assertion branch) — registered child and changed to `unwrap()` (P1)
+- F-057: Added lock safety comment at `record_include_relationships` call site (P2)
+- F-058: Preload was using full `load_single_with_chain` (processes includes) — replaced with lightweight load matching Python's `auto_include=False` (P1)
+- F-058: `test_preload_skips_already_loaded_namespace` was vacuous (cache would hide the bug) — rewrote to use fake nonexistent URI that would fail if preload was triggered (P2)
+- F-058: Pre-compute `display().to_string()` and `Utc::now()` before acquiring write lock (P2)
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-056: `get_all_states()` clones entire map every call — necessary cost of RwLock approach
+- F-056: Cache Mutex uses `if let Ok(...)` (silent skip) while bundles RwLock uses `unwrap_or_else` (poison recovery) — philosophically aligned, both avoid panicking
+- F-057: `record_include_relationships` silently no-ops for unregistered bundles — matches Python behavior
+- F-057: `record_include_relationships` triggers `save()` inside async chain — O(depth) writes, matches Python
+- F-057: Circular dependencies produce phantom relationship records — pre-existing cycle detection behavior
+- F-058: Preload errors logged instead of propagated as DependencyError — actual include resolution handles error with better context
+- F-058: `parse_include` called twice on same includes (preload + Phase 1) — negligible cost
+
+### File Size Warning
+- `src/registry/mod.rs` is at 1,329 lines (exceeds 1,000-line warning threshold). Consider decomposing into `registry/preload.rs`, `registry/includes.rs`, `registry/persistence.rs` submodules in a future refactoring wave.
+
+### What's Next
+- All 16 waves complete. 576 tests, 0 clippy warnings, 58 features delivered.
+- Registry now fully supports: interior mutability via RwLock, automatic include relationship recording, namespace preload for cold-start resolution, local_path population after loading.
+- Remaining unported Python functionality:
+  - `PreparedBundle` (bundle.py:845-1289) — session lifecycle controller. `_build_bundles_for_resolver` and `_create_system_prompt_factory` have NO external blockers (all building blocks ported). `create_session` and `spawn` depend on `amplifier_core::AmplifierSession`.
+  - `Bundle.prepare()` (bundle.py:230-340) — wiring layer, depends on PreparedBundle.
+- Consider: Port `PreparedBundle` foundations (struct + `_build_bundles_for_resolver` + `_create_system_prompt_factory`) — all deps available
+- Consider: PyO3 bindings (feature flag exists, no `#[pyclass]` code)
+- Consider: Batch-save optimization for `record_include_relationships` (save once per load, not once per recursion level)
+- Consider: Decompose `registry/mod.rs` (1,329 lines) into submodules
+- Consider: Benchmarks (bundle compose, cache operations, fingerprint computation)
+
+---
+
 ## Session 020 -- Wave 15 COMPLETE (F-053, F-054, F-055)
 
 ### Work Completed
