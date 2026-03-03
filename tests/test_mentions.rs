@@ -321,3 +321,178 @@ fn test_resolve_uses_base_path_not_cwd() {
 
     std::env::set_current_dir(old_dir).unwrap();
 }
+
+// ---------------------------------------------------------------------------
+// TestLoadMentions
+// ---------------------------------------------------------------------------
+
+use amplifier_foundation::mentions::loader::load_mentions;
+
+#[tokio::test]
+async fn test_load_mentions_basic_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let file_path = tmp.path().join("notes.md");
+    fs::write(&file_path, "Some content here").unwrap();
+
+    let resolver = BaseMentionResolver::with_base_path(tmp.path().to_path_buf());
+    let result = load_mentions("Check @notes.md for details", &resolver).await;
+
+    assert_eq!(result.files.len(), 1);
+    assert_eq!(result.files[0].mention, "@notes.md");
+    assert_eq!(result.files[0].content, "Some content here");
+    assert!(result.failed.is_empty());
+}
+
+#[tokio::test]
+async fn test_load_mentions_missing_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let resolver = BaseMentionResolver::with_base_path(tmp.path().to_path_buf());
+    let result = load_mentions("Check @nonexistent.md", &resolver).await;
+
+    // Missing files are silently skipped (opportunistic)
+    assert!(result.files.is_empty());
+    assert_eq!(result.failed.len(), 1);
+    assert_eq!(result.failed[0], "@nonexistent.md");
+}
+
+#[tokio::test]
+async fn test_load_mentions_directory() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir_path = tmp.path().join("mydir");
+    fs::create_dir_all(&dir_path).unwrap();
+    fs::write(dir_path.join("file.txt"), "hello").unwrap();
+
+    let resolver = BaseMentionResolver::with_base_path(tmp.path().to_path_buf());
+    let result = load_mentions("See @mydir", &resolver).await;
+
+    assert_eq!(result.files.len(), 1);
+    assert_eq!(result.files[0].mention, "@mydir");
+    // Directory listing should contain the file
+    assert!(result.files[0].content.contains("file.txt"));
+    assert!(result.files[0].content.contains("Directory:"));
+    assert!(result.failed.is_empty());
+}
+
+#[tokio::test]
+async fn test_load_mentions_deduplication() {
+    let tmp = tempfile::tempdir().unwrap();
+    let file_path = tmp.path().join("README.md");
+    fs::write(&file_path, "Same content").unwrap();
+
+    let resolver = BaseMentionResolver::with_base_path(tmp.path().to_path_buf());
+    // Same mention twice in text -- parse_mentions already deduplicates
+    let result = load_mentions("See @README.md and again @README.md", &resolver).await;
+
+    assert_eq!(result.files.len(), 1);
+}
+
+#[tokio::test]
+async fn test_load_mentions_multiple_files() {
+    let tmp = tempfile::tempdir().unwrap();
+    fs::write(tmp.path().join("a.md"), "Content A").unwrap();
+    fs::write(tmp.path().join("b.md"), "Content B").unwrap();
+
+    let resolver = BaseMentionResolver::with_base_path(tmp.path().to_path_buf());
+    let result = load_mentions("Check @a.md and @b.md", &resolver).await;
+
+    assert_eq!(result.files.len(), 2);
+    assert!(result.failed.is_empty());
+
+    let mentions: Vec<&str> = result.files.iter().map(|f| f.mention.as_str()).collect();
+    assert!(mentions.contains(&"@a.md"));
+    assert!(mentions.contains(&"@b.md"));
+}
+
+#[tokio::test]
+async fn test_load_mentions_recursive() {
+    let tmp = tempfile::tempdir().unwrap();
+    // parent.md mentions child.md
+    fs::write(tmp.path().join("parent.md"), "See @child.md for more").unwrap();
+    fs::write(tmp.path().join("child.md"), "Child content").unwrap();
+
+    let resolver = BaseMentionResolver::with_base_path(tmp.path().to_path_buf());
+    let result = load_mentions("Start with @parent.md", &resolver).await;
+
+    // Should load both parent.md and child.md (recursive)
+    assert_eq!(result.files.len(), 2);
+    let mentions: Vec<&str> = result.files.iter().map(|f| f.mention.as_str()).collect();
+    assert!(mentions.contains(&"@parent.md"));
+    assert!(mentions.contains(&"@child.md"));
+}
+
+#[tokio::test]
+async fn test_load_mentions_max_depth() {
+    let tmp = tempfile::tempdir().unwrap();
+    // Chain: a -> b -> c -> d (depth 3 should stop at c)
+    fs::write(tmp.path().join("a.md"), "See @b.md").unwrap();
+    fs::write(tmp.path().join("b.md"), "See @c.md").unwrap();
+    fs::write(tmp.path().join("c.md"), "See @d.md").unwrap();
+    fs::write(tmp.path().join("d.md"), "End").unwrap();
+
+    let resolver = BaseMentionResolver::with_base_path(tmp.path().to_path_buf());
+    // Default max_depth=3: a(0)->b(1)->c(2)->d(3), d is at depth 3 which is still resolved
+    let result = load_mentions("Start @a.md", &resolver).await;
+
+    let mentions: Vec<&str> = result.files.iter().map(|f| f.mention.as_str()).collect();
+    assert!(mentions.contains(&"@a.md"));
+    assert!(mentions.contains(&"@b.md"));
+    assert!(mentions.contains(&"@c.md"));
+    assert!(mentions.contains(&"@d.md"));
+}
+
+#[tokio::test]
+async fn test_load_mentions_no_mentions() {
+    let tmp = tempfile::tempdir().unwrap();
+    let resolver = BaseMentionResolver::with_base_path(tmp.path().to_path_buf());
+    let result = load_mentions("No mentions here", &resolver).await;
+
+    assert!(result.files.is_empty());
+    assert!(result.failed.is_empty());
+}
+
+#[tokio::test]
+async fn test_load_mentions_duplicate_content_different_files() {
+    let tmp = tempfile::tempdir().unwrap();
+    // Two files with identical content
+    fs::write(tmp.path().join("copy1.md"), "Identical content").unwrap();
+    fs::write(tmp.path().join("copy2.md"), "Identical content").unwrap();
+
+    let resolver = BaseMentionResolver::with_base_path(tmp.path().to_path_buf());
+    let result = load_mentions("See @copy1.md and @copy2.md", &resolver).await;
+
+    // First file loaded, second is deduplicated (same content)
+    assert_eq!(result.files.len(), 1);
+    assert_eq!(result.files[0].mention, "@copy1.md");
+}
+
+#[tokio::test]
+async fn test_load_mentions_circular_references() {
+    let tmp = tempfile::tempdir().unwrap();
+    // a.md mentions b.md, b.md mentions a.md (circular)
+    fs::write(tmp.path().join("a.md"), "See @b.md").unwrap();
+    fs::write(tmp.path().join("b.md"), "See @a.md").unwrap();
+
+    let resolver = BaseMentionResolver::with_base_path(tmp.path().to_path_buf());
+    let result = load_mentions("Start @a.md", &resolver).await;
+
+    // Both files should be loaded, dedup breaks the cycle
+    assert_eq!(result.files.len(), 2);
+    let mentions: Vec<&str> = result.files.iter().map(|f| f.mention.as_str()).collect();
+    assert!(mentions.contains(&"@a.md"));
+    assert!(mentions.contains(&"@b.md"));
+}
+
+#[tokio::test]
+async fn test_load_mentions_parent_before_children() {
+    let tmp = tempfile::tempdir().unwrap();
+    fs::write(tmp.path().join("parent.md"), "See @child.md for more").unwrap();
+    fs::write(tmp.path().join("child.md"), "Child content").unwrap();
+
+    let resolver = BaseMentionResolver::with_base_path(tmp.path().to_path_buf());
+    let result = load_mentions("Start with @parent.md", &resolver).await;
+
+    // Parent should appear BEFORE child in the result (encounter order)
+    assert_eq!(result.files.len(), 2);
+    assert_eq!(result.files[0].mention, "@parent.md");
+    assert_eq!(result.files[1].mention, "@child.md");
+}

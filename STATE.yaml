@@ -301,16 +301,19 @@ features:
   F-029-source-resolver:
     name: "Implement SimpleSourceResolver (new + resolve dispatch + add_handler)"
     module: "sources"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-017-sources"]
     started_at: "2025-01-17T04:00:00Z"
+    completed_at: "2025-01-17T04:30:00Z"
+    commit: "a50f593"
   F-030-load-mentions:
     name: "Implement load_mentions pipeline (parse, resolve, read, deduplicate, recurse)"
     module: "mentions"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-016-mentions", "F-028-dead-code-cleanup"]
+    started_at: "2025-01-17T04:30:00Z"
   F-031-updates-module:
     name: "Implement updates module (BundleStatus properties, check_bundle_status, update_bundle)"
     module: "updates"
