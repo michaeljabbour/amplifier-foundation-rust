@@ -1,5 +1,6 @@
 use serde_yaml_ng::Value;
 
+use super::helpers::value_type_name;
 use crate::bundle::Bundle;
 
 /// Validation result with add_error/add_warning methods.
@@ -215,17 +216,4 @@ pub fn validate_bundle_completeness(bundle: &Bundle) -> ValidationResult {
 /// Convenience function: validate completeness or raise.
 pub fn validate_bundle_completeness_or_raise(bundle: &Bundle) -> crate::error::Result<()> {
     BundleValidator::new().validate_completeness_or_raise(bundle)
-}
-
-/// Helper: get human-readable type name for a YAML Value.
-fn value_type_name(v: &Value) -> &'static str {
-    match v {
-        Value::Null => "null",
-        Value::Bool(_) => "bool",
-        Value::Number(_) => "number",
-        Value::String(_) => "str",
-        Value::Sequence(_) => "list",
-        Value::Mapping(_) => "dict",
-        Value::Tagged(_) => "tagged",
-    }
 }

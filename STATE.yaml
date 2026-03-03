@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 17
-phase_name: "Wave 17 -- Registry decomposition, batch-save, PreparedBundle foundations"
-epoch: 18
-next_action: "Wave 17 COMPLETE. 590 tests passing, 0 clippy warnings, cargo fmt clean. Consider: create_session/spawn (requires AmplifierSession), enhance BaseMentionResolver for context-dict namespace lookup, PyO3 bindings, benchmarks"
+phase: 18
+phase_name: "Wave 18 -- Bundle decomposition, mention resolver enhancement, async I/O cleanup"
+epoch: 19
+next_action: "Implement F-062 (bundle/mod.rs decomposition), F-063 (BaseMentionResolver context-dict), F-064 (tokio::fs in prompt factory)"
 blockers: []
 
 architecture_spec:
@@ -620,16 +620,38 @@ features:
     completed_at: "2025-01-25T01:45:00Z"
     commit: "182ef87"
 
+  F-062-bundle-decompose:
+    name: "Decompose bundle/mod.rs (918 lines) into focused submodules"
+    module: "bundle"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-061-prepared-bundle"]
+    started_at: "2025-01-26T00:00:00Z"
+
+  F-063-mention-resolver-context:
+    name: "Enhance BaseMentionResolver for context-dict namespace lookup"
+    module: "mentions, bundle"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-061-prepared-bundle"]
+
+  F-064-async-prompt-io:
+    name: "Replace blocking std::fs with tokio::fs in BundleSystemPromptFactory"
+    module: "bundle"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-061-prepared-bundle"]
+
 wave_gate:
-  current_wave: 17
+  current_wave: 18
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
-  approval_status: "approved"
-  notes: "Wave 17 COMPLETE: 590 tests, 0 clippy warnings, cargo fmt clean. Registry decomposed into 7 submodules, batch-save optimization, PreparedBundle foundations."
+  approval_status: "pending"
+  notes: "Wave 18: bundle decomposition, mention resolver enhancement, async I/O cleanup"
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
   total_features_completed: 61
-  last_updated: "2025-01-25T01:45:00Z"
-  last_session: "session-022-wave17-decompose-prepared"
+  last_updated: "2025-01-26T00:00:00Z"
+  last_session: "session-023-wave18-decompose-enhance"
