@@ -212,7 +212,15 @@ impl ModuleActivator {
     ///
     /// Skips installation if the module is already installed with matching
     /// fingerprint (via `InstallStateManager`).
-    async fn install_dependencies(&self, module_path: &Path) -> crate::Result<()> {
+    /// Install dependencies for a module at the given path.
+    ///
+    /// This is also used by [`crate::updates::update_bundle_for_bundle`] to
+    /// reinstall dependencies after updating a module's cached source.
+    ///
+    /// **Lifecycle note:** This method marks modules as installed in memory via
+    /// `InstallStateManager`, but does NOT persist to disk. Callers must call
+    /// [`finalize()`](Self::finalize) after all installations to save state.
+    pub async fn install_dependencies(&self, module_path: &Path) -> crate::Result<()> {
         // Check if already installed with matching fingerprint
         {
             let state = self.install_state.lock().unwrap_or_else(|e| e.into_inner());

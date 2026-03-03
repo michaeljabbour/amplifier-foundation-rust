@@ -368,3 +368,115 @@ pub async fn update_bundle(uri: &str, cache_dir: Option<&Path>) -> crate::error:
         source: None,
     })
 }
+
+/// Update bundle sources by re-downloading from remote.
+///
+/// This is a MECHANISM that has side effects — it removes cached
+/// versions, re-downloads fresh content, and optionally reinstalls
+/// dependencies.
+///
+/// Walks the bundle's component tree using [`collect_source_uris`] to find
+/// all source URIs, then updates each one (or only those in the `selective`
+/// list).
+///
+/// Matches Python's `update_bundle(bundle, cache_dir, selective, install_deps)`
+/// from `updates/__init__.py`.
+///
+/// # Arguments
+///
+/// * `bundle` — Bundle to update.
+/// * `cache_dir` — Optional cache directory. Defaults to `~/.amplifier/cache/bundles`.
+/// * `selective` — If provided, only update these source URIs.
+///   If `None`, updates all sources that have available updates.
+/// * `install_deps` — If `true`, reinstall dependencies after updating.
+///   This ensures new dependencies added to `pyproject.toml` are installed.
+///
+/// # Returns
+///
+/// A list of paths that were actually updated (successfully re-cloned).
+/// Callers can use this to trigger further actions (e.g., module reloading).
+///
+/// Sources that fail to update are silently skipped (logged at warn level).
+/// File and HTTP sources are no-ops.
+pub async fn update_bundle_for_bundle(
+    bundle: &Bundle,
+    cache_dir: Option<&Path>,
+    selective: Option<&[String]>,
+    install_deps: bool,
+) -> crate::error::Result<Vec<PathBuf>> {
+    let cache = cache_dir
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(default_cache_dir);
+
+    // Determine which sources to update
+    let sources_to_update: Vec<String> = if let Some(selective_uris) = selective {
+        // Only update URIs in the selective list
+        selective_uris.to_vec()
+    } else {
+        // Check status and update all sources with available updates
+        let status = check_bundle_status_for_bundle(bundle, Some(&cache)).await?;
+        status
+            .updateable_sources()
+            .into_iter()
+            .map(|s| s.uri.clone())
+            .collect()
+    };
+
+    // Update each source
+    let git_handler = GitSourceHandler::new();
+    let mut updated_paths: Vec<PathBuf> = Vec::new();
+
+    for uri in &sources_to_update {
+        let parsed = parse_uri(uri);
+
+        if parsed.is_file() {
+            // Local files: nothing to update
+            continue;
+        }
+
+        if git_handler.can_handle(&parsed) {
+            match git_handler.update(&parsed, &cache).await {
+                Ok(resolved) => {
+                    updated_paths.push(resolved.active_path);
+                }
+                Err(e) => {
+                    // Per-source error: log and continue (don't abort all updates)
+                    tracing::warn!("Failed to update {uri}: {e}");
+                }
+            }
+        }
+        // Non-git remote sources: silently skip (no update handler yet)
+    }
+
+    // Reinstall dependencies for updated modules.
+    // Matches Python: only attempts install for paths with pyproject.toml.
+    // Modules with only requirements.txt are not reinstalled (Python same behavior).
+    if install_deps && !updated_paths.is_empty() {
+        // Create ONE activator for all modules (not per-module) to avoid
+        // N redundant disk reads of install-state.json.
+        // Use the standard cache dir (~/.amplifier/cache) for ModuleActivator,
+        // NOT the bundles cache dir, so install-state.json lands in the same
+        // location as normal activation via `ModuleActivator::new(None, ...)`.
+        let activator_cache = get_amplifier_home().join("cache");
+        let activator =
+            crate::modules::activator::ModuleActivator::new(Some(activator_cache), true, None);
+
+        for module_path in &updated_paths {
+            let pyproject = module_path.join("pyproject.toml");
+            if pyproject.exists() {
+                if let Err(e) = activator.install_dependencies(module_path).await {
+                    tracing::warn!(
+                        "Failed to install dependencies for {}: {e}",
+                        module_path.display()
+                    );
+                }
+            }
+        }
+
+        // Persist install state to disk so fingerprint caching works
+        // on subsequent activations.
+        activator.finalize();
+    }
+
+    Ok(updated_paths)
+}

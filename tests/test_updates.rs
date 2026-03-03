@@ -4,7 +4,7 @@
 use amplifier_foundation::sources::SourceStatus;
 use amplifier_foundation::updates::{
     check_bundle_status, check_bundle_status_for_bundle, collect_source_uris, update_bundle,
-    BundleStatus,
+    update_bundle_for_bundle, BundleStatus,
 };
 use amplifier_foundation::Bundle;
 use serde_yaml_ng::Value;
@@ -901,4 +901,140 @@ source: "git+https://127.0.0.1:1/org/bundle-b@main"
 
     // Both sources should be present (no early abort on first failure)
     assert_eq!(status.sources.len(), 2);
+}
+
+// ===========================================================================
+// update_bundle_for_bundle
+// ===========================================================================
+
+#[tokio::test]
+async fn test_update_bundle_for_bundle_empty() {
+    // Empty bundle: nothing to update
+    let bundle = Bundle::new("empty-bundle");
+    let result = update_bundle_for_bundle(&bundle, None, None, true).await;
+    assert!(result.is_ok());
+    let updated_paths = result.unwrap();
+    assert!(
+        updated_paths.is_empty(),
+        "empty bundle should have no updated paths"
+    );
+}
+
+#[tokio::test]
+async fn test_update_bundle_for_bundle_file_source() {
+    // File sources are no-ops (nothing to update)
+    let mut bundle = Bundle::new("local-bundle");
+    bundle.source_uri = Some("file:///path/to/bundle".to_string());
+
+    let updated_paths = update_bundle_for_bundle(&bundle, None, None, true)
+        .await
+        .unwrap();
+    assert!(
+        updated_paths.is_empty(),
+        "file sources should not produce updated paths"
+    );
+}
+
+#[tokio::test]
+async fn test_update_bundle_for_bundle_git_source() {
+    // Git source with unreachable host: update fails but doesn't panic
+    let cache_dir = tempfile::tempdir().expect("tempdir");
+    let mut bundle = Bundle::new("git-bundle");
+    bundle.source_uri = Some("git+https://127.0.0.1:1/org/bundle@main".to_string());
+
+    // update_bundle_for_bundle catches per-source errors
+    let updated_paths = update_bundle_for_bundle(&bundle, Some(cache_dir.path()), None, false)
+        .await
+        .unwrap();
+    // Git clone fails → no updated paths
+    assert!(updated_paths.is_empty());
+}
+
+#[tokio::test]
+async fn test_update_bundle_for_bundle_selective() {
+    // Only update sources in the selective list
+    let cache_dir = tempfile::tempdir().expect("tempdir");
+    let mut bundle = Bundle::new("selective-bundle");
+    bundle.source_uri = Some("file:///local/bundle".to_string());
+
+    let provider: Value = serde_yaml_ng::from_str(
+        r#"
+module: "provider-x"
+source: "git+https://127.0.0.1:1/org/provider@main"
+"#,
+    )
+    .unwrap();
+    bundle.providers = vec![provider];
+
+    // Only try to update the git source (file source should be skipped by selective filter)
+    let selective = vec!["git+https://127.0.0.1:1/org/provider@main".to_string()];
+    let updated_paths =
+        update_bundle_for_bundle(&bundle, Some(cache_dir.path()), Some(&selective), false)
+            .await
+            .unwrap();
+    // Git clone fails → no updated paths
+    assert!(updated_paths.is_empty());
+}
+
+#[tokio::test]
+async fn test_update_bundle_for_bundle_http_source_skipped() {
+    // HTTP sources are silently skipped (no update handler)
+    let mut bundle = Bundle::new("http-bundle");
+    let tool: Value = serde_yaml_ng::from_str(
+        r#"
+module: "tool-x"
+source: "https://example.com/tool.tar.gz"
+"#,
+    )
+    .unwrap();
+    bundle.tools = vec![tool];
+
+    let updated_paths = update_bundle_for_bundle(&bundle, None, None, false)
+        .await
+        .unwrap();
+    assert!(updated_paths.is_empty());
+}
+
+#[tokio::test]
+async fn test_update_bundle_for_bundle_selective_empty_list() {
+    // Empty selective list: nothing to update
+    let mut bundle = Bundle::new("selective-bundle");
+    bundle.source_uri = Some("git+https://127.0.0.1:1/org/bundle@main".to_string());
+
+    let selective: Vec<String> = vec![];
+    let updated_paths = update_bundle_for_bundle(&bundle, None, Some(&selective), false)
+        .await
+        .unwrap();
+    assert!(updated_paths.is_empty());
+}
+
+#[tokio::test]
+async fn test_update_bundle_for_bundle_mixed_sources() {
+    // Mix of file, git, and http — only git sources are attempted
+    let cache_dir = tempfile::tempdir().expect("tempdir");
+    let mut bundle = Bundle::new("mixed-bundle");
+    bundle.source_uri = Some("file:///local/bundle".to_string());
+
+    let provider: Value = serde_yaml_ng::from_str(
+        r#"
+module: "provider-git"
+source: "git+https://127.0.0.1:1/org/provider@main"
+"#,
+    )
+    .unwrap();
+    let tool: Value = serde_yaml_ng::from_str(
+        r#"
+module: "tool-http"
+source: "https://example.com/tool.tar.gz"
+"#,
+    )
+    .unwrap();
+    bundle.providers = vec![provider];
+    bundle.tools = vec![tool];
+
+    // All three sources collected, but only git is attempted (and fails)
+    let updated_paths = update_bundle_for_bundle(&bundle, Some(cache_dir.path()), None, false)
+        .await
+        .unwrap();
+    assert!(updated_paths.is_empty());
 }
