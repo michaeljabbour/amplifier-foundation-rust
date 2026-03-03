@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
+use std::path::PathBuf;
 
+use amplifier_foundation::mentions::dedup::ContentDeduplicator;
+use amplifier_foundation::mentions::loader::format_context_block;
 use amplifier_foundation::mentions::parser::parse_mentions;
 use amplifier_foundation::mentions::resolver::BaseMentionResolver;
 use serial_test::serial;
@@ -495,4 +498,125 @@ async fn test_load_mentions_parent_before_children() {
     assert_eq!(result.files.len(), 2);
     assert_eq!(result.files[0].mention, "@parent.md");
     assert_eq!(result.files[1].mention, "@child.md");
+}
+
+// ---------------------------------------------------------------------------
+// format_context_block
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_format_context_block_empty_deduplicator() {
+    let dedup = ContentDeduplicator::new();
+    let result = format_context_block(&dedup, None);
+    assert_eq!(result, "");
+}
+
+#[test]
+fn test_format_context_block_single_file() {
+    let mut dedup = ContentDeduplicator::new();
+    let path = PathBuf::from("/home/user/project/README.md");
+    dedup.add_file(&path, "Hello, world!");
+
+    let result = format_context_block(&dedup, None);
+    // Verify XML structure: opening tag, content, closing tag
+    assert!(result.starts_with("<context_file paths=\""));
+    assert!(result.ends_with("</context_file>"));
+    assert!(result.contains("Hello, world!"));
+    assert!(result.contains("README.md"));
+    // Verify exactly one block
+    assert_eq!(result.matches("<context_file").count(), 1);
+    assert_eq!(result.matches("</context_file>").count(), 1);
+}
+
+#[test]
+fn test_format_context_block_with_mention_to_path() {
+    let mut dedup = ContentDeduplicator::new();
+    let path = PathBuf::from("/home/user/project/AGENTS.md");
+    dedup.add_file(&path, "Agent instructions here");
+
+    let mut mention_to_path = HashMap::new();
+    mention_to_path.insert("@AGENTS.md".to_string(), path.clone());
+
+    let result = format_context_block(&dedup, Some(&mention_to_path));
+    // Should show @AGENTS.md → <path> format in the paths attribute
+    assert!(result.contains("@AGENTS.md →"));
+    assert!(result.contains("AGENTS.md"));
+    // Content must be inside the XML block (between tags)
+    let content_start = result.find(">\n").unwrap() + 2;
+    let content_end = result.find("\n</context_file>").unwrap();
+    assert_eq!(
+        &result[content_start..content_end],
+        "Agent instructions here"
+    );
+}
+
+#[test]
+fn test_format_context_block_multiple_files() {
+    let mut dedup = ContentDeduplicator::new();
+    dedup.add_file(&PathBuf::from("/path/a.md"), "Content A");
+    dedup.add_file(&PathBuf::from("/path/b.md"), "Content B");
+
+    let result = format_context_block(&dedup, None);
+    // Should have two context_file blocks
+    assert_eq!(result.matches("<context_file").count(), 2);
+    assert_eq!(result.matches("</context_file>").count(), 2);
+    assert!(result.contains("Content A"));
+    assert!(result.contains("Content B"));
+    // Blocks should be separated by double newline
+    assert!(result.contains("</context_file>\n\n<context_file"));
+}
+
+#[test]
+fn test_format_context_block_duplicate_content_different_paths() {
+    let mut dedup = ContentDeduplicator::new();
+    dedup.add_file(&PathBuf::from("/path/a.md"), "Same content");
+    dedup.add_file(&PathBuf::from("/path/b.md"), "Same content");
+
+    let result = format_context_block(&dedup, None);
+    // Should produce ONE block (deduplicated) but show both paths
+    assert_eq!(result.matches("<context_file").count(), 1);
+    assert!(result.contains("Same content"));
+    // Both paths should appear in the paths attribute
+    assert!(result.contains("a.md"));
+    assert!(result.contains("b.md"));
+}
+
+#[test]
+fn test_format_context_block_mention_with_namespace() {
+    let mut dedup = ContentDeduplicator::new();
+    let path = PathBuf::from("/bundles/foundation/context/KERNEL.md");
+    dedup.add_file(&path, "Kernel documentation");
+
+    let mut mention_to_path = HashMap::new();
+    mention_to_path.insert("@foundation:context/KERNEL.md".to_string(), path.clone());
+
+    let result = format_context_block(&dedup, Some(&mention_to_path));
+    assert!(result.contains("@foundation:context/KERNEL.md →"));
+    assert!(result.contains("Kernel documentation"));
+    // Content should be between tags
+    assert!(result.starts_with("<context_file paths=\""));
+    assert!(result.ends_with("</context_file>"));
+}
+
+#[test]
+fn test_format_context_block_with_real_files() {
+    // Test with real files on disk to exercise fs::canonicalize success path
+    let tmp = tempfile::tempdir().unwrap();
+    let file_path = tmp.path().join("real_file.md");
+    fs::write(&file_path, "Real file content").unwrap();
+
+    let mut dedup = ContentDeduplicator::new();
+    dedup.add_file(&file_path, "Real file content");
+
+    let mut mention_to_path = HashMap::new();
+    mention_to_path.insert("@real_file.md".to_string(), file_path.clone());
+
+    let result = format_context_block(&dedup, Some(&mention_to_path));
+    // With real files, canonicalize succeeds on both sides, so mention attribution works
+    assert!(result.contains("@real_file.md →"));
+    assert!(result.contains("Real file content"));
+    assert_eq!(result.matches("<context_file").count(), 1);
+    // The resolved path should be absolute (from canonicalize)
+    let canonical = fs::canonicalize(&file_path).unwrap();
+    assert!(result.contains(&canonical.display().to_string()));
 }

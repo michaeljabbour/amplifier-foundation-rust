@@ -97,7 +97,7 @@ pub use sources::{file::FileSourceHandler, git::GitSourceHandler, http::HttpSour
 
 // -- Mentions --
 pub use mentions::dedup::ContentDeduplicator;
-pub use mentions::loader::load_mentions;
+pub use mentions::loader::{format_context_block, load_mentions};
 pub use mentions::models::{ContextFile, MentionResult, UniqueFile};
 pub use mentions::parser::parse_mentions;
 pub use mentions::utils::format_directory_listing;

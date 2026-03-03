@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 10
-phase_name: "Wave 10 -- API Completeness (Python __all__ parity)"
-epoch: 11
-next_action: "Wave 10 COMPLETE. 410 tests passing, 0 clippy warnings, cargo fmt clean. Python __all__ parity achieved. Consider: PyO3 bindings, ModuleActivator port, PreparedBundle port, concrete SourceHandlerWithStatus impl"
+phase: 11
+phase_name: "Wave 11 -- Advanced Module Infrastructure (ModuleActivator, BundleModuleResolver, format_context_block)"
+epoch: 12
+next_action: "Implement F-041 (format_context_block), F-042 (BundleModuleSource + BundleModuleResolver), F-043 (ModuleActivator)"
 blockers: []
 
 architecture_spec:
@@ -412,12 +412,36 @@ features:
     completed_at: "2025-01-19T01:15:00Z"
     commit: "10a41ab"
 
+  F-041-format-context-block:
+    name: "Port format_context_block (XML context block formatting for system prompts)"
+    module: "mentions"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-034-dedup-registry"]
+    started_at: "2025-01-19T02:00:00Z"
+
+  F-042-module-resolver:
+    name: "Port BundleModuleSource + BundleModuleResolver (module ID to path resolution)"
+    module: "bundle"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-018-bundle"]
+    started_at: null
+
+  F-043-module-activator:
+    name: "Port ModuleActivator (async module activation with abstracted install mechanism)"
+    module: "modules"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-035-install-state", "F-029-source-resolver"]
+    started_at: null
+
 wave_gate:
-  current_wave: 10
+  current_wave: 11
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
-  approval_status: "approved"
-  notes: "Wave 10 COMPLETE: 410 tests, 0 clippy warnings, cargo fmt clean. UpdateInfo, SourceStatus enrichment, SourceHandlerWithStatus + SourceResolver traits."
+  approval_status: "in-progress"
+  notes: "Wave 11: Advanced module infrastructure. format_context_block, BundleModuleResolver, ModuleActivator."
 
 meta:
   project: "amplifier-foundation-rs"

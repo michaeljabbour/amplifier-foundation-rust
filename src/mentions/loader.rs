@@ -1,10 +1,104 @@
+use std::collections::HashMap;
 use std::fs;
+use std::path::{self, PathBuf};
 
 use super::dedup::ContentDeduplicator;
 use super::models::{ContextFile, MentionResult};
 use super::parser::parse_mentions;
 use super::utils::format_directory_listing;
 use super::MentionResolver;
+
+/// Resolve a path to an absolute path for consistent matching.
+///
+/// Uses `fs::canonicalize` for existing paths (resolves symlinks), falls back
+/// to `std::path::absolute` for non-existent paths (matches Python's
+/// `Path.resolve()` which always returns an absolute path).
+fn resolve_path(p: &PathBuf) -> PathBuf {
+    fs::canonicalize(p).unwrap_or_else(|_| path::absolute(p).unwrap_or_else(|_| p.clone()))
+}
+
+/// Format all loaded files as XML context blocks for prepending to system prompts.
+///
+/// Creates XML-wrapped context blocks that the LLM sees BEFORE the instruction.
+/// The @mentions in the original instruction remain as semantic references.
+///
+/// # Arguments
+///
+/// * `deduplicator` — Deduplicator containing loaded context files (via `add_file`).
+/// * `mention_to_path` — Optional mapping from @mention strings to resolved paths,
+///   used to show both @mention and absolute path in XML attributes.
+///
+/// # Returns
+///
+/// Formatted context string with XML blocks, or empty string if no files.
+///
+/// # Example output
+///
+/// ```xml
+/// <context_file paths="@AGENTS.md → /home/user/project/AGENTS.md">
+/// [file content here]
+/// </context_file>
+/// ```
+///
+/// **Note:** Path and content values are NOT XML-escaped. This matches the Python
+/// reference implementation. Paths containing `"` or content containing
+/// `</context_file>` could break XML parsing — same limitation as Python.
+pub fn format_context_block(
+    deduplicator: &ContentDeduplicator,
+    mention_to_path: Option<&HashMap<String, PathBuf>>,
+) -> String {
+    let unique_files = deduplicator.get_unique_files();
+    if unique_files.is_empty() {
+        return String::new();
+    }
+
+    // Build reverse lookup: resolved_path -> list of @mentions for attribution
+    // Mentions are sorted per-path for deterministic output (Python dicts are ordered,
+    // but Rust HashMaps are not — sorting ensures reproducibility).
+    let mut path_to_mentions: HashMap<PathBuf, Vec<String>> = HashMap::new();
+    if let Some(m2p) = mention_to_path {
+        for (mention, path) in m2p {
+            let resolved = resolve_path(path);
+            path_to_mentions
+                .entry(resolved)
+                .or_default()
+                .push(mention.clone());
+        }
+        // Sort mentions per path for deterministic output
+        for mentions in path_to_mentions.values_mut() {
+            mentions.sort();
+        }
+    }
+
+    let mut blocks = Vec::new();
+    for uf in &unique_files {
+        // Build paths attribute showing @mention → absolute path for ALL paths
+        // (UniqueFile tracks multiple paths where same content was found)
+        let mut path_displays = Vec::new();
+        for p in &uf.paths {
+            let resolved = resolve_path(p);
+            let mentions = path_to_mentions.get(&resolved);
+            if let Some(mentions) = mentions {
+                // Show each @mention with its resolved path
+                for m in mentions {
+                    path_displays.push(format!("{} → {}", m, resolved.display()));
+                }
+            } else {
+                // No @mention tracked, just show path
+                path_displays.push(format!("{}", resolved.display()));
+            }
+        }
+
+        let paths_attr = path_displays.join(", ");
+        let block = format!(
+            "<context_file paths=\"{}\">\n{}\n</context_file>",
+            paths_attr, uf.content
+        );
+        blocks.push(block);
+    }
+
+    blocks.join("\n\n")
+}
 
 /// Load and resolve all @mentions from text, with recursive loading and deduplication.
 ///
