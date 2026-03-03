@@ -13,7 +13,7 @@
 phase: 20
 phase_name: "Wave 20 -- Async registry secondary paths (find_nearest, find_resource, resolve_include)"
 epoch: 21
-next_action: "Implement F-068 (async find_nearest_bundle_file), F-069 (async find_resource_path), F-070 (async resolve_include_source)"
+next_action: "Wave 20 COMPLETE. 601 tests passing, 0 clippy warnings, cargo fmt clean. All registry secondary I/O paths now async. Consider: async persistence.rs save/load, async MentionResolver::resolve(), PyO3 bindings, benchmarks"
 blockers: []
 
 architecture_spec:
@@ -690,29 +690,34 @@ features:
     completed_at: "2025-01-28T00:30:00Z"
     commit: "1cb2df6"
   F-069-async-find-resource:
-    name: "Convert find_resource_path to async (tokio::fs for exists/canonicalize)"
+    name: "Convert find_resource_path to async (tokio::fs::canonicalize as existence check + path resolution)"
     module: "registry"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-059-registry-decompose"]
     started_at: "2025-01-28T00:30:00Z"
+    completed_at: "2025-01-28T01:00:00Z"
+    commit: "cb065c2"
   F-070-async-resolve-include:
-    name: "Convert resolve_include_source to async (uses async find_resource_path + is_file)"
+    name: "Convert resolve_include_source to async (uses async find_resource_path + tokio::fs::metadata for is_file)"
     module: "registry"
-    status: "ready"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-069-async-find-resource"]
+    started_at: "2025-01-28T00:30:00Z"
+    completed_at: "2025-01-28T01:00:00Z"
+    commit: "cb065c2"
 
 wave_gate:
   current_wave: 20
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
-  approval_status: "in-progress"
-  notes: "Wave 20: Async migration of registry secondary I/O paths (find_nearest_bundle_file, find_resource_path, resolve_include_source)"
+  approval_status: "approved"
+  notes: "Wave 20 COMPLETE: 601 tests (all passing), 0 clippy warnings, cargo fmt clean. All registry secondary I/O paths (find_nearest_bundle_file, find_resource_path, resolve_include_source) now fully async."
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 67
-  last_updated: "2025-01-27T01:30:00Z"
-  last_session: "session-024-wave19-async-io"
+  total_features_completed: 70
+  last_updated: "2025-01-28T01:00:00Z"
+  last_session: "session-025-wave20-async-registry-secondary"

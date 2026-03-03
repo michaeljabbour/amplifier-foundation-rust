@@ -6,6 +6,62 @@
 
 ---
 
+## Session 025 -- Wave 20 COMPLETE (F-068, F-069, F-070)
+
+### Work Completed
+- **F-068-async-find-nearest** (1cb2df6): Converted `find_nearest_bundle_file` from sync to async. `std::fs::canonicalize` → `tokio::fs::canonicalize`, `.exists()` → `tokio::fs::metadata().await.is_ok()`. Used `tokio::join!` to check bundle.md and bundle.yaml concurrently (halves the per-iteration spawn_blocking overhead). 6 tests converted from `#[test]` to `#[tokio::test]`. Updated caller in `load_single_with_chain` to `.await`.
+- **F-069-async-find-resource** (cb065c2): Converted `find_resource_path` from sync to async. Eliminated TOCTOU by using `tokio::fs::canonicalize` as both existence check and path resolution in one syscall (previously used separate `.exists()` + `canonicalize()` two-step). On ENOENT, canonicalize returns Err, which serves as the "doesn't exist" signal. Removed the `std::path::absolute` fallback chain — if canonicalize fails, the candidate doesn't exist. 6 tests converted to async.
+- **F-070-async-resolve-include** (cb065c2, same commit as F-069): Converted `resolve_include_source` from sync to async. `namespace_path.is_file()` → `tokio::fs::metadata(namespace_path).await.map(|m| m.is_file()).unwrap_or(false)`. Cached `is_file` result to avoid duplicate metadata calls (sync version called `is_file()` twice independently — new version uses single cached value for both `resource_path` construction and `namespace_root` determination, eliminating a consistency TOCTOU). Updated compose_includes to `.await` the now-async method. Updated lock safety comment. 14 tests converted to async.
+
+### Wave 20 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 601 passing, 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **`tokio::join!` for concurrent metadata checks in find_nearest_bundle_file**: The two metadata checks for bundle.md and bundle.yaml are independent — `tokio::join!` runs them concurrently, saving one round-trip to the blocking thread pool per directory level. bundle.md is still preferred when both exist (checked first after join).
+- **`tokio::fs::canonicalize` as combined existence check + resolution**: `canonicalize` returns `Err` for non-existent paths (ENOENT), so calling it is equivalent to `exists()` + `canonicalize()` but in one syscall instead of two. This eliminates the TOCTOU between the existence check and the path resolution.
+- **Removed `std::path::absolute` fallback from `find_resource_path`**: The previous code had a fallback chain: try canonicalize, then try absolute, then clone. The `absolute` fallback was for "path exists but can't be canonicalized" (e.g., broken parent symlink). This is extremely rare and the canonicalize-only approach is cleaner. If a path exists but canonicalize fails, it's treated as non-existent (matches Python's behavior where resolve() raises on broken symlinks).
+- **Cached `is_file` result in `resolve_include_source`**: The sync version called `namespace_path.is_file()` twice — once for resource_path construction and once for namespace_root determination. The async version caches the result of a single `tokio::fs::metadata` call. This is both more efficient (one syscall instead of two) and more consistent (both uses see the same answer, eliminating a TOCTOU where the file type could theoretically change between calls).
+- **`resolve_include_source` made async (not just its callees)**: Making `find_resource_path` async forced `resolve_include_source` to become async too, since it calls `find_resource_path`. This was expected and planned as F-070. Both shipped in the same commit.
+- **Lock safety preserved**: The `self.bundles.read()` lock in `resolve_include_source` is dropped before any `.await` points. Comment updated to reflect "prevents holding lock across await points" (was "prevents holding lock during blocking syscalls").
+
+### Antagonistic Review Issues Found & Fixed
+- F-068: Used `tokio::join!` for concurrent bundle.md + bundle.yaml metadata checks instead of sequential awaits (P2: saves one spawn_blocking round-trip per directory level)
+- F-069: Eliminated TOCTOU by using canonicalize as combined existence check + path resolution (P3: reviewer suggestion)
+- F-069/F-070: Cached `is_file` result to avoid duplicate metadata calls (P2: was called twice independently)
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-068: `find_nearest_bundle_file` takes `&self` but doesn't use self — could be a free function. Pre-existing API design, not changing in this wave (would break public API).
+- F-068: Per-call `spawn_blocking` overhead may exceed syscall cost for local filesystem ops. Consistent with codebase-wide pattern (all previous sessions used per-op tokio::fs). Single `spawn_blocking` for entire function would require extracting `&self` dependency.
+- F-069/F-070: `strip_prefix` fails when `found` (canonical) vs `namespace_root` (non-canonical) paths differ (e.g., `/tmp` vs `/private/tmp` on macOS). Pre-existing from F-053, not introduced by async conversion. Would need canonicalizing `namespace_root` too.
+- F-069/F-070: `unwrap_or(false)` on metadata errors conflates "doesn't exist" with "permission denied". Pre-existing pattern across 4 sites in the codebase.
+- F-069/F-070: Same metadata→is_file→parent-or-self pattern appears 4 times. Pre-existing duplication, could be extracted to helper.
+- F-068: No symlink test for find_nearest_bundle_file (pre-existing gap from sync version).
+
+### Remaining Blocking I/O in Async Contexts
+- `persistence.rs`: `save()` with `std::fs::create_dir_all` + `std::fs::write` (registry/persistence.rs) — small file, called from async via `record_include_relationships`
+- `persistence.rs`: `load_persisted_state()` with `std::fs::read_to_string` — called from sync `BundleRegistry::new()`
+- `MentionResolver::resolve()`: `path.exists()` calls (mentions/resolver.rs) — sync trait, making async requires trait redesign
+- `Bundle::load_agent_metadata()`: `std::fs::read_to_string` (bundle/agent_meta.rs) — sync function, not called from async
+- `write_with_backup`/`write_atomic_bytes`: sync by design (tempfile crate)
+- `validate_cached_paths`: `Path::new(lp).exists()` (registry/persistence.rs) — called from sync contexts
+
+### What's Next
+- All 20 waves complete. 601 tests, 0 clippy warnings, 70 features delivered.
+- All registry I/O hotpath is now fully async: loader, includes, find_nearest_bundle_file, find_resource_path, resolve_include_source.
+- Remaining blocking I/O is in secondary paths: persistence (small files), MentionResolver (sync trait), validate_cached_paths.
+- Remaining unported PreparedBundle functionality:
+  - `create_session` (bundle.py:981-1109) — depends on AmplifierSession from amplifier_core
+  - `spawn` (bundle.py:1111-1289) — depends on AmplifierSession from amplifier_core
+- Consider: Async persistence.rs save/load (small impact, small files)
+- Consider: Async MentionResolver::resolve() (requires trait redesign)
+- Consider: PyO3 bindings (feature flag exists, no `#[pyclass]` code)
+- Consider: Benchmarks (bundle compose, cache operations, system prompt factory)
+
+---
+
 ## Session 024 -- Wave 19 COMPLETE (F-065, F-066, F-067)
 
 ### Work Completed
