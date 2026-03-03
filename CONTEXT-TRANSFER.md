@@ -6,6 +6,64 @@
 
 ---
 
+## Session 017 -- Wave 12 COMPLETE (F-044, F-045, F-046)
+
+### Work Completed
+- **F-044-doctest-cleanup** (8d37289): Fixed failing ModuleActivator doctest by adding `use ModuleActivate` import. Removed unused `ModelResolutionResult` struct from `spawn/mod.rs` (dead code since Session 005, never used by any function). Updated `lib.rs` re-exports, `test_reexports.rs`, and `specs/modules/spawn.md`.
+- **F-045-git-status-handler** (460ea1d): Implemented `SourceHandlerWithStatus` trait on `GitSourceHandler`. `get_status()` reads `.amplifier_cache_meta.json` metadata, checks pinned refs via `SourceStatus::is_pinned()`, runs `git ls-remote` with 30s timeout, compares cached vs remote commit SHAs. `update()` removes existing cache (propagating errors) and delegates to `resolve()` for fresh clone. Helper methods: `get_cache_metadata`, `get_remote_commit` (with `tokio::time::timeout`), `build_source_uri`. 8 new tests.
+- **F-046-wire-status-updates** (c93215f): Wired `SourceHandlerWithStatus` into `check_bundle_status` and `update_bundle`. Both functions now dispatch git URIs to `GitSourceHandler.get_status()` / `GitSourceHandler.update()` respectively. Added `cache_dir: Option<&Path>` parameter to both functions, defaulting to `~/.amplifier/cache/bundles` (matching `SimpleSourceResolver`). HTTP sources remain unsupported (returns unknown/error). 1 new test. All existing tests updated with cache_dir parameter.
+
+### Wave 12 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 450 passing, 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **ModuleActivator doctest needs `use ModuleActivate`**: The `activate()` method lives on the `ModuleActivate` trait, not as an inherent method. Doctest requires explicit trait import to compile.
+- **ModelResolutionResult removed (not deprecated)**: Dead since Session 005, version 0.1.0 so no semver concern. No function ever accepted or returned it. Spec in `specs/modules/spawn.md` also cleaned up.
+- **SourceStatus::is_pinned() used as single canonical implementation**: Rather than duplicating pinned-ref detection logic in `GitSourceHandler`, `get_status` sets `cached_ref` first then calls `status.is_pinned()`. Single place to fix bugs.
+- **get_remote_commit uses tokio::time::timeout(30s)**: Matches Python's `asyncio.wait_for(..., timeout=30)`. Prevents indefinite hang on unresponsive remotes. Returns None on timeout (same as on failure).
+- **update() propagates remove_dir_all errors**: Unlike `resolve()` which does best-effort cleanup, `update()` raises on removal failure. Returning stale data after user explicitly requested update is worse than failing.
+- **check_bundle_status/update_bundle take Option<&Path> cache_dir**: Defaults to `get_amplifier_home()/cache/bundles` matching `SimpleSourceResolver::new()`. Tests use `tempdir()` to avoid polluting real cache.
+- **Cache path uses `cache/bundles/` not just `cache/`**: Must match `SimpleSourceResolver` default to ensure status checks and updates operate on the same cache directory as the resolver. Reviewer caught this mismatch.
+- **check_bundle_status/update_bundle dispatch directly to GitSourceHandler::new()**: Hardcoded dispatch matches Python's pattern. Not using `dyn SourceHandlerWithStatus` dispatch because only one handler exists. Can be refactored to handler-registry pattern when HTTP handler is added.
+- **update_bundle returns () not ResolvedSource**: The trait returns `Result<ResolvedSource>` but `update_bundle` discards it. Callers who need the path can call `resolve()` after updating. Matches Python's simpler return.
+- **Tests use 127.0.0.1:1 for all git URIs**: Ensures no real network calls in tests. Connection to port 1 always fails immediately with connection refused.
+
+### Antagonistic Review Issues Found & Fixed
+- F-044: Removed tombstone comment from test_reexports.rs (reviewer caught test archaeology)
+- F-044: Updated specs/modules/spawn.md to remove ModelResolutionResult definition
+- F-045: Added 30s timeout to get_remote_commit (reviewer caught indefinite hang risk — P1 bug)
+- F-045: update() now propagates remove_dir_all errors (reviewer caught stale cache risk — P2 bug)
+- F-045: Consolidated is_ref_pinned to use SourceStatus::is_pinned() (reviewer caught duplication)
+- F-045: Strengthened test_git_get_status_not_cached assertions (reviewer caught weak assertion)
+- F-045: Added test_git_update_no_existing_cache (reviewer caught missing coverage)
+- F-046: Fixed cache path from `cache/` to `cache/bundles/` matching SimpleSourceResolver (reviewer caught directory mismatch — blocking bug)
+- F-046: Changed pinned test from github.com to 127.0.0.1:1 (reviewer caught real network call risk)
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-045: verify_clone_integrity false negative for repos without pyproject.toml/bundle.yaml — pre-existing in resolve(), not introduced here
+- F-045: is_pinned treats "version-2" branch as pinned — faithful port of Python bug, documented
+- F-045: get_remote_commit doesn't suppress stderr — Command::output() already captures both stdout and stderr
+- F-046: URI identity mismatch between BundleStatus.bundle_source and inner SourceStatus.uri — pre-existing design, git handler normalizes URI
+- F-046: Hardcoded GitSourceHandler::new() bypasses trait dispatch — matches Python's explicit dispatch, acceptable for single handler
+- F-046: update_bundle discards ResolvedSource — matches simpler Python return contract
+- F-046: Unnecessary uri_owned.clone() in check_bundle_status — micro-optimization, not blocking
+
+### What's Next
+- All 12 waves complete. 450 tests, 0 clippy warnings, 46 features delivered.
+- Remaining unported Python functionality:
+  - `PreparedBundle` (bundle.py:845-1289) — session lifecycle controller. Depends on AmplifierRuntime traits being concrete (amplifier_core::AmplifierSession). Major: create_session, spawn, _build_bundles_for_resolver, _create_system_prompt_factory.
+- Consider: PyO3 bindings (feature flag exists, no `#[pyclass]`/`#[pymodule]` code)
+- Consider: HTTP `SourceHandlerWithStatus` impl (HEAD + ETag/Last-Modified)
+- Consider: Refactor check_bundle_status/update_bundle to use handler registry (dyn dispatch)
+- Consider: Benchmarks (bundle compose, cache operations, fingerprint computation)
+- Consider: Integration test for GitSourceHandler with real git clone
+- Consider: Return ResolvedSource from update_bundle (richer API)
+
+---
+
 ## Session 016 -- Wave 11 COMPLETE (F-041, F-042, F-043)
 
 ### Work Completed
