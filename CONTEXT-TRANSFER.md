@@ -6,6 +6,61 @@
 
 ---
 
+## Session 014 -- Wave 9 COMPLETE (F-035, F-036, F-037)
+
+### Work Completed
+- **F-035-install-state** (56af148): Ported Python's `InstallStateManager` to `src/modules/state.rs`. SHA-256 fingerprinting of `pyproject.toml` + `requirements.txt` for skip-if-unchanged semantics. Self-healing: corrupted JSON, version mismatch, or schema errors silently reset to fresh state. Atomic save via `tempfile::NamedTempFile::persist()` (concurrent-safe). Path keys use `std::path::absolute()` fallback for non-existent paths (matches Python's `Path.resolve()` behavior). Tolerates unknown fields in JSON for cross-implementation compatibility (Python writes a `"python"` field that Rust ignores). `save(&mut self)` correctly resets dirty flag. 18 new tests.
+- **F-036-provider-prefs-resolution** (4d5ca3e): Implemented `apply_provider_preferences_with_resolution` -- async version of `apply_provider_preferences` that resolves glob model patterns via a callback. Generic signature `F: Fn(&str) -> Fut + Send + Sync` where `Fut: Future<Output = Vec<String>> + Send`. Send+Sync bounds enable `tokio::spawn` compatibility. Falls back to original glob pattern when no match found. `tracing::warn!` for missing providers (matches Python logging). Re-exported in `lib.rs`. 7 new async tests.
+- **F-037-dead-stub-cleanup** (2e0dc72): Removed 5 empty TODO stub files (`bundle/module_resolver.rs`, `bundle/prepared.rs`, `bundle/prompt.rs`, `registry/includes.rs`, `registry/persistence.rs`). Added documentation comments to parent modules explaining that registry logic lives in `registry/mod.rs` and bundle stubs are reserved for future AmplifierRuntime-dependent functionality. Updated `modules/mod.rs` with proper module-level docs.
+
+### Wave 9 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 376 passing, 0 ignored, 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **InstallStateManager omits Python's `sys.executable` tracking**: The Python version invalidates all module state when the Python executable changes (venv switch). The Rust version has no equivalent concept since it's a Rust library, not a Python runtime. For cross-implementation compatibility, the Rust deserializer tolerates the `"python"` field via serde's default behavior (no `#[serde(deny_unknown_fields)]`).
+- **InstallStateManager.save() returns io::Result<()>**: Python's `save()` swallows `OSError` and logs a warning. Rust propagates errors to callers (idiomatic Rust -- callers decide error handling policy). This is a deliberate API divergence.
+- **InstallStateManager.save(&mut self) not &self**: Python uses `self._dirty = False` after successful write. Rust requires `&mut self` to reset the dirty flag. The antagonistic review correctly identified that `&self` would be unable to clear the flag.
+- **InstallStateManager.path_key uses std::path::absolute()**: `fs::canonicalize()` fails for non-existent paths. Python's `Path.resolve()` always returns an absolute path. `std::path::absolute()` (stable since 1.79) resolves against cwd without requiring the path to exist. Used as fallback when `canonicalize()` fails.
+- **InstallStateManager uses tempfile::NamedTempFile for atomic save**: Python uses `tempfile.mkstemp()`. The antagonistic review correctly identified that a fixed temp file name (`install-state.tmp`) would allow concurrent writes to corrupt each other. `NamedTempFile::new_in()` + `.persist()` provides unique temp names and atomic rename in one call.
+- **apply_provider_preferences_with_resolution uses generic callback, not coordinator**: Python takes `coordinator: Any` and does duck-typing to query models. Rust uses `F: Fn(&str) -> Fut` where `Fut: Future<Output = Vec<String>>`. This is more flexible -- callers provide any async function that maps provider names to model lists. No dependency on the Coordinator trait.
+- **Callback returns Vec<String>, not Result**: The Python version wraps model queries in try/except and falls back to empty list. Rust callers handle errors internally in the closure and return `vec![]` as fallback. Adding `Result` to the callback return type would complicate the API without benefit.
+- **Send+Sync bounds on callback**: Required for `tokio::spawn` compatibility. Without these, the returned future is not Send, making it unusable in multi-threaded tokio runtimes.
+- **Empty stub files deleted, not just documented**: `registry/includes.rs` and `registry/persistence.rs` had their logic implemented directly in `registry/mod.rs`. The stubs added no value and cluttered the file tree. `bundle/module_resolver.rs`, `bundle/prepared.rs`, `bundle/prompt.rs` depended on unimplemented AmplifierRuntime functionality. Keeping them as empty `pub mod` items polluted the public API with empty modules.
+- **ModelResolutionResult is still unused**: Noted by the antagonistic review. It was a placeholder from Session 005. The new `apply_provider_preferences_with_resolution` doesn't use it because the resolution happens inline. The struct could be removed or repurposed when the full async resolution pipeline is built.
+
+### Antagonistic Review Issues Found & Fixed
+- F-035: Changed `save(&self)` to `save(&mut self)` to allow dirty flag reset (reviewer caught that `&self` can't mutate)
+- F-035: Changed `path_key` fallback from `module_path.to_path_buf()` to `std::path::absolute()` (reviewer caught relative path key mismatch)
+- F-035: Changed from fixed temp file name to `tempfile::NamedTempFile` (reviewer caught concurrent write corruption risk)
+- F-035: Added 4 additional tests: save_clears_dirty_flag, double_save_is_noop, fingerprint_format_sha256, loads_state_with_extra_fields
+- F-036: Added `Send + Sync` bounds to callback and future (reviewer caught tokio::spawn incompatibility)
+- F-036: Added `tracing::warn!` for missing providers and no-match cases (reviewer caught silent operational divergence)
+- F-036: Added 2 additional tests: empty_model_list_from_callback, no_providers_in_plan
+- F-037: Removed "Wave 9" reference from registry comment (reviewer caught project-internal bookkeeping in source)
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-035: No `python` environment discriminator (Rust has no Python interpreter to track)
+- F-035: `save()` propagates errors instead of swallowing (idiomatic Rust, callers decide)
+- F-036: Callback can't return errors (callers handle internally, matches Python's try/except pattern)
+- F-036: `ModelResolutionResult` is still dead code (pre-existing from Session 005, not introduced here)
+- F-036: Signature deviates from informal spec (callback is better than pre-built HashMap)
+- F-036: `build_provider_lookup` has redundant HashMap insert for prefixed providers (pre-existing, not introduced here)
+
+### What's Next
+- All 9 waves complete. 376 tests, 0 clippy warnings, 37 features delivered.
+- Remaining unported Python functionality:
+  - `ModuleActivator` (modules/activator.py) -- async module activation via subprocess. Depends on `uv` tooling. No Python tests.
+  - `BundleModuleResolver/BundleModuleSource` (bundle.py:711-842) -- maps module IDs to paths. Depends on ModuleActivator.
+  - `PreparedBundle` (bundle.py:845-1289) -- session lifecycle controller. Depends on AmplifierRuntime traits being concrete.
+- Consider: PyO3 bindings for cross-language interop
+- Consider: Benchmarks (bundle compose, cache operations, fingerprint computation)
+- Consider: Remove unused `ModelResolutionResult` or integrate it into resolution pipeline
+
+---
+
 ## Session 013 -- Wave 8 COMPLETE (F-032, F-033, F-034)
 
 ### Work Completed
