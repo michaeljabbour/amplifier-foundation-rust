@@ -71,10 +71,10 @@ features:
   F-004-test-port-wave2:
     name: "Port Wave 2 tests + stubs"
     module: "io, sources, mentions, session"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/features/wave-0/F-004-test-port-wave2.md"
     depends_on: ["F-001-cargo-scaffold", "F-002-error-types"]
-    started_at: null
+    started_at: "2025-01-15T10:00:00Z"
     completed_at: null
     commit: null
   F-005-test-port-wave3:

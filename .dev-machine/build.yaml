@@ -83,7 +83,7 @@ steps:
   # ---------------------------------------------------------------------------
   - id: "work-loop"
     type: "recipe"
-    recipe: "./.dev-machine/iteration.yaml"
+    recipe: "./iteration.yaml"
     context:
       state_file: "./STATE.yaml"
       context_file: "./CONTEXT-TRANSFER.md"

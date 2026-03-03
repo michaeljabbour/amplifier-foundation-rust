@@ -110,7 +110,7 @@ steps:
   # ---------------------------------------------------------------------------
   - id: "fix-loop"
     type: "recipe"
-    recipe: "./.dev-machine/fix-iteration.yaml"
+    recipe: "./fix-iteration.yaml"
     context:
       project_dir: "/Users/michaeljabbour/dev/amplifier-foundation-rust/"
       iteration: "{{iteration}}"
