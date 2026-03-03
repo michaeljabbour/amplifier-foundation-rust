@@ -879,7 +879,7 @@ fn test_get_session_lineage_deeply_nested_forks() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_slice_events_to_timestamp_basic() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -910,7 +910,7 @@ fn test_slice_events_to_timestamp_basic() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_get_last_timestamp_for_turn() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -927,7 +927,7 @@ fn test_get_last_timestamp_for_turn() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_slice_events_for_fork() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -948,7 +948,7 @@ fn test_slice_events_for_fork() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_count_events() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
@@ -959,7 +959,7 @@ fn test_count_events() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_count_events_nonexistent_file() {
     let tmp = tempdir().expect("failed to create temp dir");
     let nonexistent = tmp.path().join("does_not_exist.jsonl");
@@ -973,7 +973,7 @@ fn test_count_events_nonexistent_file() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_get_event_summary() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());

@@ -13,7 +13,7 @@
 phase: 2
 phase_name: "Wave 2 -- Mid-tier Modules (mixed sync/async)"
 epoch: 3
-next_action: "Implement F-012-session-slice"
+next_action: "Implement F-013-session-events"
 blockers: []
 
 architecture_spec:
@@ -143,16 +143,19 @@ features:
   F-012-session-slice:
     name: "Implement session/slice.rs (get_turn_boundaries, count_turns, slice_to_turn, find_orphaned_tool_calls, add_synthetic_tool_results, get_turn_summary)"
     module: "session"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-004-test-port-wave2"]
     started_at: "2025-01-16T04:00:00Z"
+    completed_at: "2025-01-16T04:20:00Z"
+    commit: "ed2428e"
   F-013-session-events:
     name: "Implement session/events.rs (slice_events_to_timestamp, get_last_timestamp_for_turn, slice_events_for_fork, count_events, get_event_summary)"
     module: "session"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-004-test-port-wave2"]
+    started_at: "2025-01-16T04:25:00Z"
   F-014-session-fork:
     name: "Implement session/fork.rs (fork_session, fork_session_in_memory, get_fork_preview, list_session_forks, get_session_lineage)"
     module: "session"
@@ -170,6 +173,6 @@ wave_gate:
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 11
-  last_updated: "2025-01-16T04:00:00Z"
+  total_features_completed: 12
+  last_updated: "2025-01-16T04:25:00Z"
   last_session: "session-006-wave2-session"
