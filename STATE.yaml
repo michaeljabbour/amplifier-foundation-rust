@@ -653,17 +653,20 @@ features:
   F-065-async-mentions-loader:
     name: "Full async migration of mentions/loader.rs (tokio::fs for file reads, async recursive resolve_mention)"
     module: "mentions"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-030-load-mentions"]
     started_at: "2025-01-27T00:00:00Z"
+    completed_at: "2025-01-27T00:30:00Z"
+    commit: "a4d1fad"
 
   F-066-async-registry-loader:
     name: "Replace blocking std::fs with tokio::fs in registry/loader.rs (load_yaml_bundle, load_markdown_bundle)"
     module: "registry"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-059-registry-decompose"]
+    started_at: "2025-01-27T00:35:00Z"
 
   F-067-async-io-files:
     name: "Replace blocking std::fs with tokio::fs in io/files.rs (read_with_retry, write_with_retry)"

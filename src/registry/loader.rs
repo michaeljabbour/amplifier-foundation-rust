@@ -51,10 +51,14 @@ impl BundleRegistry {
             let local_path = resolve_file_uri(uri)?;
 
             // Load bundle from disk
-            let mut bundle = self.load_from_path(&local_path)?;
+            let mut bundle = self.load_from_path(&local_path).await?;
 
             // Detect subdirectory bundle
-            let bundle_dir = if local_path.is_file() {
+            let is_file = tokio::fs::metadata(&local_path)
+                .await
+                .map(|m| m.is_file())
+                .unwrap_or(false);
+            let bundle_dir = if is_file {
                 local_path.parent().unwrap_or(&local_path).to_path_buf()
             } else {
                 local_path.clone()
@@ -72,7 +76,7 @@ impl BundleRegistry {
 
                     // Only if root is in a DIFFERENT directory (not the same bundle)
                     if root_dir != bundle_dir {
-                        if let Ok(root_bundle) = self.load_from_path(&root_bundle_path) {
+                        if let Ok(root_bundle) = self.load_from_path(&root_bundle_path).await {
                             bundle
                                 .source_base_paths
                                 .insert(root_bundle.name.clone(), root_dir.clone());
@@ -122,15 +126,22 @@ impl BundleRegistry {
     }
 
     /// Load a bundle from a local filesystem path.
-    pub(super) fn load_from_path(&self, path: &Path) -> crate::error::Result<Bundle> {
-        if path.is_dir() {
+    ///
+    /// Uses `tokio::fs` for non-blocking I/O (file reads and metadata checks).
+    pub(super) async fn load_from_path(&self, path: &Path) -> crate::error::Result<Bundle> {
+        let is_dir = tokio::fs::metadata(path)
+            .await
+            .map(|m| m.is_dir())
+            .unwrap_or(false);
+
+        if is_dir {
             let bundle_md = path.join("bundle.md");
-            if bundle_md.exists() {
-                return self.load_markdown_bundle(&bundle_md);
+            if tokio::fs::metadata(&bundle_md).await.is_ok() {
+                return self.load_markdown_bundle(&bundle_md).await;
             }
             let bundle_yaml = path.join("bundle.yaml");
-            if bundle_yaml.exists() {
-                return self.load_yaml_bundle(&bundle_yaml);
+            if tokio::fs::metadata(&bundle_yaml).await.is_ok() {
+                return self.load_yaml_bundle(&bundle_yaml).await;
             }
             return Err(crate::error::BundleError::NotFound {
                 uri: path.display().to_string(),
@@ -139,19 +150,20 @@ impl BundleRegistry {
 
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         match ext {
-            "md" => self.load_markdown_bundle(path),
-            "yaml" | "yml" => self.load_yaml_bundle(path),
-            _ => self.load_yaml_bundle(path),
+            "md" => self.load_markdown_bundle(path).await,
+            "yaml" | "yml" => self.load_yaml_bundle(path).await,
+            _ => self.load_yaml_bundle(path).await,
         }
     }
 
-    /// Load a YAML bundle file.
-    fn load_yaml_bundle(&self, path: &Path) -> crate::error::Result<Bundle> {
-        let content =
-            std::fs::read_to_string(path).map_err(|e| crate::error::BundleError::LoadError {
+    /// Load a YAML bundle file using non-blocking I/O.
+    async fn load_yaml_bundle(&self, path: &Path) -> crate::error::Result<Bundle> {
+        let content = tokio::fs::read_to_string(path).await.map_err(|e| {
+            crate::error::BundleError::LoadError {
                 reason: format!("Failed to read bundle file: {}", path.display()),
                 source: Some(Box::new(e)),
-            })?;
+            }
+        })?;
 
         let raw: Value = serde_yaml_ng::from_str(&content)?;
 
@@ -162,13 +174,14 @@ impl BundleRegistry {
         Bundle::from_dict_with_base_path(&Value::Mapping(wrapper), base_path)
     }
 
-    /// Load a markdown bundle file (with YAML frontmatter).
-    fn load_markdown_bundle(&self, path: &Path) -> crate::error::Result<Bundle> {
-        let content =
-            std::fs::read_to_string(path).map_err(|e| crate::error::BundleError::LoadError {
+    /// Load a markdown bundle file (with YAML frontmatter) using non-blocking I/O.
+    async fn load_markdown_bundle(&self, path: &Path) -> crate::error::Result<Bundle> {
+        let content = tokio::fs::read_to_string(path).await.map_err(|e| {
+            crate::error::BundleError::LoadError {
                 reason: format!("Failed to read bundle file: {}", path.display()),
                 source: Some(Box::new(e)),
-            })?;
+            }
+        })?;
 
         let (frontmatter, body) = crate::io::frontmatter::parse_frontmatter(&content)?;
 

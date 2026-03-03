@@ -241,9 +241,13 @@ impl BundleRegistry {
                 // and update local_path — WITHOUT processing the namespace
                 // bundle's own includes (matches Python's auto_include=False).
                 match resolve_file_uri(&uri) {
-                    Ok(local_path) => match self.load_from_path(&local_path) {
+                    Ok(local_path) => match self.load_from_path(&local_path).await {
                         Ok(bundle) => {
-                            let bundle_dir = if local_path.is_file() {
+                            let is_file = tokio::fs::metadata(&local_path)
+                                .await
+                                .map(|m| m.is_file())
+                                .unwrap_or(false);
+                            let bundle_dir = if is_file {
                                 local_path.parent().unwrap_or(&local_path).to_path_buf()
                             } else {
                                 local_path.clone()

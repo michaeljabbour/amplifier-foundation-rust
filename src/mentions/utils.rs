@@ -37,8 +37,8 @@ pub async fn format_directory_listing_async(path: &Path) -> String {
                     .unwrap_or(true);
                 items.push((is_file, name));
             }
-            Ok(None) => break,       // end of directory
-            Err(_) => continue,       // skip errors, matching sync .flatten()
+            Ok(None) => break,  // end of directory
+            Err(_) => continue, // skip errors, matching sync .flatten()
         }
     }
 
