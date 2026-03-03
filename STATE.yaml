@@ -13,7 +13,7 @@
 phase: 8
 phase_name: "Wave 8 -- Source Handler Resolve + API Completion"
 epoch: 9
-next_action: "Implementing F-033 GitSourceHandler.resolve"
+next_action: "Implementing F-034 ContentDeduplicator API + Registry IndexMap"
 blockers: []
 
 architecture_spec:
@@ -338,14 +338,17 @@ features:
   F-033-git-resolve:
     name: "Implement GitSourceHandler.resolve (git clone to cache via subprocess)"
     module: "sources"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-017-sources"]
     started_at: "2025-01-17T06:35:00Z"
+    completed_at: "2025-01-17T07:00:00Z"
+    commit: "877b647"
   F-034-dedup-registry:
     name: "ContentDeduplicator full Python API + BundleRegistry IndexMap"
     module: "mentions, registry"
-    status: "ready"
+    status: "in-progress"
+    started_at: "2025-01-17T07:05:00Z"
     spec: "specs/architecture.md"
     depends_on: ["F-028-dead-code-cleanup", "F-020-registry"]
 

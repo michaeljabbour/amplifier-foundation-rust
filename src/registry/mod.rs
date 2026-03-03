@@ -2,6 +2,7 @@ pub mod includes;
 pub mod persistence;
 
 use crate::bundle::Bundle;
+use indexmap::IndexMap;
 use serde_yaml_ng::{Mapping, Value};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -152,9 +153,12 @@ impl BundleState {
 }
 
 /// Central bundle management.
+///
+/// Uses `IndexMap` for `bundles` to ensure deterministic ordering in
+/// serialized output (registry.json). Insertion order is preserved.
 pub struct BundleRegistry {
     home: PathBuf,
-    bundles: HashMap<String, BundleState>,
+    bundles: IndexMap<String, BundleState>,
     cache: std::sync::Mutex<HashMap<String, Bundle>>,
 }
 
@@ -162,7 +166,7 @@ impl BundleRegistry {
     pub fn new(home: PathBuf) -> Self {
         let mut registry = BundleRegistry {
             home,
-            bundles: HashMap::new(),
+            bundles: IndexMap::new(),
             cache: std::sync::Mutex::new(HashMap::new()),
         };
         registry.load_persisted_state();
@@ -186,7 +190,7 @@ impl BundleRegistry {
     /// Performs bidirectional relationship cleanup.
     /// Does NOT persist -- caller must call save().
     pub fn unregister(&mut self, name: &str) -> bool {
-        let state = match self.bundles.remove(name) {
+        let state = match self.bundles.shift_remove(name) {
             Some(s) => s,
             None => return false,
         };

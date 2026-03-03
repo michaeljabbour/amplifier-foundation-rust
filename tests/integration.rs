@@ -1062,3 +1062,159 @@ fn test_format_directory_listing_dirs_before_files() {
         "directories should come before files in listing"
     );
 }
+
+// ============================================================================
+// Test 20: ContentDeduplicator — full Python API (add_file, get_unique_files, is_seen, get_known_hashes)
+// ============================================================================
+
+#[test]
+fn test_content_deduplicator_add_file_new() {
+    let mut dedup = ContentDeduplicator::new();
+    let path = std::path::PathBuf::from("/a/file.txt");
+    assert!(
+        dedup.add_file(&path, "hello world"),
+        "new content should return true"
+    );
+}
+
+#[test]
+fn test_content_deduplicator_add_file_duplicate() {
+    let mut dedup = ContentDeduplicator::new();
+    let path1 = std::path::PathBuf::from("/a/file1.txt");
+    let path2 = std::path::PathBuf::from("/b/file2.txt");
+    assert!(dedup.add_file(&path1, "same content"));
+    assert!(
+        !dedup.add_file(&path2, "same content"),
+        "duplicate content should return false"
+    );
+}
+
+#[test]
+fn test_content_deduplicator_add_file_tracks_paths() {
+    let mut dedup = ContentDeduplicator::new();
+    let path1 = std::path::PathBuf::from("/a/file1.txt");
+    let path2 = std::path::PathBuf::from("/b/file2.txt");
+    dedup.add_file(&path1, "shared content");
+    dedup.add_file(&path2, "shared content");
+
+    let unique = dedup.get_unique_files();
+    assert_eq!(unique.len(), 1, "should be one unique content");
+    assert_eq!(unique[0].paths.len(), 2, "should track both paths");
+    assert!(unique[0].paths.contains(&path1));
+    assert!(unique[0].paths.contains(&path2));
+    assert_eq!(unique[0].content, "shared content");
+    assert!(!unique[0].content_hash.is_empty());
+}
+
+#[test]
+fn test_content_deduplicator_get_unique_files_multiple() {
+    let mut dedup = ContentDeduplicator::new();
+    dedup.add_file(&std::path::PathBuf::from("/a.txt"), "content A");
+    dedup.add_file(&std::path::PathBuf::from("/b.txt"), "content B");
+    dedup.add_file(&std::path::PathBuf::from("/c.txt"), "content A"); // duplicate
+
+    let unique = dedup.get_unique_files();
+    assert_eq!(unique.len(), 2, "should be two unique contents");
+}
+
+#[test]
+fn test_content_deduplicator_is_seen() {
+    let mut dedup = ContentDeduplicator::new();
+    assert!(!dedup.is_seen("new content"), "unseen content");
+    dedup.add_file(&std::path::PathBuf::from("/a.txt"), "new content");
+    assert!(dedup.is_seen("new content"), "seen content");
+    assert!(
+        !dedup.is_seen("other content"),
+        "different content not seen"
+    );
+}
+
+#[test]
+fn test_content_deduplicator_get_known_hashes() {
+    let mut dedup = ContentDeduplicator::new();
+    assert!(dedup.get_known_hashes().is_empty());
+    dedup.add_file(&std::path::PathBuf::from("/a.txt"), "content A");
+    dedup.add_file(&std::path::PathBuf::from("/b.txt"), "content B");
+    dedup.add_file(&std::path::PathBuf::from("/c.txt"), "content A"); // duplicate
+    let hashes = dedup.get_known_hashes();
+    assert_eq!(hashes.len(), 2, "should have 2 unique hashes");
+}
+
+#[test]
+fn test_content_deduplicator_is_duplicate_compat_forward() {
+    // add_file → is_duplicate (forward direction)
+    let mut dedup = ContentDeduplicator::new();
+    dedup.add_file(&std::path::PathBuf::from("/a.txt"), "content");
+    assert!(
+        dedup.is_duplicate("content"),
+        "is_duplicate should detect content added via add_file"
+    );
+}
+
+#[test]
+fn test_content_deduplicator_is_duplicate_compat_reverse() {
+    // is_duplicate → add_file (reverse direction: backfill maps)
+    let mut dedup = ContentDeduplicator::new();
+    assert!(
+        !dedup.is_duplicate("content"),
+        "first call should return false"
+    );
+    // Now add_file with the same content — should detect as duplicate
+    assert!(
+        !dedup.add_file(&std::path::PathBuf::from("/a.txt"), "content"),
+        "add_file should report duplicate for content already seen via is_duplicate"
+    );
+    // get_unique_files should include the backfilled entry
+    let unique = dedup.get_unique_files();
+    assert_eq!(unique.len(), 1, "should have one unique content");
+    assert_eq!(unique[0].content, "content");
+    assert_eq!(unique[0].paths, vec![std::path::PathBuf::from("/a.txt")]);
+}
+
+// ============================================================================
+// Test 21: BundleRegistry deterministic ordering (IndexMap)
+// ============================================================================
+
+#[test]
+fn test_registry_deterministic_ordering() {
+    use amplifier_foundation::registry::BundleRegistry;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
+
+    // Register bundles individually in a known order.
+    // Each call inserts one entry, so IndexMap insertion order is deterministic.
+    let mut b1 = std::collections::HashMap::new();
+    b1.insert("zulu".to_string(), "file:///zulu".to_string());
+    registry.register(&b1);
+
+    let mut b2 = std::collections::HashMap::new();
+    b2.insert("alpha".to_string(), "file:///alpha".to_string());
+    registry.register(&b2);
+
+    let mut b3 = std::collections::HashMap::new();
+    b3.insert("mike".to_string(), "file:///mike".to_string());
+    registry.register(&b3);
+
+    // Save and check key ordering
+    registry.save();
+    let content = std::fs::read_to_string(tmp.path().join("registry.json")).unwrap();
+    let data: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let bundle_keys: Vec<&str> = data["bundles"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(|k| k.as_str())
+        .collect();
+
+    // With IndexMap, keys should be in insertion order: zulu, alpha, mike
+    assert_eq!(bundle_keys, vec!["zulu", "alpha", "mike"]);
+
+    // Consecutive saves should produce identical output
+    registry.save();
+    let content2 = std::fs::read_to_string(tmp.path().join("registry.json")).unwrap();
+    assert_eq!(
+        content, content2,
+        "consecutive saves should produce identical output"
+    );
+}
