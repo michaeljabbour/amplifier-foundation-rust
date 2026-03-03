@@ -8,7 +8,6 @@ use tempfile::tempdir;
 // ---------------------------------------------------------------------------
 
 #[test]
-#[ignore = "Wave 2"]
 fn test_creates_backup_of_existing_file() {
     let tmp = tempdir().unwrap();
     let file_path = tmp.path().join("test.txt");
@@ -29,7 +28,6 @@ fn test_creates_backup_of_existing_file() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
 fn test_no_backup_for_new_file() {
     let tmp = tempdir().unwrap();
     let file_path = tmp.path().join("new.txt");
@@ -48,7 +46,6 @@ fn test_no_backup_for_new_file() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
 fn test_custom_backup_suffix() {
     let tmp = tempdir().unwrap();
     let file_path = tmp.path().join("test.txt");
@@ -73,7 +70,6 @@ fn test_custom_backup_suffix() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
 fn test_creates_parent_directories() {
     let tmp = tempdir().unwrap();
     let nested_path = tmp.path().join("a").join("b").join("test.txt");
@@ -88,7 +84,6 @@ fn test_creates_parent_directories() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
 fn test_unicode_content() {
     let tmp = tempdir().unwrap();
     let file_path = tmp.path().join("unicode.txt");
@@ -100,7 +95,6 @@ fn test_unicode_content() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
 fn test_binary_mode() {
     let tmp = tempdir().unwrap();
     let file_path = tmp.path().join("binary.bin");

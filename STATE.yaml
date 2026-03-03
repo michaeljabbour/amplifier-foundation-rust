@@ -167,6 +167,13 @@ features:
     started_at: "2025-01-16T04:45:00Z"
     completed_at: "2025-01-16T05:15:00Z"
     commit: "347a1ec"
+  F-015-io:
+    name: "Implement io module (write_with_backup, write_with_backup_bytes, read_with_retry, write_with_retry, read_yaml, write_yaml, parse_frontmatter)"
+    module: "io"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-004-test-port-wave2"]
+    started_at: "2025-01-16T06:00:00Z"
 
 wave_gate:
   current_wave: 2
