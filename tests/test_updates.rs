@@ -1,7 +1,12 @@
-//! Tests for the updates module (BundleStatus, check_bundle_status, update_bundle).
+//! Tests for the updates module (BundleStatus, check_bundle_status, update_bundle,
+//! collect_source_uris, check_bundle_status_for_bundle, update_bundle_for_bundle).
 
 use amplifier_foundation::sources::SourceStatus;
-use amplifier_foundation::updates::{check_bundle_status, update_bundle, BundleStatus};
+use amplifier_foundation::updates::{
+    check_bundle_status, collect_source_uris, update_bundle, BundleStatus,
+};
+use amplifier_foundation::Bundle;
+use serde_yaml_ng::Value;
 
 // ===========================================================================
 // BundleStatus
@@ -429,4 +434,292 @@ async fn test_check_bundle_status_git_not_cached() {
     .await
     .unwrap();
     assert!(!status.sources[0].is_cached);
+}
+
+// ===========================================================================
+// collect_source_uris
+// ===========================================================================
+
+#[test]
+fn test_collect_source_uris_empty_bundle() {
+    let bundle = Bundle::new("test-bundle");
+    let uris = collect_source_uris(&bundle);
+    assert!(uris.is_empty());
+}
+
+#[test]
+fn test_collect_source_uris_empty_string_source_uri() {
+    let mut bundle = Bundle::new("test-bundle");
+    bundle.source_uri = Some(String::new());
+    let uris = collect_source_uris(&bundle);
+    assert!(
+        uris.is_empty(),
+        "empty string source_uri should be excluded"
+    );
+}
+
+#[test]
+fn test_collect_source_uris_empty_source_in_module() {
+    let mut bundle = Bundle::new("test-bundle");
+    let provider: Value = serde_yaml_ng::from_str(
+        r#"
+module: "provider-x"
+source: ""
+"#,
+    )
+    .unwrap();
+    bundle.providers = vec![provider];
+    let uris = collect_source_uris(&bundle);
+    assert!(
+        uris.is_empty(),
+        "empty string source in module should be excluded"
+    );
+}
+
+#[test]
+fn test_collect_source_uris_session_null() {
+    // Bundle::new() sets session to Value::Null — most common case
+    let bundle = Bundle::new("test-bundle");
+    assert_eq!(bundle.session, Value::Null);
+    let uris = collect_source_uris(&bundle);
+    assert!(uris.is_empty());
+}
+
+#[test]
+fn test_collect_source_uris_session_not_a_mapping() {
+    let mut bundle = Bundle::new("test-bundle");
+    bundle.session = Value::String("invalid-session".to_string());
+    let uris = collect_source_uris(&bundle);
+    assert!(uris.is_empty());
+}
+
+#[test]
+fn test_collect_source_uris_non_string_source_value() {
+    let mut bundle = Bundle::new("test-bundle");
+    // source is an integer, not a string
+    let provider: Value = serde_yaml_ng::from_str(
+        r#"
+module: "provider-x"
+source: 42
+"#,
+    )
+    .unwrap();
+    bundle.providers = vec![provider];
+    let uris = collect_source_uris(&bundle);
+    assert!(
+        uris.is_empty(),
+        "non-string source should be silently skipped"
+    );
+}
+
+#[test]
+fn test_collect_source_uris_bundle_source_uri() {
+    let mut bundle = Bundle::new("test-bundle");
+    bundle.source_uri = Some("git+https://github.com/org/bundle@main".to_string());
+    let uris = collect_source_uris(&bundle);
+    assert_eq!(uris.len(), 1);
+    assert!(uris.contains(&"git+https://github.com/org/bundle@main".to_string()));
+}
+
+#[test]
+fn test_collect_source_uris_session_orchestrator() {
+    let mut bundle = Bundle::new("test-bundle");
+    let session_yaml: Value = serde_yaml_ng::from_str(
+        r#"
+orchestrator:
+  source: "git+https://github.com/org/orchestrator@main"
+  module: "my-orchestrator"
+"#,
+    )
+    .unwrap();
+    bundle.session = session_yaml;
+    let uris = collect_source_uris(&bundle);
+    assert_eq!(uris.len(), 1);
+    assert!(uris.contains(&"git+https://github.com/org/orchestrator@main".to_string()));
+}
+
+#[test]
+fn test_collect_source_uris_session_context() {
+    let mut bundle = Bundle::new("test-bundle");
+    let session_yaml: Value = serde_yaml_ng::from_str(
+        r#"
+context:
+  source: "git+https://github.com/org/context-manager@v1.0"
+  module: "my-context"
+"#,
+    )
+    .unwrap();
+    bundle.session = session_yaml;
+    let uris = collect_source_uris(&bundle);
+    assert_eq!(uris.len(), 1);
+    assert!(uris.contains(&"git+https://github.com/org/context-manager@v1.0".to_string()));
+}
+
+#[test]
+fn test_collect_source_uris_providers() {
+    let mut bundle = Bundle::new("test-bundle");
+    let provider: Value = serde_yaml_ng::from_str(
+        r#"
+module: "provider-anthropic"
+source: "git+https://github.com/org/provider@main"
+config:
+  model: "claude-3"
+"#,
+    )
+    .unwrap();
+    bundle.providers = vec![provider];
+    let uris = collect_source_uris(&bundle);
+    assert_eq!(uris.len(), 1);
+    assert!(uris.contains(&"git+https://github.com/org/provider@main".to_string()));
+}
+
+#[test]
+fn test_collect_source_uris_tools() {
+    let mut bundle = Bundle::new("test-bundle");
+    let tool: Value = serde_yaml_ng::from_str(
+        r#"
+module: "tool-browser"
+source: "git+https://github.com/org/tool@v2.0"
+"#,
+    )
+    .unwrap();
+    bundle.tools = vec![tool];
+    let uris = collect_source_uris(&bundle);
+    assert_eq!(uris.len(), 1);
+    assert!(uris.contains(&"git+https://github.com/org/tool@v2.0".to_string()));
+}
+
+#[test]
+fn test_collect_source_uris_hooks() {
+    let mut bundle = Bundle::new("test-bundle");
+    let hook: Value = serde_yaml_ng::from_str(
+        r#"
+module: "hook-logging"
+source: "git+https://github.com/org/hook@main"
+"#,
+    )
+    .unwrap();
+    bundle.hooks = vec![hook];
+    let uris = collect_source_uris(&bundle);
+    assert_eq!(uris.len(), 1);
+    assert!(uris.contains(&"git+https://github.com/org/hook@main".to_string()));
+}
+
+#[test]
+fn test_collect_source_uris_deduplicates() {
+    let mut bundle = Bundle::new("test-bundle");
+    bundle.source_uri = Some("git+https://github.com/org/bundle@main".to_string());
+
+    // Same URI in a provider
+    let provider: Value = serde_yaml_ng::from_str(
+        r#"
+module: "provider-x"
+source: "git+https://github.com/org/bundle@main"
+"#,
+    )
+    .unwrap();
+    bundle.providers = vec![provider];
+
+    let uris = collect_source_uris(&bundle);
+    assert_eq!(uris.len(), 1, "duplicate URIs should be deduplicated");
+}
+
+#[test]
+fn test_collect_source_uris_all_sources() {
+    let mut bundle = Bundle::new("test-bundle");
+    bundle.source_uri = Some("git+https://github.com/org/bundle@main".to_string());
+
+    let session_yaml: Value = serde_yaml_ng::from_str(
+        r#"
+orchestrator:
+  source: "git+https://github.com/org/orchestrator@main"
+  module: "my-orchestrator"
+context:
+  source: "git+https://github.com/org/context@v1.0"
+  module: "my-context"
+"#,
+    )
+    .unwrap();
+    bundle.session = session_yaml;
+
+    let provider: Value = serde_yaml_ng::from_str(
+        r#"
+module: "provider-anthropic"
+source: "git+https://github.com/org/provider@main"
+"#,
+    )
+    .unwrap();
+    bundle.providers = vec![provider];
+
+    let tool: Value = serde_yaml_ng::from_str(
+        r#"
+module: "tool-browser"
+source: "git+https://github.com/org/tool@v2.0"
+"#,
+    )
+    .unwrap();
+    bundle.tools = vec![tool];
+
+    let hook: Value = serde_yaml_ng::from_str(
+        r#"
+module: "hook-logging"
+source: "git+https://github.com/org/hook@main"
+"#,
+    )
+    .unwrap();
+    bundle.hooks = vec![hook];
+
+    let uris = collect_source_uris(&bundle);
+    assert_eq!(uris.len(), 6);
+    assert!(uris.contains(&"git+https://github.com/org/bundle@main".to_string()));
+    assert!(uris.contains(&"git+https://github.com/org/orchestrator@main".to_string()));
+    assert!(uris.contains(&"git+https://github.com/org/context@v1.0".to_string()));
+    assert!(uris.contains(&"git+https://github.com/org/provider@main".to_string()));
+    assert!(uris.contains(&"git+https://github.com/org/tool@v2.0".to_string()));
+    assert!(uris.contains(&"git+https://github.com/org/hook@main".to_string()));
+}
+
+#[test]
+fn test_collect_source_uris_skips_no_source_modules() {
+    let mut bundle = Bundle::new("test-bundle");
+
+    // Provider without a source field (local module)
+    let provider: Value = serde_yaml_ng::from_str(
+        r#"
+module: "provider-local"
+config:
+  model: "gpt-4"
+"#,
+    )
+    .unwrap();
+    bundle.providers = vec![provider];
+
+    let uris = collect_source_uris(&bundle);
+    assert!(uris.is_empty());
+}
+
+#[test]
+fn test_collect_source_uris_skips_non_mapping_modules() {
+    let mut bundle = Bundle::new("test-bundle");
+
+    // String-only module entry (no "source" key possible)
+    bundle.providers = vec![Value::String("provider-inline".to_string())];
+
+    let uris = collect_source_uris(&bundle);
+    assert!(uris.is_empty());
+}
+
+#[test]
+fn test_collect_source_uris_session_orchestrator_not_a_mapping() {
+    let mut bundle = Bundle::new("test-bundle");
+    // session.orchestrator is a string, not a mapping
+    let session_yaml: Value = serde_yaml_ng::from_str(
+        r#"
+orchestrator: "simple-orchestrator"
+"#,
+    )
+    .unwrap();
+    bundle.session = session_yaml;
+    let uris = collect_source_uris(&bundle);
+    assert!(uris.is_empty());
 }

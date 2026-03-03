@@ -1,5 +1,9 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+use serde_yaml_ng::Value;
+
+use crate::bundle::Bundle;
 use crate::paths::uri::{get_amplifier_home, parse_uri};
 use crate::sources::git::GitSourceHandler;
 use crate::sources::{SourceHandler, SourceHandlerWithStatus, SourceStatus};
@@ -88,6 +92,81 @@ impl BundleStatus {
 /// operate on the same cache directory as the resolver.
 fn default_cache_dir() -> PathBuf {
     get_amplifier_home().join("cache").join("bundles")
+}
+
+/// Collect all source URIs from a bundle.
+///
+/// Extracts sources from:
+/// - Bundle's own source (`source_uri`, if loaded from remote)
+/// - Session orchestrator and context (`session.orchestrator.source`, `session.context.source`)
+/// - Providers, tools, hooks (each item's `source` field)
+///
+/// Returns a deduplicated list of unique source URIs. The order is not
+/// guaranteed (uses `HashSet` internally for deduplication).
+///
+/// Matches Python's `_collect_source_uris(bundle)` from `updates/__init__.py`.
+///
+/// # Examples
+///
+/// ```
+/// use amplifier_foundation::Bundle;
+/// use amplifier_foundation::updates::collect_source_uris;
+///
+/// let mut bundle = Bundle::new("my-bundle");
+/// bundle.source_uri = Some("git+https://github.com/org/bundle@main".to_string());
+///
+/// let uris = collect_source_uris(&bundle);
+/// assert_eq!(uris.len(), 1);
+/// ```
+pub fn collect_source_uris(bundle: &Bundle) -> Vec<String> {
+    let mut sources: HashSet<String> = HashSet::new();
+    let source_key = Value::String("source".to_string());
+
+    // Helper: insert non-empty strings only.
+    // Python's `if source_uri:` treats "" as falsy; match that behavior.
+    let mut insert = |s: &str| {
+        if !s.is_empty() {
+            sources.insert(s.to_string());
+        }
+    };
+
+    // Bundle's own source URI
+    if let Some(uri) = bundle.source_uri.as_deref() {
+        insert(uri);
+    }
+
+    // Session config: orchestrator and context
+    // Python: `isinstance(session.get("orchestrator"), dict) and "source" in session["orchestrator"]`
+    if let Some(session_map) = bundle.session.as_mapping() {
+        for key in &["orchestrator", "context"] {
+            if let Some(entry) = session_map.get(Value::String(key.to_string())) {
+                if let Some(entry_map) = entry.as_mapping() {
+                    if let Some(source_val) = entry_map.get(&source_key) {
+                        if let Some(s) = source_val.as_str() {
+                            insert(s);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Module lists: providers, tools, hooks
+    // Note: includes are deliberately excluded — they are checked independently
+    // as first-class bundles. Matches Python comment in _collect_source_uris.
+    for module_list in [&bundle.providers, &bundle.tools, &bundle.hooks] {
+        for module_entry in module_list {
+            if let Some(mod_map) = module_entry.as_mapping() {
+                if let Some(source_val) = mod_map.get(&source_key) {
+                    if let Some(s) = source_val.as_str() {
+                        insert(s);
+                    }
+                }
+            }
+        }
+    }
+
+    sources.into_iter().collect()
 }
 
 /// Check update status for a bundle source URI.

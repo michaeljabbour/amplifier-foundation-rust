@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 12
-phase_name: "Wave 12 -- Doctest fix, Git status handler, Update system wiring"
-epoch: 13
-next_action: "Wave 12 COMPLETE. 450 tests passing, 0 clippy warnings, cargo fmt clean. Consider: PreparedBundle port, PyO3 bindings, HTTP SourceHandlerWithStatus impl, benchmarks"
+phase: 13
+phase_name: "Wave 13 -- Bundle-level update system (collect_source_uris, Bundle check_bundle_status, selective update_bundle)"
+epoch: 14
+next_action: "Implement F-047 collect_source_uris, F-048 Bundle-level check_bundle_status, F-049 enhanced update_bundle"
 blockers: []
 
 architecture_spec:
@@ -472,16 +472,38 @@ features:
     completed_at: "2025-01-20T01:15:00Z"
     commit: "c93215f"
 
+  F-047-collect-source-uris:
+    name: "Port collect_source_uris (extract all source URIs from a Bundle)"
+    module: "updates"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-046-wire-status-updates"]
+    started_at: "2025-01-21T00:00:00Z"
+
+  F-048-bundle-check-status:
+    name: "Port Bundle-level check_bundle_status (accept Bundle, walk components)"
+    module: "updates"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-047-collect-source-uris"]
+
+  F-049-bundle-update:
+    name: "Enhance update_bundle with Bundle, selective updates, dep install"
+    module: "updates"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-048-bundle-check-status"]
+
 wave_gate:
-  current_wave: 12
+  current_wave: 13
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
-  approval_status: "approved"
-  notes: "Wave 12 COMPLETE: 450 tests, 0 clippy warnings, cargo fmt clean. Doctest fix, ModelResolutionResult removed, GitSourceHandler status handler, updates wired to status."
+  approval_status: "in-progress"
+  notes: "Wave 13 in progress: Bundle-level update system."
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
   total_features_completed: 46
-  last_updated: "2025-01-20T01:15:00Z"
-  last_session: "session-017-wave12-git-status-updates"
+  last_updated: "2025-01-21T00:00:00Z"
+  last_session: "session-018-wave13-bundle-updates"
