@@ -6,6 +6,41 @@
 
 ---
 
+## Session 005 -- Wave 1 Completion (F-010, F-011)
+
+### Work Completed
+- **F-010-tracing-utils** (1a54a2a): Implemented tracing_utils module -- generate_sub_session_id with W3C Trace Context lineage. LazyLock compiled regex patterns, agent name sanitization, parent span extraction from session ID or trace ID. 9 tests un-ignored, all pass.
+- **F-011-spawn** (93c9783): Implemented spawn module (sync portions) -- ProviderPreference (new, to_dict, from_dict, from_list), is_glob_pattern, resolve_model_pattern (glob::Pattern for fnmatch semantics), apply_provider_preferences with flexible provider name matching and build_provider_lookup. ModelResolutionResult struct as placeholder for async resolution. 17 tests un-ignored, all pass.
+
+### Wave 1 COMPLETE
+- All 87 Wave 1 tests passing: 18 (dicts) + 15 (paths) + 12 (cache) + 16 (serialization) + 9 (tracing) + 17 (spawn)
+- 161 tests still ignored: 96 (Wave 2) + 65 (Wave 3)
+- Total: 87 passing + 161 ignored = 248 total tests
+- **AWAITING HUMAN APPROVAL** to proceed to Wave 2
+
+### Design Decisions Made
+- **tracing_utils uses std::sync::LazyLock for regex**: LazyLock is stable since Rust 1.80. Four compiled regexes: SPAN_PATTERN, TRACE_ID_PATTERN, NON_ALNUM, MULTI_HYPHEN.
+- **MULTI_HYPHEN regex is dead code (kept for Python parity)**: NON_ALNUM already uses `[^a-z0-9]+` which collapses runs, making MULTI_HYPHEN a no-op. Same dead code exists in Python. Kept for 1:1 fidelity.
+- **child_span binding split for clarity**: `let child_hex = Uuid::new_v4().simple().to_string(); let child_span = &child_hex[..16];` instead of relying on subtle temporary lifetime extension.
+- **glob::Pattern for fnmatch semantics**: Minor divergence from Python's fnmatch on Windows (case sensitivity), but model names are ASCII lowercase so no practical impact. glob crate was already in Cargo.toml.
+- **build_provider_lookup indexes three name forms**: module_id ("provider-anthropic"), short_name ("anthropic"), and prefixed form ("provider-anthropic"). Same triple-indexing strategy as Python's `_build_provider_lookup`.
+- **apply_provider_preferences returns clone for all code paths**: Unlike Python which returns `mount_plan` (same object) for empty prefs, Rust returns `mount_plan.clone()`. Tests use `assert_eq!` (equality) not identity comparison, so this is compatible.
+- **ModelResolutionResult includes available_models field**: Added per Session 001 note. Struct is placeholder until async resolution in Wave 2.
+- **ProviderPreference.from_list silently skips invalid entries**: Uses filter_map with .ok() to skip entries that fail from_dict parsing. No Python equivalent but spec includes it.
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- MULTI_HYPHEN and trim_start_matches('.') are dead code kept for Python parity
+- build_provider_lookup inserts empty-string keys when providers lack "module" key -- same behavior as Python
+- apply_single_override injects config: {} into providers that had no config key -- same as Python's `dict(p.get("config", {}))`
+- ModelResolutionResult is unused (placeholder for Wave 2 async resolution)
+
+### What's Next
+- Wave 2 implementation: io (6 tests), sources (16 tests), mentions (21 tests), session (53 tests)
+- Wave 2 is mixed sync/async -- io and sources are async, session is sync, mentions is mixed
+- Need human approval at Wave 1 gate before proceeding
+
+---
+
 ## Session 004 -- Wave 1 Implementation (F-007, F-008, F-009)
 
 ### Work Completed
