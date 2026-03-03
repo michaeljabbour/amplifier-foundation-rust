@@ -1,4 +1,5 @@
 pub struct ContentDeduplicator {
+    #[allow(dead_code)]
     seen: std::collections::HashSet<String>,
 }
 

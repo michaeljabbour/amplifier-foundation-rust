@@ -125,35 +125,35 @@ fn test_from_dict_full() {
         .as_mapping()
         .expect("session should be mapping");
     assert_eq!(
-        session_map.get(&str_val("orchestrator")),
+        session_map.get(str_val("orchestrator")),
         Some(&str_val("custom-orchestrator"))
     );
     let ctx = session_map
-        .get(&str_val("context"))
+        .get(str_val("context"))
         .expect("session.context should exist");
     let ctx_map = ctx.as_mapping().expect("context should be mapping");
-    assert_eq!(ctx_map.get(&str_val("key")), Some(&str_val("value")));
+    assert_eq!(ctx_map.get(str_val("key")), Some(&str_val("value")));
 
     // Providers
     assert_eq!(bundle.providers.len(), 1);
     let prov = bundle.providers[0]
         .as_mapping()
         .expect("provider should be mapping");
-    assert_eq!(prov.get(&str_val("module")), Some(&str_val("provider-a")));
+    assert_eq!(prov.get(str_val("module")), Some(&str_val("provider-a")));
 
     // Tools
     assert_eq!(bundle.tools.len(), 1);
     let tool = bundle.tools[0]
         .as_mapping()
         .expect("tool should be mapping");
-    assert_eq!(tool.get(&str_val("module")), Some(&str_val("tool-a")));
+    assert_eq!(tool.get(str_val("module")), Some(&str_val("tool-a")));
 
     // Hooks
     assert_eq!(bundle.hooks.len(), 1);
     let hook = bundle.hooks[0]
         .as_mapping()
         .expect("hook should be mapping");
-    assert_eq!(hook.get(&str_val("module")), Some(&str_val("hook-a")));
+    assert_eq!(hook.get(str_val("module")), Some(&str_val("hook-a")));
 
     // Includes
     assert_eq!(bundle.includes.len(), 1);
@@ -199,15 +199,15 @@ fn test_compose_session_deep_merge() {
 
     // Child's orchestrator wins
     assert_eq!(
-        session_map.get(&str_val("orchestrator")),
+        session_map.get(str_val("orchestrator")),
         Some(&str_val("child-orchestrator"))
     );
     // Base's context preserved
     let ctx = session_map
-        .get(&str_val("context"))
+        .get(str_val("context"))
         .expect("context should survive merge");
     let ctx_map = ctx.as_mapping().expect("context should be mapping");
-    assert_eq!(ctx_map.get(&str_val("key")), Some(&str_val("base-value")));
+    assert_eq!(ctx_map.get(str_val("key")), Some(&str_val("base-value")));
 }
 
 #[test]
@@ -234,17 +234,17 @@ fn test_compose_providers_merge_by_module() {
     let prov = result.providers[0]
         .as_mapping()
         .expect("provider should be mapping");
-    assert_eq!(prov.get(&str_val("module")), Some(&str_val("provider-a")));
+    assert_eq!(prov.get(str_val("module")), Some(&str_val("provider-a")));
 
     let config = prov
-        .get(&str_val("config"))
+        .get(str_val("config"))
         .expect("config should exist")
         .as_mapping()
         .expect("config should be mapping");
     // x from base, y overridden by child, z from child
-    assert_eq!(config.get(&str_val("x")), Some(&str_val("1")));
-    assert_eq!(config.get(&str_val("y")), Some(&str_val("3")));
-    assert_eq!(config.get(&str_val("z")), Some(&str_val("4")));
+    assert_eq!(config.get(str_val("x")), Some(&str_val("1")));
+    assert_eq!(config.get(str_val("y")), Some(&str_val("3")));
+    assert_eq!(config.get(str_val("z")), Some(&str_val("4")));
 }
 
 #[test]
@@ -270,7 +270,7 @@ fn test_compose_multiple_bundles() {
         .map(|p| {
             p.as_mapping()
                 .unwrap()
-                .get(&str_val("module"))
+                .get(str_val("module"))
                 .unwrap()
                 .as_str()
                 .unwrap()
@@ -328,23 +328,23 @@ fn test_full_mount_plan() {
     let plan_map = plan.as_mapping().expect("plan should be a mapping");
 
     assert!(
-        plan_map.get(&str_val("session")).is_some(),
+        plan_map.get(str_val("session")).is_some(),
         "mount plan should have session"
     );
     assert!(
-        plan_map.get(&str_val("providers")).is_some(),
+        plan_map.get(str_val("providers")).is_some(),
         "mount plan should have providers"
     );
     assert!(
-        plan_map.get(&str_val("tools")).is_some(),
+        plan_map.get(str_val("tools")).is_some(),
         "mount plan should have tools"
     );
     assert!(
-        plan_map.get(&str_val("hooks")).is_some(),
+        plan_map.get(str_val("hooks")).is_some(),
         "mount plan should have hooks"
     );
     assert!(
-        plan_map.get(&str_val("agents")).is_some(),
+        plan_map.get(str_val("agents")).is_some(),
         "mount plan should have agents"
     );
 }
@@ -457,7 +457,7 @@ fn test_resolve_pending_context_with_source_base_paths() {
 
     // After resolution, pending_context should be resolved into context
     assert!(
-        bundle.pending_context.is_empty() || bundle.context.len() > 0,
+        bundle.pending_context.is_empty() || !bundle.context.is_empty(),
         "pending context should be resolved"
     );
     // The resolved path should exist

@@ -150,7 +150,7 @@ fn test_first_preference_matches() {
     let providers = result
         .as_mapping()
         .unwrap()
-        .get(&str_val("providers"))
+        .get(str_val("providers"))
         .unwrap()
         .as_sequence()
         .unwrap();
@@ -159,13 +159,13 @@ fn test_first_preference_matches() {
     let anthropic_config = providers[0]
         .as_mapping()
         .unwrap()
-        .get(&str_val("config"))
+        .get(str_val("config"))
         .unwrap()
         .as_mapping()
         .unwrap();
-    assert_eq!(anthropic_config.get(&str_val("priority")), Some(&int(0)));
+    assert_eq!(anthropic_config.get(str_val("priority")), Some(&int(0)));
     assert_eq!(
-        anthropic_config.get(&str_val("model")),
+        anthropic_config.get(str_val("model")),
         Some(&str_val("claude-haiku-3"))
     );
 
@@ -173,11 +173,11 @@ fn test_first_preference_matches() {
     let openai_config = providers[1]
         .as_mapping()
         .unwrap()
-        .get(&str_val("config"))
+        .get(str_val("config"))
         .unwrap()
         .as_mapping()
         .unwrap();
-    assert_eq!(openai_config.get(&str_val("priority")), Some(&int(20)));
+    assert_eq!(openai_config.get(str_val("priority")), Some(&int(20)));
 }
 
 #[test]
@@ -196,7 +196,7 @@ fn test_second_preference_matches_when_first_unavailable() {
     let providers = result
         .as_mapping()
         .unwrap()
-        .get(&str_val("providers"))
+        .get(str_val("providers"))
         .unwrap()
         .as_sequence()
         .unwrap();
@@ -205,13 +205,13 @@ fn test_second_preference_matches_when_first_unavailable() {
     let openai_config = providers[0]
         .as_mapping()
         .unwrap()
-        .get(&str_val("config"))
+        .get(str_val("config"))
         .unwrap()
         .as_mapping()
         .unwrap();
-    assert_eq!(openai_config.get(&str_val("priority")), Some(&int(0)));
+    assert_eq!(openai_config.get(str_val("priority")), Some(&int(0)));
     assert_eq!(
-        openai_config.get(&str_val("model")),
+        openai_config.get(str_val("model")),
         Some(&str_val("gpt-4o-mini"))
     );
 }
@@ -232,19 +232,19 @@ fn test_no_preferences_match() {
     let providers = result
         .as_mapping()
         .unwrap()
-        .get(&str_val("providers"))
+        .get(str_val("providers"))
         .unwrap()
         .as_sequence()
         .unwrap();
     let config = providers[0]
         .as_mapping()
         .unwrap()
-        .get(&str_val("config"))
+        .get(str_val("config"))
         .unwrap()
         .as_mapping()
         .unwrap();
-    assert_eq!(config.get(&str_val("priority")), Some(&int(10)));
-    assert!(config.get(&str_val("model")).is_none());
+    assert_eq!(config.get(str_val("priority")), Some(&int(10)));
+    assert!(config.get(str_val("model")).is_none());
 }
 
 #[test]
@@ -257,20 +257,20 @@ fn test_flexible_provider_matching_short_name() {
     let providers = result
         .as_mapping()
         .unwrap()
-        .get(&str_val("providers"))
+        .get(str_val("providers"))
         .unwrap()
         .as_sequence()
         .unwrap();
     let config = providers[0]
         .as_mapping()
         .unwrap()
-        .get(&str_val("config"))
+        .get(str_val("config"))
         .unwrap()
         .as_mapping()
         .unwrap();
-    assert_eq!(config.get(&str_val("priority")), Some(&int(0)));
+    assert_eq!(config.get(str_val("priority")), Some(&int(0)));
     assert_eq!(
-        config.get(&str_val("model")),
+        config.get(str_val("model")),
         Some(&str_val("claude-haiku-3"))
     );
 }
@@ -288,18 +288,18 @@ fn test_flexible_provider_matching_full_name() {
     let providers = result
         .as_mapping()
         .unwrap()
-        .get(&str_val("providers"))
+        .get(str_val("providers"))
         .unwrap()
         .as_sequence()
         .unwrap();
     let config = providers[0]
         .as_mapping()
         .unwrap()
-        .get(&str_val("config"))
+        .get(str_val("config"))
         .unwrap()
         .as_mapping()
         .unwrap();
-    assert_eq!(config.get(&str_val("priority")), Some(&int(0)));
+    assert_eq!(config.get(str_val("priority")), Some(&int(0)));
 }
 
 #[test]
@@ -320,20 +320,20 @@ fn test_mount_plan_not_mutated() {
     let providers = result
         .as_mapping()
         .unwrap()
-        .get(&str_val("providers"))
+        .get(str_val("providers"))
         .unwrap()
         .as_sequence()
         .unwrap();
     let config = providers[0]
         .as_mapping()
         .unwrap()
-        .get(&str_val("config"))
+        .get(str_val("config"))
         .unwrap()
         .as_mapping()
         .unwrap();
-    assert_eq!(config.get(&str_val("priority")), Some(&int(0)));
+    assert_eq!(config.get(str_val("priority")), Some(&int(0)));
     assert_eq!(
-        config.get(&str_val("model")),
+        config.get(str_val("model")),
         Some(&str_val("claude-haiku-3"))
     );
 
@@ -341,17 +341,17 @@ fn test_mount_plan_not_mutated() {
     let orig_providers = mount_plan
         .as_mapping()
         .unwrap()
-        .get(&str_val("providers"))
+        .get(str_val("providers"))
         .unwrap()
         .as_sequence()
         .unwrap();
     let orig_config = orig_providers[0]
         .as_mapping()
         .unwrap()
-        .get(&str_val("config"))
+        .get(str_val("config"))
         .unwrap()
         .as_mapping()
         .unwrap();
-    assert_eq!(orig_config.get(&str_val("priority")), Some(&int(10)));
-    assert!(orig_config.get(&str_val("model")).is_none());
+    assert_eq!(orig_config.get(str_val("priority")), Some(&int(10)));
+    assert!(orig_config.get(str_val("model")).is_none());
 }

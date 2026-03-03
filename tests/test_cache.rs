@@ -183,11 +183,11 @@ fn test_disk_cache_persists_across_instances() {
         // Verify the value survived round-trip through disk
         if let Value::Mapping(ref map) = result {
             assert_eq!(
-                map.get(&Value::String("name".into())),
+                map.get(Value::String("name".into())),
                 Some(&Value::String("persistent-bundle".into()))
             );
             assert_eq!(
-                map.get(&Value::String("version".into())),
+                map.get(Value::String("version".into())),
                 Some(&Value::String("1.0.0".into()))
             );
         } else {

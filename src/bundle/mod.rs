@@ -81,24 +81,24 @@ impl Bundle {
         let empty_mapping = Mapping::new();
         let bundle_meta = data
             .as_mapping()
-            .and_then(|m| m.get(&Value::String("bundle".to_string())))
+            .and_then(|m| m.get(Value::String("bundle".to_string())))
             .and_then(|v| v.as_mapping())
             .unwrap_or(&empty_mapping);
 
         let bundle_name = bundle_meta
-            .get(&Value::String("name".to_string()))
+            .get(Value::String("name".to_string()))
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
 
         let version = bundle_meta
-            .get(&Value::String("version".to_string()))
+            .get(Value::String("version".to_string()))
             .and_then(|v| v.as_str())
             .unwrap_or("1.0.0")
             .to_string();
 
         let description = bundle_meta
-            .get(&Value::String("description".to_string()))
+            .get(Value::String("description".to_string()))
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
@@ -113,19 +113,19 @@ impl Bundle {
 
         // Validate and extract module lists
         let providers = Self::validate_module_list(
-            bundle_meta.get(&Value::String("providers".to_string())),
+            bundle_meta.get(Value::String("providers".to_string())),
             "providers",
             &bundle_identifier,
             base_path,
         )?;
         let tools = Self::validate_module_list(
-            bundle_meta.get(&Value::String("tools".to_string())),
+            bundle_meta.get(Value::String("tools".to_string())),
             "tools",
             &bundle_identifier,
             base_path,
         )?;
         let hooks = Self::validate_module_list(
-            bundle_meta.get(&Value::String("hooks".to_string())),
+            bundle_meta.get(Value::String("hooks".to_string())),
             "hooks",
             &bundle_identifier,
             base_path,
@@ -133,31 +133,31 @@ impl Bundle {
 
         // Session
         let session = bundle_meta
-            .get(&Value::String("session".to_string()))
+            .get(Value::String("session".to_string()))
             .cloned()
             .unwrap_or(Value::Null);
 
         // Spawn
         let spawn = bundle_meta
-            .get(&Value::String("spawn".to_string()))
+            .get(Value::String("spawn".to_string()))
             .cloned()
             .unwrap_or(Value::Null);
 
         // Includes
         let includes = bundle_meta
-            .get(&Value::String("includes".to_string()))
+            .get(Value::String("includes".to_string()))
             .and_then(|v| v.as_sequence())
             .cloned()
             .unwrap_or_default();
 
         // Parse context: split into resolved (local) and pending (namespaced)
         let context_config = bundle_meta
-            .get(&Value::String("context".to_string()))
+            .get(Value::String("context".to_string()))
             .and_then(|v| v.as_mapping());
         let (resolved_context, pending_context) = Self::parse_context(context_config, base_path);
 
         // Parse agents
-        let agents = Self::parse_agents(bundle_meta.get(&Value::String("agents".to_string())));
+        let agents = Self::parse_agents(bundle_meta.get(Value::String("agents".to_string())));
 
         Ok(Bundle {
             name: bundle_name,
@@ -556,11 +556,15 @@ impl Bundle {
             if let Some(base) = self.source_base_paths.get(namespace) {
                 let resolved_path = construct_context_path(base, path_part);
                 self.context.insert(name, resolved_path);
-            } else if self.base_path.is_some() && namespace == self.name {
-                // Self-referencing fallback
-                let bp = self.base_path.as_ref().unwrap();
-                let resolved_path = construct_context_path(bp, path_part);
-                self.context.insert(name, resolved_path);
+            } else if let Some(bp) = self.base_path.as_ref() {
+                if namespace == self.name {
+                    // Self-referencing fallback
+                    let resolved_path = construct_context_path(bp, path_part);
+                    self.context.insert(name, resolved_path);
+                } else {
+                    // Can't resolve yet, put back
+                    self.pending_context.insert(name, ref_str);
+                }
             } else {
                 // Can't resolve yet, put back
                 self.pending_context.insert(name, ref_str);

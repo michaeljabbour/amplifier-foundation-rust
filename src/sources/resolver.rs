@@ -1,6 +1,7 @@
 use crate::paths::uri::ResolvedSource;
 
 pub struct SimpleSourceResolver {
+    #[allow(dead_code)]
     handlers: Vec<Box<dyn super::SourceHandler>>,
 }
 

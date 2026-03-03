@@ -200,8 +200,7 @@ pub fn fork_session_in_memory(
 
 /// Get a preview of what a fork would produce without actually forking.
 pub fn get_fork_preview(session_dir: &Path, turn: usize) -> crate::error::Result<Value> {
-    let session_dir =
-        fs::canonicalize(session_dir).map_err(|e| crate::error::BundleError::Io(e))?;
+    let session_dir = fs::canonicalize(session_dir).map_err(crate::error::BundleError::Io)?;
 
     let transcript_path = session_dir.join("transcript.jsonl");
     let metadata_path = session_dir.join("metadata.json");
@@ -281,8 +280,7 @@ pub fn get_fork_preview(session_dir: &Path, turn: usize) -> crate::error::Result
 
 /// List all sessions forked from a given session.
 pub fn list_session_forks(session_dir: &Path) -> crate::error::Result<Vec<Value>> {
-    let session_dir =
-        fs::canonicalize(session_dir).map_err(|e| crate::error::BundleError::Io(e))?;
+    let session_dir = fs::canonicalize(session_dir).map_err(crate::error::BundleError::Io)?;
 
     let sessions_root = session_dir.parent().unwrap_or(&session_dir).to_path_buf();
 
@@ -360,8 +358,7 @@ pub fn list_session_forks(session_dir: &Path) -> crate::error::Result<Vec<Value>
 
 /// Get the full lineage tree for a session.
 pub fn get_session_lineage(session_dir: &Path) -> crate::error::Result<Value> {
-    let session_dir =
-        fs::canonicalize(session_dir).map_err(|e| crate::error::BundleError::Io(e))?;
+    let session_dir = fs::canonicalize(session_dir).map_err(crate::error::BundleError::Io)?;
 
     let sessions_root = session_dir.parent().unwrap_or(&session_dir).to_path_buf();
 

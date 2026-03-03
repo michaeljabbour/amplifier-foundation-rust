@@ -45,12 +45,12 @@ impl ProviderPreference {
             .ok_or_else(|| "ProviderPreference requires a mapping".to_string())?;
 
         let provider = map
-            .get(&Value::String("provider".to_string()))
+            .get(Value::String("provider".to_string()))
             .and_then(|v| v.as_str())
             .ok_or_else(|| "ProviderPreference requires 'provider' key".to_string())?;
 
         let model = map
-            .get(&Value::String("model".to_string()))
+            .get(Value::String("model".to_string()))
             .and_then(|v| v.as_str())
             .ok_or_else(|| "ProviderPreference requires 'model' key".to_string())?;
 
@@ -89,7 +89,7 @@ fn build_provider_lookup(providers: &[Value]) -> HashMap<String, usize> {
     for (i, p) in providers.iter().enumerate() {
         let module_id = p
             .as_mapping()
-            .and_then(|m| m.get(&Value::String("module".to_string())))
+            .and_then(|m| m.get(Value::String("module".to_string())))
             .and_then(|v| v.as_str())
             .unwrap_or("");
 
@@ -125,7 +125,7 @@ fn apply_single_override(
 
         // Clone the config mapping
         let mut config = p_map
-            .get(&Value::String("config".to_string()))
+            .get(Value::String("config".to_string()))
             .and_then(|v| v.as_mapping().cloned())
             .unwrap_or_default();
 
@@ -167,7 +167,7 @@ pub fn apply_provider_preferences(mount_plan: &Value, preferences: &[ProviderPre
 
     let providers = mount_plan
         .as_mapping()
-        .and_then(|m| m.get(&Value::String("providers".to_string())))
+        .and_then(|m| m.get(Value::String("providers".to_string())))
         .and_then(|v| v.as_sequence());
 
     let providers = match providers {

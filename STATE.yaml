@@ -245,16 +245,19 @@ features:
   F-023-fmt-clean:
     name: "cargo fmt --check clean across entire codebase"
     module: "all"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-022-examples"]
     started_at: "2025-01-17T00:00:00Z"
+    completed_at: "2025-01-17T00:10:00Z"
+    commit: "4096b48"
   F-024-clippy-clean:
     name: "cargo clippy --all-targets zero warnings (MSRV bump + all lint fixes)"
     module: "all"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-023-fmt-clean"]
+    started_at: "2025-01-17T00:10:00Z"
   F-025-integration-tests:
     name: "Integration tests (real YAML bundle loading, roundtrip, cross-module)"
     module: "all"
