@@ -32,6 +32,7 @@ fn test_bundle_status_with_update() {
             current_version: Some("abc123".to_string()),
             latest_version: Some("def456".to_string()),
             has_update: Some(true),
+            ..Default::default()
         }],
     };
 
@@ -51,9 +52,8 @@ fn test_bundle_status_up_to_date() {
         bundle_source: None,
         sources: vec![SourceStatus {
             uri: "file:///path/to/bundle".to_string(),
-            current_version: None,
-            latest_version: None,
             has_update: Some(false),
+            ..Default::default()
         }],
     };
 
@@ -70,9 +70,8 @@ fn test_bundle_status_unknown() {
         bundle_source: None,
         sources: vec![SourceStatus {
             uri: "https://example.com/bundle".to_string(),
-            current_version: None,
-            latest_version: None,
             has_update: None,
+            ..Default::default()
         }],
     };
 
@@ -95,18 +94,17 @@ fn test_bundle_status_mixed() {
                 current_version: Some("abc".to_string()),
                 latest_version: Some("def".to_string()),
                 has_update: Some(true),
+                ..Default::default()
             },
             SourceStatus {
                 uri: "file:///local/bundle".to_string(),
-                current_version: None,
-                latest_version: None,
                 has_update: Some(false),
+                ..Default::default()
             },
             SourceStatus {
                 uri: "https://example.com".to_string(),
-                current_version: None,
-                latest_version: None,
                 has_update: None,
+                ..Default::default()
             },
         ],
     };
@@ -206,4 +204,185 @@ async fn test_update_bundle_http_uri() {
     // HTTP update isn't implemented, should return error
     let result = update_bundle("https://example.com/bundle.yaml").await;
     assert!(result.is_err());
+}
+
+// ===========================================================================
+// SourceStatus enriched fields + is_pinned
+// ===========================================================================
+
+#[test]
+fn test_source_status_default() {
+    let status = SourceStatus::default();
+    assert_eq!(status.uri, "");
+    assert!(status.current_version.is_none());
+    assert!(status.latest_version.is_none());
+    assert!(status.has_update.is_none());
+    assert!(!status.is_cached);
+    assert!(status.cached_at.is_none());
+    assert!(status.cached_ref.is_none());
+    assert!(status.cached_commit.is_none());
+    assert!(status.remote_ref.is_none());
+    assert!(status.remote_commit.is_none());
+    assert!(status.error.is_none());
+    assert_eq!(status.summary, "");
+}
+
+#[test]
+fn test_source_status_is_pinned_commit_sha() {
+    let status = SourceStatus {
+        cached_ref: Some("abc123def456abc123def456abc123def456abc1".to_string()),
+        ..Default::default()
+    };
+    assert!(status.is_pinned());
+}
+
+#[test]
+fn test_source_status_is_pinned_version_tag() {
+    let status = SourceStatus {
+        cached_ref: Some("v1.2.3".to_string()),
+        ..Default::default()
+    };
+    assert!(status.is_pinned());
+}
+
+#[test]
+fn test_source_status_is_pinned_version_tag_no_dots() {
+    let status = SourceStatus {
+        cached_ref: Some("v2".to_string()),
+        ..Default::default()
+    };
+    assert!(status.is_pinned());
+}
+
+#[test]
+fn test_source_status_not_pinned_branch() {
+    let status = SourceStatus {
+        cached_ref: Some("main".to_string()),
+        ..Default::default()
+    };
+    assert!(!status.is_pinned());
+}
+
+#[test]
+fn test_source_status_not_pinned_none() {
+    let status = SourceStatus::default();
+    assert!(!status.is_pinned());
+}
+
+#[test]
+fn test_source_status_not_pinned_short_hex() {
+    // 39 chars - not a full SHA
+    let status = SourceStatus {
+        cached_ref: Some("abc123def456abc123def456abc123def456abc".to_string()),
+        ..Default::default()
+    };
+    assert!(!status.is_pinned());
+}
+
+#[test]
+fn test_source_status_is_pinned_uppercase_sha() {
+    // Python normalizes to lowercase via .lower() before checking hex
+    let status = SourceStatus {
+        cached_ref: Some("ABC123DEF456ABC123DEF456ABC123DEF456ABC1".to_string()),
+        ..Default::default()
+    };
+    assert!(status.is_pinned());
+}
+
+#[test]
+fn test_source_status_is_pinned_mixed_case_sha() {
+    let status = SourceStatus {
+        cached_ref: Some("aBc123def456abc123def456abc123def456abc1".to_string()),
+        ..Default::default()
+    };
+    assert!(status.is_pinned());
+}
+
+#[test]
+fn test_source_status_not_pinned_v_no_digit() {
+    let status = SourceStatus {
+        cached_ref: Some("version-latest".to_string()),
+        ..Default::default()
+    };
+    assert!(!status.is_pinned());
+}
+
+#[test]
+fn test_source_status_not_pinned_bare_v() {
+    let status = SourceStatus {
+        cached_ref: Some("v".to_string()),
+        ..Default::default()
+    };
+    assert!(!status.is_pinned());
+}
+
+#[test]
+fn test_source_status_not_pinned_empty_string() {
+    let status = SourceStatus {
+        cached_ref: Some(String::new()),
+        ..Default::default()
+    };
+    assert!(!status.is_pinned());
+}
+
+#[test]
+fn test_source_status_new_constructor() {
+    let status = SourceStatus::new("git+https://github.com/org/repo");
+    assert_eq!(status.uri, "git+https://github.com/org/repo");
+    assert!(!status.is_cached);
+    assert!(status.has_update.is_none());
+}
+
+#[test]
+fn test_source_status_enriched_fields() {
+    let status = SourceStatus {
+        uri: "git+https://github.com/org/repo@main".to_string(),
+        is_cached: true,
+        cached_at: Some("2025-01-19T00:00:00Z".to_string()),
+        cached_ref: Some("main".to_string()),
+        cached_commit: Some("abc123".to_string()),
+        remote_ref: Some("main".to_string()),
+        remote_commit: Some("def456".to_string()),
+        has_update: Some(true),
+        error: None,
+        summary: "Update available (abc123 -> def456)".to_string(),
+        ..Default::default()
+    };
+    assert!(status.is_cached);
+    assert_eq!(status.cached_at.as_deref(), Some("2025-01-19T00:00:00Z"));
+    assert_eq!(status.cached_commit.as_deref(), Some("abc123"));
+    assert_eq!(status.remote_commit.as_deref(), Some("def456"));
+    assert!(status.summary.contains("Update available"));
+}
+
+#[test]
+fn test_source_status_error_field() {
+    let status = SourceStatus {
+        uri: "git+https://example.com/repo".to_string(),
+        error: Some("Connection refused".to_string()),
+        summary: "Status check failed".to_string(),
+        ..Default::default()
+    };
+    assert_eq!(status.error.as_deref(), Some("Connection refused"));
+    assert!(status.has_update.is_none());
+}
+
+#[tokio::test]
+async fn test_check_bundle_status_populates_summary() {
+    let status = check_bundle_status("file:///some/path").await.unwrap();
+    assert!(!status.sources[0].summary.is_empty());
+}
+
+#[tokio::test]
+async fn test_check_bundle_status_file_is_cached() {
+    let status = check_bundle_status("file:///some/path").await.unwrap();
+    assert!(status.sources[0].is_cached);
+}
+
+#[tokio::test]
+async fn test_check_bundle_status_unknown_not_cached() {
+    let status = check_bundle_status("git+https://example.com/repo@main")
+        .await
+        .unwrap();
+    assert!(!status.sources[0].is_cached);
 }

@@ -107,18 +107,19 @@ pub async fn check_bundle_status(uri: &str) -> crate::error::Result<BundleStatus
         // Local files are always "current"
         SourceStatus {
             uri: uri_owned.clone(),
-            current_version: None,
-            latest_version: None,
             has_update: Some(false),
+            is_cached: true,
+            summary: "Local file (always current)".to_string(),
+            ..Default::default()
         }
     } else {
         // Git, HTTP, and other remote sources: can't check without
         // implementing the respective handlers' get_status methods
         SourceStatus {
             uri: uri_owned.clone(),
-            current_version: None,
-            latest_version: None,
             has_update: None,
+            summary: "Update checking not supported for this source type".to_string(),
+            ..Default::default()
         }
     };
 
