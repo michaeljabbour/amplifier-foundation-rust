@@ -10,8 +10,8 @@
 //! Run with: cargo run --example path_utils
 
 use amplifier_foundation::{
-    construct_agent_path, construct_context_path, deep_merge,
-    get_amplifier_home, normalize_path, parse_uri,
+    construct_agent_path, construct_context_path, deep_merge, get_amplifier_home, normalize_path,
+    parse_uri,
 };
 use std::path::PathBuf;
 
@@ -31,12 +31,31 @@ fn main() {
     for uri in &uris {
         let parsed = parse_uri(uri);
         println!("URI: {}", uri);
-        println!("  scheme: {:?}", if parsed.scheme.is_empty() { "none" } else { &parsed.scheme });
-        println!("  host: {:?}", if parsed.host.is_empty() { "none" } else { &parsed.host });
+        println!(
+            "  scheme: {:?}",
+            if parsed.scheme.is_empty() {
+                "none"
+            } else {
+                &parsed.scheme
+            }
+        );
+        println!(
+            "  host: {:?}",
+            if parsed.host.is_empty() {
+                "none"
+            } else {
+                &parsed.host
+            }
+        );
         println!("  path: {:?}", &parsed.path);
-        println!("  is_file: {}, is_http: {}, is_git: {}, is_zip: {}, is_package: {}",
-            parsed.is_file(), parsed.is_http(), parsed.is_git(),
-            parsed.is_zip(), parsed.is_package());
+        println!(
+            "  is_file: {}, is_http: {}, is_git: {}, is_zip: {}, is_package: {}",
+            parsed.is_file(),
+            parsed.is_http(),
+            parsed.is_git(),
+            parsed.is_zip(),
+            parsed.is_package()
+        );
         println!();
     }
 
@@ -66,9 +85,19 @@ fn main() {
     // 5. Deep merge example
     println!("\n--- Deep Merge ---");
     let base: serde_yaml_ng::Value = serde_yaml_ng::from_str("a: 1\nb:\n  x: 10\n  y: 20").unwrap();
-    let overlay: serde_yaml_ng::Value = serde_yaml_ng::from_str("b:\n  y: 30\n  z: 40\nc: 3").unwrap();
+    let overlay: serde_yaml_ng::Value =
+        serde_yaml_ng::from_str("b:\n  y: 30\n  z: 40\nc: 3").unwrap();
     let merged = deep_merge(&base, &overlay);
-    println!("Base:    {}", serde_yaml_ng::to_string(&base).unwrap().trim());
-    println!("Overlay: {}", serde_yaml_ng::to_string(&overlay).unwrap().trim());
-    println!("Merged:  {}", serde_yaml_ng::to_string(&merged).unwrap().trim());
+    println!(
+        "Base:    {}",
+        serde_yaml_ng::to_string(&base).unwrap().trim()
+    );
+    println!(
+        "Overlay: {}",
+        serde_yaml_ng::to_string(&overlay).unwrap().trim()
+    );
+    println!(
+        "Merged:  {}",
+        serde_yaml_ng::to_string(&merged).unwrap().trim()
+    );
 }

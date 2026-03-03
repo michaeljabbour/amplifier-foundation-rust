@@ -110,29 +110,20 @@ fn test_merge_module_lists_child_adds_new_modules() {
 #[test]
 
 fn test_merge_module_lists_child_config_overrides_parent() {
-    let parent = [mapping(&[(
-        "module",
-        str_val("a"),
-    ), (
-        "config",
-        mapping(&[("x", int(1)), ("y", int(2))]),
-    )])];
-    let child = [mapping(&[(
-        "module",
-        str_val("a"),
-    ), (
-        "config",
-        mapping(&[("y", int(3)), ("z", int(4))]),
-    )])];
+    let parent = [mapping(&[
+        ("module", str_val("a")),
+        ("config", mapping(&[("x", int(1)), ("y", int(2))])),
+    ])];
+    let child = [mapping(&[
+        ("module", str_val("a")),
+        ("config", mapping(&[("y", int(3)), ("z", int(4))])),
+    ])];
     let result = merge_module_lists(&parent, &child);
     assert_eq!(result.len(), 1);
 
     let item = &result[0];
     let item_map = item.as_mapping().expect("expected mapping");
-    assert_eq!(
-        item_map.get(str_val("module")),
-        Some(&str_val("a"))
-    );
+    assert_eq!(item_map.get(str_val("module")), Some(&str_val("a")));
     assert_eq!(
         item_map.get(str_val("config")),
         Some(&mapping(&[("x", int(1)), ("y", int(3)), ("z", int(4))]))
@@ -164,7 +155,6 @@ fn test_merge_module_lists_preserves_order() {
 }
 
 #[test]
-
 #[should_panic]
 fn test_merge_module_lists_raises_on_string_in_parent() {
     // Expected: panic/error with "Malformed module config at index 0"
@@ -176,7 +166,6 @@ fn test_merge_module_lists_raises_on_string_in_parent() {
 }
 
 #[test]
-
 #[should_panic]
 fn test_merge_module_lists_raises_on_string_in_child() {
     // Expected: panic/error with "Malformed module config at index 1"
@@ -212,10 +201,7 @@ fn test_merge_module_lists_raises_on_non_dict_types() {
 #[test]
 
 fn test_get_nested_simple_path() {
-    let data = mapping(&[(
-        "a",
-        mapping(&[("b", mapping(&[("c", int(1))]))]),
-    )]);
+    let data = mapping(&[("a", mapping(&[("b", mapping(&[("c", int(1))]))]))]);
     let result = get_nested(&data, &["a", "b", "c"]);
     assert_eq!(result, Some(int(1)));
 }
@@ -252,10 +238,7 @@ fn test_get_nested_empty_path_returns_data() {
 fn test_set_nested_simple_path() {
     let mut data = mapping(&[]);
     set_nested(&mut data, &["a", "b", "c"], int(1));
-    let expected = mapping(&[(
-        "a",
-        mapping(&[("b", mapping(&[("c", int(1))]))]),
-    )]);
+    let expected = mapping(&[("a", mapping(&[("b", mapping(&[("c", int(1))]))]))]);
     assert_eq!(data, expected);
 }
 

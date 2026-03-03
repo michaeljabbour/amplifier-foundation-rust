@@ -1,6 +1,6 @@
-use std::path::Path;
-use async_trait::async_trait;
 use crate::paths::uri::{ParsedURI, ResolvedSource};
+use async_trait::async_trait;
+use std::path::Path;
 
 pub mod file;
 pub mod git;

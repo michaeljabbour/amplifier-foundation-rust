@@ -4,9 +4,8 @@ use regex::Regex;
 use serde_yaml_ng::Value;
 
 /// Compiled frontmatter regex (lazy-initialized).
-static FRONTMATTER_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?s)^---[ \t]*\n(.*?)\n---[ \t]*\n?").unwrap()
-});
+static FRONTMATTER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?s)^---[ \t]*\n(.*?)\n---[ \t]*\n?").unwrap());
 
 /// Parse YAML frontmatter from a string.
 ///

@@ -63,7 +63,9 @@ impl ProviderPreference {
     /// Parse a list of YAML Value mappings into a Vec<ProviderPreference>.
     /// Silently skips entries that fail to parse.
     pub fn from_list(data: &[Value]) -> Vec<Self> {
-        data.iter().filter_map(|v| Self::from_dict(v).ok()).collect()
+        data.iter()
+            .filter_map(|v| Self::from_dict(v).ok())
+            .collect()
     }
 }
 
@@ -139,10 +141,7 @@ fn apply_single_override(
             );
         }
 
-        p_map.insert(
-            Value::String("config".to_string()),
-            Value::Mapping(config),
-        );
+        p_map.insert(Value::String("config".to_string()), Value::Mapping(config));
         new_providers.push(Value::Mapping(p_map));
     }
 
@@ -161,10 +160,7 @@ fn apply_single_override(
 /// Returns a new mount plan with the first matching provider promoted.
 /// Returns a clone of the original mount plan if no preferences match.
 /// Returns the original mount plan unchanged if preferences is empty.
-pub fn apply_provider_preferences(
-    mount_plan: &Value,
-    preferences: &[ProviderPreference],
-) -> Value {
+pub fn apply_provider_preferences(mount_plan: &Value, preferences: &[ProviderPreference]) -> Value {
     if preferences.is_empty() {
         return mount_plan.clone();
     }

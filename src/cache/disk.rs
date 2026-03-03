@@ -42,7 +42,8 @@ impl DiskCache {
             })
             .collect();
 
-        self.cache_dir.join(format!("{safe_prefix}-{key_hash}.json"))
+        self.cache_dir
+            .join(format!("{safe_prefix}-{key_hash}.json"))
     }
 
     fn ensure_cache_dir(&self) {

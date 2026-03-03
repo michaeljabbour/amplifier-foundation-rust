@@ -58,7 +58,10 @@ fn test_custom_backup_suffix() {
 
     // Backup should use the custom suffix.
     let backup_path = file_path.with_extension("txt.bak");
-    assert!(backup_path.exists(), "custom-suffix backup file should exist");
+    assert!(
+        backup_path.exists(),
+        "custom-suffix backup file should exist"
+    );
     assert_eq!(fs::read_to_string(&backup_path).unwrap(), "original");
 
     // Default .backup should NOT exist.

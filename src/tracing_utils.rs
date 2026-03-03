@@ -13,8 +13,7 @@ static SPAN_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^([0-9a-f]{16})-([0-9a-f]{16})_").unwrap());
 
 /// Pattern to validate a 32-char hex trace ID.
-static TRACE_ID_PATTERN: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^[0-9a-f]{32}$").unwrap());
+static TRACE_ID_PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[0-9a-f]{32}$").unwrap());
 
 /// Pattern for non-alphanumeric characters (for sanitization).
 static NON_ALNUM: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^a-z0-9]+").unwrap());

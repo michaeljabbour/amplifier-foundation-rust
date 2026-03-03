@@ -104,7 +104,10 @@ fn test_validate_missing_name() {
     let validator = BundleValidator::new();
     let result = validator.validate(&bundle);
     assert!(!result.valid);
-    assert!(result.errors.iter().any(|e| e.to_lowercase().contains("name")));
+    assert!(result
+        .errors
+        .iter()
+        .any(|e| e.to_lowercase().contains("name")));
 }
 
 #[test]
@@ -225,7 +228,10 @@ fn test_partial_bundle_is_expected_incomplete() {
     let validator = BundleValidator::new();
 
     let basic = validator.validate(&bundle);
-    assert!(basic.valid, "basic validation should pass for a partial bundle");
+    assert!(
+        basic.valid,
+        "basic validation should pass for a partial bundle"
+    );
 
     let completeness = validator.validate_completeness(&bundle);
     assert!(

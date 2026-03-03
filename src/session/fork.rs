@@ -18,9 +18,7 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use super::events::slice_events_for_fork;
-use super::slice::{
-    count_turns, find_orphaned_tool_calls, get_turn_boundaries, slice_to_turn,
-};
+use super::slice::{count_turns, find_orphaned_tool_calls, get_turn_boundaries, slice_to_turn};
 
 /// Result of a fork operation.
 #[derive(Debug, Clone)]
@@ -47,15 +45,14 @@ pub fn fork_session(
     target_dir: Option<&Path>,
     include_events: bool,
 ) -> crate::error::Result<ForkResult> {
-    let session_dir = fs::canonicalize(session_dir).map_err(|_| {
-        crate::error::BundleError::LoadError {
+    let session_dir =
+        fs::canonicalize(session_dir).map_err(|_| crate::error::BundleError::LoadError {
             reason: format!(
                 "No transcript.jsonl in {}. This doesn't appear to be a valid session directory.",
                 session_dir.display()
             ),
             source: None,
-        }
-    })?;
+        })?;
 
     let transcript_path = session_dir.join("transcript.jsonl");
     let metadata_path = session_dir.join("metadata.json");
@@ -113,10 +110,7 @@ pub fn fork_session(
 
     let base_dir = match target_dir {
         Some(dir) => dir.to_path_buf(),
-        None => session_dir
-            .parent()
-            .unwrap_or(&session_dir)
-            .to_path_buf(),
+        None => session_dir.parent().unwrap_or(&session_dir).to_path_buf(),
     };
 
     let new_session_dir = base_dir.join(&session_id);
@@ -205,13 +199,9 @@ pub fn fork_session_in_memory(
 }
 
 /// Get a preview of what a fork would produce without actually forking.
-pub fn get_fork_preview(
-    session_dir: &Path,
-    turn: usize,
-) -> crate::error::Result<Value> {
-    let session_dir = fs::canonicalize(session_dir).map_err(|e| {
-        crate::error::BundleError::Io(e)
-    })?;
+pub fn get_fork_preview(session_dir: &Path, turn: usize) -> crate::error::Result<Value> {
+    let session_dir =
+        fs::canonicalize(session_dir).map_err(|e| crate::error::BundleError::Io(e))?;
 
     let transcript_path = session_dir.join("transcript.jsonl");
     let metadata_path = session_dir.join("metadata.json");
@@ -291,14 +281,10 @@ pub fn get_fork_preview(
 
 /// List all sessions forked from a given session.
 pub fn list_session_forks(session_dir: &Path) -> crate::error::Result<Vec<Value>> {
-    let session_dir = fs::canonicalize(session_dir).map_err(|e| {
-        crate::error::BundleError::Io(e)
-    })?;
+    let session_dir =
+        fs::canonicalize(session_dir).map_err(|e| crate::error::BundleError::Io(e))?;
 
-    let sessions_root = session_dir
-        .parent()
-        .unwrap_or(&session_dir)
-        .to_path_buf();
+    let sessions_root = session_dir.parent().unwrap_or(&session_dir).to_path_buf();
 
     let metadata_path = session_dir.join("metadata.json");
     let parent_id = if metadata_path.exists() {
@@ -344,11 +330,7 @@ pub fn list_session_forks(session_dir: &Path) -> crate::error::Result<Vec<Value>
 
         match load_metadata(&child_metadata_path) {
             Ok(child_metadata) => {
-                if child_metadata
-                    .get("parent_id")
-                    .and_then(|v| v.as_str())
-                    == Some(&parent_id)
-                {
+                if child_metadata.get("parent_id").and_then(|v| v.as_str()) == Some(&parent_id) {
                     forks.push(json!({
                         "session_id": child_metadata.get("session_id")
                             .and_then(|v| v.as_str())
@@ -378,14 +360,10 @@ pub fn list_session_forks(session_dir: &Path) -> crate::error::Result<Vec<Value>
 
 /// Get the full lineage tree for a session.
 pub fn get_session_lineage(session_dir: &Path) -> crate::error::Result<Value> {
-    let session_dir = fs::canonicalize(session_dir).map_err(|e| {
-        crate::error::BundleError::Io(e)
-    })?;
+    let session_dir =
+        fs::canonicalize(session_dir).map_err(|e| crate::error::BundleError::Io(e))?;
 
-    let sessions_root = session_dir
-        .parent()
-        .unwrap_or(&session_dir)
-        .to_path_buf();
+    let sessions_root = session_dir.parent().unwrap_or(&session_dir).to_path_buf();
 
     let metadata_path = session_dir.join("metadata.json");
     let metadata = if metadata_path.exists() {

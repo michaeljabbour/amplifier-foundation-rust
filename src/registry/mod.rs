@@ -39,25 +39,40 @@ impl BundleState {
 
     pub fn to_dict(&self) -> serde_json::Value {
         let mut map = serde_json::Map::new();
-        map.insert("uri".to_string(), serde_json::Value::String(self.uri.clone()));
-        map.insert("name".to_string(), serde_json::Value::String(self.name.clone()));
+        map.insert(
+            "uri".to_string(),
+            serde_json::Value::String(self.uri.clone()),
+        );
+        map.insert(
+            "name".to_string(),
+            serde_json::Value::String(self.name.clone()),
+        );
         if let Some(v) = &self.version {
             map.insert("version".to_string(), serde_json::Value::String(v.clone()));
         }
         if let Some(lp) = &self.local_path {
-            map.insert("local_path".to_string(), serde_json::Value::String(lp.clone()));
+            map.insert(
+                "local_path".to_string(),
+                serde_json::Value::String(lp.clone()),
+            );
         }
         map.insert("is_root".to_string(), serde_json::Value::Bool(self.is_root));
         map.insert(
             "explicitly_requested".to_string(),
             serde_json::Value::Bool(self.explicitly_requested),
         );
-        map.insert("app_bundle".to_string(), serde_json::Value::Bool(self.app_bundle));
+        map.insert(
+            "app_bundle".to_string(),
+            serde_json::Value::Bool(self.app_bundle),
+        );
         if !self.includes.is_empty() {
             map.insert(
                 "includes".to_string(),
                 serde_json::Value::Array(
-                    self.includes.iter().map(|s| serde_json::Value::String(s.clone())).collect(),
+                    self.includes
+                        .iter()
+                        .map(|s| serde_json::Value::String(s.clone()))
+                        .collect(),
                 ),
             );
         }
@@ -65,12 +80,18 @@ impl BundleState {
             map.insert(
                 "included_by".to_string(),
                 serde_json::Value::Array(
-                    self.included_by.iter().map(|s| serde_json::Value::String(s.clone())).collect(),
+                    self.included_by
+                        .iter()
+                        .map(|s| serde_json::Value::String(s.clone()))
+                        .collect(),
                 ),
             );
         }
         if let Some(rn) = &self.root_name {
-            map.insert("root_name".to_string(), serde_json::Value::String(rn.clone()));
+            map.insert(
+                "root_name".to_string(),
+                serde_json::Value::String(rn.clone()),
+            );
         }
         serde_json::Value::Object(map)
     }
@@ -298,86 +319,84 @@ impl BundleRegistry {
         &'a self,
         uri: &'a str,
         loading_chain: &'a HashSet<String>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = crate::error::Result<Bundle>> + 'a>> {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = crate::error::Result<Bundle>> + 'a>>
+    {
         Box::pin(async move {
-        // Check cache
-        if let Ok(cache) = self.cache.lock() {
-            if let Some(bundle) = cache.get(uri) {
-                return Ok(bundle.clone());
+            // Check cache
+            if let Ok(cache) = self.cache.lock() {
+                if let Some(bundle) = cache.get(uri) {
+                    return Ok(bundle.clone());
+                }
             }
-        }
 
-        // Cycle detection
-        if loading_chain.contains(uri) {
-            tracing::warn!("Circular dependency detected: {}", uri);
-            // Return a minimal bundle to break the cycle gracefully
-            return Ok(Bundle::new(&extract_bundle_name(uri)));
-        }
+            // Cycle detection
+            if loading_chain.contains(uri) {
+                tracing::warn!("Circular dependency detected: {}", uri);
+                // Return a minimal bundle to break the cycle gracefully
+                return Ok(Bundle::new(&extract_bundle_name(uri)));
+            }
 
-        // Resolve URI to local path
-        let local_path = resolve_file_uri(uri)?;
+            // Resolve URI to local path
+            let local_path = resolve_file_uri(uri)?;
 
-        // Load bundle from disk
-        let mut bundle = self.load_from_path(&local_path)?;
+            // Load bundle from disk
+            let mut bundle = self.load_from_path(&local_path)?;
 
-        // Detect subdirectory bundle
-        let bundle_dir = if local_path.is_file() {
-            local_path
-                .parent()
-                .unwrap_or(&local_path)
-                .to_path_buf()
-        } else {
-            local_path.clone()
-        };
+            // Detect subdirectory bundle
+            let bundle_dir = if local_path.is_file() {
+                local_path.parent().unwrap_or(&local_path).to_path_buf()
+            } else {
+                local_path.clone()
+            };
 
-        // Look for a root bundle ABOVE this one
-        // Start searching from parent of bundle directory
-        if let Some(parent_dir) = bundle_dir.parent() {
-            if let Some(root_bundle_path) = self.find_nearest_bundle_file(parent_dir, &self.home) {
-                let root_dir = root_bundle_path
-                    .parent()
-                    .unwrap_or(&root_bundle_path)
-                    .to_path_buf();
+            // Look for a root bundle ABOVE this one
+            // Start searching from parent of bundle directory
+            if let Some(parent_dir) = bundle_dir.parent() {
+                if let Some(root_bundle_path) =
+                    self.find_nearest_bundle_file(parent_dir, &self.home)
+                {
+                    let root_dir = root_bundle_path
+                        .parent()
+                        .unwrap_or(&root_bundle_path)
+                        .to_path_buf();
 
-                // Only if root is in a DIFFERENT directory (not the same bundle)
-                if root_dir != bundle_dir {
-                    // Load root bundle to get its name
-                    if let Ok(root_bundle) = self.load_from_path(&root_bundle_path) {
-                        // Map root namespace → root's directory (source_root)
-                        bundle
-                            .source_base_paths
-                            .insert(root_bundle.name.clone(), root_dir.clone());
-
-                        // Also map nested bundle name → root dir if different
-                        if !bundle.name.is_empty() && bundle.name != root_bundle.name {
+                    // Only if root is in a DIFFERENT directory (not the same bundle)
+                    if root_dir != bundle_dir {
+                        // Load root bundle to get its name
+                        if let Ok(root_bundle) = self.load_from_path(&root_bundle_path) {
+                            // Map root namespace → root's directory (source_root)
                             bundle
                                 .source_base_paths
-                                .insert(bundle.name.clone(), root_dir);
+                                .insert(root_bundle.name.clone(), root_dir.clone());
+
+                            // Also map nested bundle name → root dir if different
+                            if !bundle.name.is_empty() && bundle.name != root_bundle.name {
+                                bundle
+                                    .source_base_paths
+                                    .insert(bundle.name.clone(), root_dir);
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // Set base_path
-        bundle.base_path = Some(bundle_dir);
+            // Set base_path
+            bundle.base_path = Some(bundle_dir);
 
-        // Handle includes recursively
-        if !bundle.includes.is_empty() {
-            let mut new_chain = loading_chain.clone();
-            new_chain.insert(uri.to_string());
+            // Handle includes recursively
+            if !bundle.includes.is_empty() {
+                let mut new_chain = loading_chain.clone();
+                new_chain.insert(uri.to_string());
 
-            bundle = self
-                .compose_includes(bundle, &new_chain)
-                .await?;
-        }
+                bundle = self.compose_includes(bundle, &new_chain).await?;
+            }
 
-        // Cache the result
-        if let Ok(mut cache) = self.cache.lock() {
-            cache.insert(uri.to_string(), bundle.clone());
-        }
+            // Cache the result
+            if let Ok(mut cache) = self.cache.lock() {
+                cache.insert(uri.to_string(), bundle.clone());
+            }
 
-        Ok(bundle)
+            Ok(bundle)
         }) // end Box::pin(async move { ... })
     }
 
@@ -409,21 +428,17 @@ impl BundleRegistry {
 
     /// Load a YAML bundle file.
     fn load_yaml_bundle(&self, path: &Path) -> crate::error::Result<Bundle> {
-        let content = std::fs::read_to_string(path).map_err(|e| {
-            crate::error::BundleError::LoadError {
+        let content =
+            std::fs::read_to_string(path).map_err(|e| crate::error::BundleError::LoadError {
                 reason: format!("Failed to read bundle file: {}", path.display()),
                 source: Some(Box::new(e)),
-            }
-        })?;
+            })?;
 
         let raw: Value = serde_yaml_ng::from_str(&content)?;
 
         // Wrap in {"bundle": raw} to match from_dict expected format
         let mut wrapper = Mapping::new();
-        wrapper.insert(
-            Value::String("bundle".to_string()),
-            raw,
-        );
+        wrapper.insert(Value::String("bundle".to_string()), raw);
 
         let base_path = path.parent().unwrap_or(path);
         Bundle::from_dict_with_base_path(&Value::Mapping(wrapper), base_path)
@@ -431,12 +446,11 @@ impl BundleRegistry {
 
     /// Load a markdown bundle file (with YAML frontmatter).
     fn load_markdown_bundle(&self, path: &Path) -> crate::error::Result<Bundle> {
-        let content = std::fs::read_to_string(path).map_err(|e| {
-            crate::error::BundleError::LoadError {
+        let content =
+            std::fs::read_to_string(path).map_err(|e| crate::error::BundleError::LoadError {
                 reason: format!("Failed to read bundle file: {}", path.display()),
                 source: Some(Box::new(e)),
-            }
-        })?;
+            })?;
 
         let (frontmatter, body) = crate::io::frontmatter::parse_frontmatter(&content)?;
 
@@ -472,47 +486,48 @@ impl BundleRegistry {
         &'a self,
         bundle: Bundle,
         loading_chain: &'a HashSet<String>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = crate::error::Result<Bundle>> + 'a>> {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = crate::error::Result<Bundle>> + 'a>>
+    {
         Box::pin(async move {
-        let includes = bundle.includes.clone();
-        let mut loaded_includes: Vec<Bundle> = Vec::new();
+            let includes = bundle.includes.clone();
+            let mut loaded_includes: Vec<Bundle> = Vec::new();
 
-        for include in &includes {
-            let include_uri = match include.as_str() {
-                Some(uri) => uri.to_string(),
-                None => continue,
-            };
+            for include in &includes {
+                let include_uri = match include.as_str() {
+                    Some(uri) => uri.to_string(),
+                    None => continue,
+                };
 
-            match self
-                .load_single_with_chain(&include_uri, loading_chain)
-                .await
-            {
-                Ok(included_bundle) => {
-                    loaded_includes.push(included_bundle);
-                }
-                Err(crate::error::BundleError::DependencyError(msg)) => {
-                    tracing::warn!("Skipping circular dependency: {}", msg);
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to load include {}: {}", include_uri, e);
+                match self
+                    .load_single_with_chain(&include_uri, loading_chain)
+                    .await
+                {
+                    Ok(included_bundle) => {
+                        loaded_includes.push(included_bundle);
+                    }
+                    Err(crate::error::BundleError::DependencyError(msg)) => {
+                        tracing::warn!("Skipping circular dependency: {}", msg);
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to load include {}: {}", include_uri, e);
+                    }
                 }
             }
-        }
 
-        if loaded_includes.is_empty() {
-            return Ok(bundle);
-        }
+            if loaded_includes.is_empty() {
+                return Ok(bundle);
+            }
 
-        // Compose: includes first (as base), then bundle on top (bundle wins)
-        // Python: includes[0].compose(includes[1])...compose(bundle)
-        let mut result = loaded_includes.remove(0);
-        let refs: Vec<&Bundle> = loaded_includes.iter().collect();
-        if !refs.is_empty() {
-            result = result.compose(&refs);
-        }
-        result = result.compose(&[&bundle]);
+            // Compose: includes first (as base), then bundle on top (bundle wins)
+            // Python: includes[0].compose(includes[1])...compose(bundle)
+            let mut result = loaded_includes.remove(0);
+            let refs: Vec<&Bundle> = loaded_includes.iter().collect();
+            if !refs.is_empty() {
+                result = result.compose(&refs);
+            }
+            result = result.compose(&[&bundle]);
 
-        Ok(result)
+            Ok(result)
         }) // end Box::pin(async move { ... })
     }
 

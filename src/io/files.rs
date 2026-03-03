@@ -93,10 +93,7 @@ fn write_atomic_bytes(path: &Path, data: &[u8]) -> crate::error::Result<()> {
 
     // Create temp file in same directory (same filesystem for atomic rename)
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    let stem = path
-        .file_stem()
-        .unwrap_or_default()
-        .to_string_lossy();
+    let stem = path.file_stem().unwrap_or_default().to_string_lossy();
     let prefix = format!(".{stem}_");
 
     let mut tmp_path = None;

@@ -70,10 +70,7 @@ impl Bundle {
         Self::from_dict_with_base_path_opt(data, None)
     }
 
-    pub fn from_dict_with_base_path(
-        data: &Value,
-        base_path: &Path,
-    ) -> crate::error::Result<Self> {
+    pub fn from_dict_with_base_path(data: &Value, base_path: &Path) -> crate::error::Result<Self> {
         Self::from_dict_with_base_path_opt(data, Some(base_path))
     }
 
@@ -157,13 +154,10 @@ impl Bundle {
         let context_config = bundle_meta
             .get(&Value::String("context".to_string()))
             .and_then(|v| v.as_mapping());
-        let (resolved_context, pending_context) =
-            Self::parse_context(context_config, base_path);
+        let (resolved_context, pending_context) = Self::parse_context(context_config, base_path);
 
         // Parse agents
-        let agents = Self::parse_agents(
-            bundle_meta.get(&Value::String("agents".to_string())),
-        );
+        let agents = Self::parse_agents(bundle_meta.get(&Value::String("agents".to_string())));
 
         Ok(Bundle {
             name: bundle_name,
@@ -365,10 +359,7 @@ impl Bundle {
         let mut map = Mapping::new();
 
         if !is_null_or_empty_mapping(&self.session) {
-            map.insert(
-                Value::String("session".to_string()),
-                self.session.clone(),
-            );
+            map.insert(Value::String("session".to_string()), self.session.clone());
         }
         if !self.providers.is_empty() {
             map.insert(
@@ -399,10 +390,7 @@ impl Bundle {
             );
         }
         if !is_null_or_empty_mapping(&self.spawn) {
-            map.insert(
-                Value::String("spawn".to_string()),
-                self.spawn.clone(),
-            );
+            map.insert(Value::String("spawn".to_string()), self.spawn.clone());
         }
 
         Value::Mapping(map)

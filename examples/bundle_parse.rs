@@ -8,7 +8,7 @@
 //!
 //! Run with: cargo run --example bundle_parse
 
-use amplifier_foundation::{Bundle, BundleValidator, validate_bundle};
+use amplifier_foundation::{validate_bundle, Bundle, BundleValidator};
 
 fn main() {
     println!("=== Bundle Parsing Example ===\n");

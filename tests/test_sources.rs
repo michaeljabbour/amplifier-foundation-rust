@@ -45,8 +45,8 @@ fn make_parsed_uri(scheme: &str, path: &str, subpath: &str) -> ParsedURI {
 fn create_test_zip(zip_path: &std::path::Path, entries: &[(&str, &str)]) {
     let file = fs::File::create(zip_path).expect("failed to create zip file");
     let mut writer = zip::ZipWriter::new(file);
-    let options = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Stored);
+    let options =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
 
     for (name, content) in entries {
         writer
@@ -288,10 +288,7 @@ async fn test_zip_uses_cache() {
 
     // Create a zip archive.
     let zip_path = tmp.path().join("cached.zip");
-    create_test_zip(
-        &zip_path,
-        &[("bundle.yaml", "name: cached-bundle")],
-    );
+    create_test_zip(&zip_path, &[("bundle.yaml", "name: cached-bundle")]);
 
     let handler = ZipSourceHandler::new();
     let parsed = make_parsed_uri("zip+file", zip_path.to_str().unwrap(), "");

@@ -29,18 +29,17 @@ impl ZipSourceHandler {
         let file = fs::File::open(zip_path).map_err(|e| crate::error::BundleError::NotFound {
             uri: format!("Zip file not found: {}: {e}", zip_path.display()),
         })?;
-        let mut archive = zip::ZipArchive::new(file).map_err(|e| {
-            crate::error::BundleError::LoadError {
+        let mut archive =
+            zip::ZipArchive::new(file).map_err(|e| crate::error::BundleError::LoadError {
                 reason: format!("Failed to read zip archive: {e}"),
                 source: None,
-            }
-        })?;
-        archive.extract(extract_path).map_err(|e| {
-            crate::error::BundleError::LoadError {
+            })?;
+        archive
+            .extract(extract_path)
+            .map_err(|e| crate::error::BundleError::LoadError {
                 reason: format!("Failed to extract zip: {e}"),
                 source: None,
-            }
-        })?;
+            })?;
         Ok(())
     }
 }

@@ -29,8 +29,10 @@ fn test_simple_mention() {
 fn test_multiple_mentions() {
     let result = parse_mentions("See @first.md and @second.md");
     let result_set: HashSet<String> = result.into_iter().collect();
-    let expected: HashSet<String> =
-        ["@first.md", "@second.md"].iter().map(|s| s.to_string()).collect();
+    let expected: HashSet<String> = ["@first.md", "@second.md"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
     assert_eq!(result_set, expected);
 }
 
@@ -120,7 +122,10 @@ fn test_resolve_simple_file() {
     let resolver = BaseMentionResolver::new();
     let resolved = resolver.resolve("@AGENTS.md");
     assert!(resolved.is_some());
-    assert_eq!(resolved.unwrap().canonicalize().unwrap(), file_path.canonicalize().unwrap());
+    assert_eq!(
+        resolved.unwrap().canonicalize().unwrap(),
+        file_path.canonicalize().unwrap()
+    );
 
     std::env::set_current_dir(old_dir).unwrap();
 }

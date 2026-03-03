@@ -18,9 +18,7 @@ fn test_git_https_uri() {
 
 #[test]
 fn test_git_uri_with_subdirectory_fragment() {
-    let uri = parse_uri(
-        "git+https://github.com/org/repo@main#subdirectory=bundles/foundation",
-    );
+    let uri = parse_uri("git+https://github.com/org/repo@main#subdirectory=bundles/foundation");
     assert_eq!(uri.scheme, "git+https");
     assert_eq!(uri.host, "github.com");
     assert_eq!(uri.path, "/org/repo");
@@ -30,9 +28,7 @@ fn test_git_uri_with_subdirectory_fragment() {
 
 #[test]
 fn test_zip_https_uri() {
-    let uri = parse_uri(
-        "zip+https://releases.example.com/bundle.zip#subdirectory=foundation",
-    );
+    let uri = parse_uri("zip+https://releases.example.com/bundle.zip#subdirectory=foundation");
     assert_eq!(uri.scheme, "zip+https");
     assert_eq!(uri.host, "releases.example.com");
     assert_eq!(uri.path, "/bundle.zip");
@@ -42,8 +38,7 @@ fn test_zip_https_uri() {
 
 #[test]
 fn test_zip_file_uri() {
-    let uri =
-        parse_uri("zip+file:///local/archive.zip#subdirectory=my-bundle");
+    let uri = parse_uri("zip+file:///local/archive.zip#subdirectory=my-bundle");
     assert_eq!(uri.scheme, "zip+file");
     assert_eq!(uri.path, "/local/archive.zip");
     assert_eq!(uri.subpath, "my-bundle");
@@ -91,8 +86,7 @@ fn test_absolute_path() {
 
 #[test]
 fn test_relative_path_with_base() {
-    let result =
-        normalize_path("file.txt", Some(Path::new("/home/user")));
+    let result = normalize_path("file.txt", Some(Path::new("/home/user")));
     assert_eq!(result, Path::new("/home/user/file.txt"));
 }
 

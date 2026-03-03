@@ -4,14 +4,12 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 /// Match all @-prefixed tokens (mention candidates).
-static MENTION_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"@([a-zA-Z0-9_:./~\-]+)").unwrap()
-});
+static MENTION_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"@([a-zA-Z0-9_:./~\-]+)").unwrap());
 
 /// Email addresses to reject from mention matches.
-static EMAIL_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}").unwrap()
-});
+static EMAIL_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}").unwrap());
 
 static FENCED_CODE_BLOCK: LazyLock<Regex> = LazyLock::new(|| {
     // Fenced code blocks: ``` must be at start of line per CommonMark spec
@@ -45,11 +43,16 @@ pub fn parse_mentions(text: &str) -> Vec<String> {
     for m in MENTION_PATTERN.find_iter(&text_without_code) {
         let start = m.start();
         // Skip if this @ is inside an email address span
-        if email_spans.iter().any(|(es, ee)| start >= *es && start < *ee) {
+        if email_spans
+            .iter()
+            .any(|(es, ee)| start >= *es && start < *ee)
+        {
             continue;
         }
 
-        let caps = MENTION_PATTERN.captures(&text_without_code[start..]).unwrap();
+        let caps = MENTION_PATTERN
+            .captures(&text_without_code[start..])
+            .unwrap();
         let mention = format!("@{}", &caps[1]);
         if seen.insert(mention.clone()) {
             result.push(mention);

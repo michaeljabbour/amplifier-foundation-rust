@@ -35,8 +35,12 @@ bundle:
 
     let base_data: serde_yaml_ng::Value = serde_yaml_ng::from_str(base_yaml).unwrap();
     let base = Bundle::from_dict(&base_data).unwrap();
-    println!("Base bundle: {} (providers: {}, tools: {})",
-        base.name, base.providers.len(), base.tools.len());
+    println!(
+        "Base bundle: {} (providers: {}, tools: {})",
+        base.name,
+        base.providers.len(),
+        base.tools.len()
+    );
 
     // 2. Create a child bundle that extends the base
     let child_yaml = r#"
@@ -63,8 +67,12 @@ bundle:
 
     let child_data: serde_yaml_ng::Value = serde_yaml_ng::from_str(child_yaml).unwrap();
     let child = Bundle::from_dict(&child_data).unwrap();
-    println!("Child bundle: {} (providers: {}, tools: {})",
-        child.name, child.providers.len(), child.tools.len());
+    println!(
+        "Child bundle: {} (providers: {}, tools: {})",
+        child.name,
+        child.providers.len(),
+        child.tools.len()
+    );
 
     // 3. Compose: child on top of base
     let composed = base.compose(&[&child]);
@@ -72,13 +80,17 @@ bundle:
     println!("\n--- After Composition ---");
     println!("Name: {} (child wins)", composed.name);
     println!("Version: {} (child wins)", composed.version);
-    println!("Providers: {} (merged by module ID)", composed.providers.len());
+    println!(
+        "Providers: {} (merged by module ID)",
+        composed.providers.len()
+    );
     println!("Tools: {} (merged by module ID)", composed.tools.len());
 
     // Show provider details
     println!("\nProviders after merge:");
     for (i, provider) in composed.providers.iter().enumerate() {
-        let module = provider.as_mapping()
+        let module = provider
+            .as_mapping()
             .and_then(|m| m.get("module"))
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
@@ -88,7 +100,8 @@ bundle:
     // Show tool details
     println!("\nTools after merge:");
     for (i, tool) in composed.tools.iter().enumerate() {
-        let module = tool.as_mapping()
+        let module = tool
+            .as_mapping()
             .and_then(|m| m.get("module"))
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");

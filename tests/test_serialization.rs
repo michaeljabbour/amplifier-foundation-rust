@@ -85,7 +85,10 @@ fn test_nested_structure() {
     assert!(result.is_object());
     assert_eq!(result["level1"]["level2"]["level3"][0], json!(1));
     assert_eq!(result["level1"]["level2"]["level3"][1], json!(2));
-    assert_eq!(result["level1"]["level2"]["level3"][2]["level4"], json!("deep"));
+    assert_eq!(
+        result["level1"]["level2"]["level3"][2]["level4"],
+        json!("deep")
+    );
 }
 
 #[test]

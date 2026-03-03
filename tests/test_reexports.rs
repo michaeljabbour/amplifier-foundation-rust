@@ -44,9 +44,7 @@ fn test_reexport_result_type() {
     let ok_result: Result<i32> = Ok(42);
     assert!(ok_result.is_ok());
 
-    let err_result: Result<i32> = Err(BundleError::NotFound {
-        uri: "x".into(),
-    });
+    let err_result: Result<i32> = Err(BundleError::NotFound { uri: "x".into() });
     assert!(err_result.is_err());
 }
 
@@ -88,11 +86,8 @@ fn test_reexport_dicts() {
     let val = get_nested(&data, &["x", "y"]);
     assert!(val.is_some());
 
-    let default_val = get_nested_with_default(
-        &data,
-        &["x", "missing"],
-        Value::String("default".into()),
-    );
+    let default_val =
+        get_nested_with_default(&data, &["x", "missing"], Value::String("default".into()));
     assert_eq!(default_val, Value::String("default".into()));
 }
 

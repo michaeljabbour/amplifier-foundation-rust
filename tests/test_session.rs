@@ -156,8 +156,7 @@ fn create_sample_session(base: &Path) -> PathBuf {
         .collect::<Vec<_>>()
         .join("\n")
         + "\n";
-    fs::write(session_dir.join("events.jsonl"), &events_content)
-        .expect("failed to write events");
+    fs::write(session_dir.join("events.jsonl"), &events_content).expect("failed to write events");
 
     session_dir
 }
@@ -444,7 +443,10 @@ fn test_slice_to_turn_complete_orphaned_tools() {
             .map(|s| s == "call_orphan")
             .unwrap_or(false)
     });
-    assert!(synthetic.is_some(), "expected synthetic result for call_orphan");
+    assert!(
+        synthetic.is_some(),
+        "expected synthetic result for call_orphan"
+    );
     let content = synthetic.unwrap()["content"].as_str().unwrap_or("");
     assert!(
         content.contains("forked"),
@@ -509,8 +511,8 @@ fn test_fork_session_at_turn_1() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
 
-    let result = fork_session(&session_dir, Some(1), None, None, false)
-        .expect("fork_session failed");
+    let result =
+        fork_session(&session_dir, Some(1), None, None, false).expect("fork_session failed");
 
     assert_eq!(result.forked_from_turn, 1);
     assert_eq!(result.parent_id, "parent_session_123");
@@ -532,8 +534,8 @@ fn test_fork_session_at_turn_2() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
 
-    let result = fork_session(&session_dir, Some(2), None, None, false)
-        .expect("fork_session failed");
+    let result =
+        fork_session(&session_dir, Some(2), None, None, false).expect("fork_session failed");
 
     assert_eq!(result.forked_from_turn, 2);
     assert_eq!(result.message_count, 4);
@@ -545,8 +547,7 @@ fn test_fork_session_default_is_latest() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
 
-    let result = fork_session(&session_dir, None, None, None, false)
-        .expect("fork_session failed");
+    let result = fork_session(&session_dir, None, None, None, false).expect("fork_session failed");
 
     assert_eq!(result.forked_from_turn, 3);
     assert_eq!(result.message_count, 6);
@@ -558,12 +559,12 @@ fn test_fork_session_preserves_lineage() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
 
-    let result = fork_session(&session_dir, Some(2), None, None, false)
-        .expect("fork_session failed");
+    let result =
+        fork_session(&session_dir, Some(2), None, None, false).expect("fork_session failed");
 
     let fork_dir = result.session_dir.as_ref().expect("expected session_dir");
-    let metadata_str = fs::read_to_string(fork_dir.join("metadata.json"))
-        .expect("failed to read forked metadata");
+    let metadata_str =
+        fs::read_to_string(fork_dir.join("metadata.json")).expect("failed to read forked metadata");
     let metadata: Value = serde_json::from_str(&metadata_str).expect("invalid metadata JSON");
 
     assert_eq!(metadata["parent_id"], "parent_session_123");
@@ -580,12 +581,12 @@ fn test_fork_session_preserves_parent_metadata() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
 
-    let result = fork_session(&session_dir, Some(1), None, None, false)
-        .expect("fork_session failed");
+    let result =
+        fork_session(&session_dir, Some(1), None, None, false).expect("fork_session failed");
 
     let fork_dir = result.session_dir.as_ref().expect("expected session_dir");
-    let metadata_str = fs::read_to_string(fork_dir.join("metadata.json"))
-        .expect("failed to read forked metadata");
+    let metadata_str =
+        fs::read_to_string(fork_dir.join("metadata.json")).expect("failed to read forked metadata");
     let metadata: Value = serde_json::from_str(&metadata_str).expect("invalid metadata JSON");
 
     assert_eq!(metadata["bundle"], "foundation");
@@ -628,8 +629,8 @@ fn test_fork_session_includes_events() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
 
-    let result = fork_session(&session_dir, Some(2), None, None, true)
-        .expect("fork_session failed");
+    let result =
+        fork_session(&session_dir, Some(2), None, None, true).expect("fork_session failed");
 
     let fork_dir = result.session_dir.as_ref().expect("expected session_dir");
     let events_path = fork_dir.join("events.jsonl");
@@ -679,8 +680,14 @@ fn test_fork_session_in_memory_basic() {
     assert_eq!(result.forked_from_turn, 1);
     assert_eq!(result.parent_id, "parent_1");
     assert_eq!(result.message_count, 2);
-    assert!(result.session_dir.is_none(), "in-memory fork should have no session_dir");
-    assert!(result.messages.is_some(), "in-memory fork should include messages");
+    assert!(
+        result.session_dir.is_none(),
+        "in-memory fork should have no session_dir"
+    );
+    assert!(
+        result.messages.is_some(),
+        "in-memory fork should include messages"
+    );
     assert_eq!(result.messages.as_ref().unwrap().len(), 2);
 }
 
@@ -711,7 +718,10 @@ fn test_fork_session_in_memory_handles_orphaned_tools() {
             .map(|s| s == "call_orphan")
             .unwrap_or(false)
     });
-    assert!(synthetic.is_some(), "expected synthetic result for call_orphan");
+    assert!(
+        synthetic.is_some(),
+        "expected synthetic result for call_orphan"
+    );
     let content = synthetic.unwrap()["content"].as_str().unwrap_or("");
     assert!(
         content.contains("forked"),
@@ -722,8 +732,7 @@ fn test_fork_session_in_memory_handles_orphaned_tools() {
 #[test]
 
 fn test_fork_session_in_memory_empty_messages() {
-    let result = fork_session_in_memory(&[], None, None)
-        .expect("fork_session_in_memory failed");
+    let result = fork_session_in_memory(&[], None, None).expect("fork_session_in_memory failed");
 
     assert_eq!(result.forked_from_turn, 0);
     assert_eq!(result.message_count, 0);
@@ -776,7 +785,10 @@ fn test_list_session_forks_no_forks() {
     let session_dir = create_sample_session(tmp.path());
 
     let forks = list_session_forks(&session_dir).expect("list_session_forks failed");
-    assert!(forks.is_empty(), "session with no forks should return empty list");
+    assert!(
+        forks.is_empty(),
+        "session with no forks should return empty list"
+    );
 }
 
 #[test]
@@ -786,8 +798,8 @@ fn test_list_session_forks_finds_forks() {
     let session_dir = create_sample_session(tmp.path());
 
     // Create a fork
-    let fork_result = fork_session(&session_dir, Some(1), None, None, false)
-        .expect("fork_session failed");
+    let fork_result =
+        fork_session(&session_dir, Some(1), None, None, false).expect("fork_session failed");
 
     let forks = list_session_forks(&session_dir).expect("list_session_forks failed");
     assert_eq!(forks.len(), 1, "should find exactly one fork");
@@ -828,20 +840,27 @@ fn test_get_session_lineage_forked_session() {
     let tmp = tempdir().expect("failed to create temp dir");
     let session_dir = create_sample_session(tmp.path());
 
-    let fork_result = fork_session(&session_dir, Some(2), None, None, false)
-        .expect("fork_session failed");
-    let fork_dir = fork_result.session_dir.as_ref().expect("expected session_dir");
+    let fork_result =
+        fork_session(&session_dir, Some(2), None, None, false).expect("fork_session failed");
+    let fork_dir = fork_result
+        .session_dir
+        .as_ref()
+        .expect("expected session_dir");
 
     let lineage = get_session_lineage(fork_dir).expect("get_session_lineage failed");
 
     assert_eq!(lineage["parent_id"], "parent_session_123");
-    let ancestors = lineage["ancestors"].as_array().expect("ancestors should be array");
+    let ancestors = lineage["ancestors"]
+        .as_array()
+        .expect("ancestors should be array");
     assert!(
         !ancestors.is_empty(),
         "forked session should have non-empty ancestors"
     );
     assert!(
-        ancestors.iter().any(|a| a["session_id"] == "parent_session_123"),
+        ancestors
+            .iter()
+            .any(|a| a["session_id"] == "parent_session_123"),
         "ancestors should contain parent session"
     );
     assert_eq!(lineage["depth"], 1);
@@ -854,24 +873,20 @@ fn test_get_session_lineage_deeply_nested_forks() {
     let session_dir = create_sample_session(tmp.path());
 
     // First fork
-    let fork1 = fork_session(&session_dir, Some(2), None, None, false)
-        .expect("first fork failed");
+    let fork1 = fork_session(&session_dir, Some(2), None, None, false).expect("first fork failed");
     let fork1_dir = fork1.session_dir.as_ref().expect("expected session_dir");
 
     // Second fork (fork of fork)
-    let fork2 = fork_session(fork1_dir, Some(1), None, None, false)
-        .expect("second fork failed");
+    let fork2 = fork_session(fork1_dir, Some(1), None, None, false).expect("second fork failed");
     let fork2_dir = fork2.session_dir.as_ref().expect("expected session_dir");
 
     let lineage = get_session_lineage(fork2_dir).expect("get_session_lineage failed");
 
     assert_eq!(lineage["depth"], 2);
-    let ancestors = lineage["ancestors"].as_array().expect("ancestors should be array");
-    assert_eq!(
-        ancestors.len(),
-        2,
-        "depth-2 fork should have 2 ancestors"
-    );
+    let ancestors = lineage["ancestors"]
+        .as_array()
+        .expect("ancestors should be array");
+    assert_eq!(ancestors.len(), 2, "depth-2 fork should have 2 ancestors");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -897,7 +912,9 @@ fn test_slice_events_to_timestamp_basic() {
     // Verify no events after the cutoff timestamp
     let sliced = read_jsonl(&output_path);
     for event in &sliced {
-        let ts = event["timestamp"].as_str().expect("event should have timestamp");
+        let ts = event["timestamp"]
+            .as_str()
+            .expect("event should have timestamp");
         assert!(
             ts <= cutoff,
             "event timestamp {ts} should be <= cutoff {cutoff}"

@@ -435,10 +435,7 @@ fn setup_dependency_bundles(
     // Write bundle.yaml files with includes pointing to file:// URIs.
     for name in names {
         let bundle_dir = &dirs[*name];
-        let includes: Vec<&str> = includes_map
-            .get(name)
-            .cloned()
-            .unwrap_or_default();
+        let includes: Vec<&str> = includes_map.get(name).cloned().unwrap_or_default();
         let include_uris: Vec<String> = includes
             .iter()
             .map(|dep| format!("file://{}", dirs[*dep].display()))
@@ -458,10 +455,7 @@ async fn test_diamond_dependency_loads_successfully() {
         ("bundle-a", vec!["bundle-b", "bundle-c"]),
         ("bundle-b", vec!["bundle-c"]),
     ]);
-    let (_tmp, dirs) = setup_dependency_bundles(
-        &["bundle-a", "bundle-b", "bundle-c"],
-        &includes,
-    );
+    let (_tmp, dirs) = setup_dependency_bundles(&["bundle-a", "bundle-b", "bundle-c"], &includes);
 
     let uri_a = format!("file://{}", dirs["bundle-a"].display());
     let registry = BundleRegistry::new(_tmp.path().to_path_buf());
@@ -482,10 +476,7 @@ async fn test_circular_dependency_handled_gracefully() {
         ("bundle-a", vec!["bundle-b"]),
         ("bundle-b", vec!["bundle-a"]),
     ]);
-    let (_tmp, dirs) = setup_dependency_bundles(
-        &["bundle-a", "bundle-b"],
-        &includes,
-    );
+    let (_tmp, dirs) = setup_dependency_bundles(&["bundle-a", "bundle-b"], &includes);
 
     let uri_a = format!("file://{}", dirs["bundle-a"].display());
     let registry = BundleRegistry::new(_tmp.path().to_path_buf());
@@ -526,10 +517,7 @@ async fn test_three_level_circular_dependency_handled_gracefully() {
         ("bundle-b", vec!["bundle-c"]),
         ("bundle-c", vec!["bundle-a"]),
     ]);
-    let (_tmp, dirs) = setup_dependency_bundles(
-        &["bundle-a", "bundle-b", "bundle-c"],
-        &includes,
-    );
+    let (_tmp, dirs) = setup_dependency_bundles(&["bundle-a", "bundle-b", "bundle-c"], &includes);
 
     let uri_a = format!("file://{}", dirs["bundle-a"].display());
     let registry = BundleRegistry::new(_tmp.path().to_path_buf());
@@ -551,10 +539,7 @@ async fn test_circular_dependency_logs_warning() {
         ("bundle-a", vec!["bundle-b"]),
         ("bundle-b", vec!["bundle-a"]),
     ]);
-    let (_tmp, dirs) = setup_dependency_bundles(
-        &["bundle-a", "bundle-b"],
-        &includes,
-    );
+    let (_tmp, dirs) = setup_dependency_bundles(&["bundle-a", "bundle-b"], &includes);
 
     let uri_a = format!("file://{}", dirs["bundle-a"].display());
     let registry = BundleRegistry::new(_tmp.path().to_path_buf());

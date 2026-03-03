@@ -90,10 +90,10 @@ pub use mentions::resolver::BaseMentionResolver;
 pub use sources::resolver::SimpleSourceResolver;
 
 // -- Source types --
-pub use sources::SourceStatus;
-pub use sources::{file::FileSourceHandler, git::GitSourceHandler, http::HttpSourceHandler};
 #[cfg(feature = "zip-sources")]
 pub use sources::zip::ZipSourceHandler;
+pub use sources::SourceStatus;
+pub use sources::{file::FileSourceHandler, git::GitSourceHandler, http::HttpSourceHandler};
 
 // -- Mentions --
 pub use mentions::dedup::ContentDeduplicator;
@@ -102,7 +102,9 @@ pub use mentions::models::{ContextFile, MentionResult};
 pub use mentions::parser::parse_mentions;
 
 // -- I/O utilities --
-pub use io::files::{read_with_retry, write_with_backup, write_with_backup_bytes, write_with_retry};
+pub use io::files::{
+    read_with_retry, write_with_backup, write_with_backup_bytes, write_with_retry,
+};
 pub use io::frontmatter::parse_frontmatter;
 pub use io::yaml::{read_yaml, write_yaml};
 
@@ -124,11 +126,10 @@ pub use paths::uri::{get_amplifier_home, normalize_path, parse_uri, ParsedURI, R
 // -- Session --
 pub use session::capabilities::{get_working_dir, set_working_dir, WORKING_DIR_CAPABILITY};
 pub use session::{
-    add_synthetic_tool_results, count_events, count_turns, find_orphaned_tool_calls,
-    fork_session, fork_session_in_memory, get_event_summary, get_fork_preview,
-    get_last_timestamp_for_turn, get_session_lineage, get_turn_boundaries, get_turn_summary,
-    list_session_forks, slice_events_for_fork, slice_events_to_timestamp, slice_to_turn,
-    ForkResult,
+    add_synthetic_tool_results, count_events, count_turns, find_orphaned_tool_calls, fork_session,
+    fork_session_in_memory, get_event_summary, get_fork_preview, get_last_timestamp_for_turn,
+    get_session_lineage, get_turn_boundaries, get_turn_summary, list_session_forks,
+    slice_events_for_fork, slice_events_to_timestamp, slice_to_turn, ForkResult,
 };
 
 // -- Spawn utilities --
@@ -140,6 +141,6 @@ pub use updates::{check_bundle_status, update_bundle, BundleStatus};
 
 // -- Runtime traits --
 pub use runtime::{
-    AmplifierRuntime, AmplifierSession, ApprovalSystem, ContextManager, Coordinator,
-    DisplaySystem, HookHandler, HookRegistry, SessionOptions, SystemPromptFactory,
+    AmplifierRuntime, AmplifierSession, ApprovalSystem, ContextManager, Coordinator, DisplaySystem,
+    HookHandler, HookRegistry, SessionOptions, SystemPromptFactory,
 };

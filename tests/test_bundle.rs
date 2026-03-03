@@ -51,7 +51,10 @@ fn module_entry(module: &str) -> Value {
 
 /// Build a module entry with config: `{"module": module_name, "config": {pairs...}}`.
 fn module_entry_with_config(module: &str, config_pairs: &[(&str, Value)]) -> Value {
-    mapping(&[("module", str_val(module)), ("config", mapping(config_pairs))])
+    mapping(&[
+        ("module", str_val(module)),
+        ("config", mapping(config_pairs)),
+    ])
 }
 
 // =====================================================================
@@ -117,7 +120,10 @@ fn test_from_dict_full() {
     assert_eq!(bundle.description, "A full test bundle");
 
     // Session should be preserved
-    let session_map = bundle.session.as_mapping().expect("session should be mapping");
+    let session_map = bundle
+        .session
+        .as_mapping()
+        .expect("session should be mapping");
     assert_eq!(
         session_map.get(&str_val("orchestrator")),
         Some(&str_val("custom-orchestrator"))
@@ -137,12 +143,16 @@ fn test_from_dict_full() {
 
     // Tools
     assert_eq!(bundle.tools.len(), 1);
-    let tool = bundle.tools[0].as_mapping().expect("tool should be mapping");
+    let tool = bundle.tools[0]
+        .as_mapping()
+        .expect("tool should be mapping");
     assert_eq!(tool.get(&str_val("module")), Some(&str_val("tool-a")));
 
     // Hooks
     assert_eq!(bundle.hooks.len(), 1);
-    let hook = bundle.hooks[0].as_mapping().expect("hook should be mapping");
+    let hook = bundle.hooks[0]
+        .as_mapping()
+        .expect("hook should be mapping");
     assert_eq!(hook.get(&str_val("module")), Some(&str_val("hook-a")));
 
     // Includes
@@ -283,10 +293,7 @@ fn test_compose_instruction_replaced() {
     let result = base.compose(&[&child]);
 
     // Later instruction replaces earlier
-    assert_eq!(
-        result.instruction,
-        Some("child instruction".to_string())
-    );
+    assert_eq!(result.instruction, Some("child instruction".to_string()));
 }
 
 // =====================================================================
@@ -403,7 +410,10 @@ fn test_parse_context_defers_namespaced_refs() {
                 "context",
                 mapping(&[
                     ("local_file", str_val("context/readme.md")),
-                    ("other_ns:remote_file", str_val("other_ns:context/remote.md")),
+                    (
+                        "other_ns:remote_file",
+                        str_val("other_ns:context/remote.md"),
+                    ),
                 ]),
             ),
         ]),
@@ -452,7 +462,10 @@ fn test_resolve_pending_context_with_source_base_paths() {
     );
     // The resolved path should exist
     let has_resolved = bundle.context.values().any(|p| p.exists());
-    assert!(has_resolved, "at least one context path should be resolved and exist");
+    assert!(
+        has_resolved,
+        "at least one context path should be resolved and exist"
+    );
 }
 
 #[test]
@@ -487,16 +500,13 @@ fn test_resolve_pending_context_self_reference() {
 
 fn test_compose_merges_pending_context() {
     let mut base = Bundle::new("base");
-    base.pending_context.insert(
-        "ns_a:file_a.md".to_string(),
-        "ns_a:file_a.md".to_string(),
-    );
+    base.pending_context
+        .insert("ns_a:file_a.md".to_string(), "ns_a:file_a.md".to_string());
 
     let mut child = Bundle::new("child");
-    child.pending_context.insert(
-        "ns_b:file_b.md".to_string(),
-        "ns_b:file_b.md".to_string(),
-    );
+    child
+        .pending_context
+        .insert("ns_b:file_b.md".to_string(), "ns_b:file_b.md".to_string());
 
     let result = base.compose(&[&child]);
 
@@ -523,16 +533,13 @@ fn test_pending_context_resolved_after_compose() {
     fs::write(&file_b, "# B").expect("failed to write file_b");
 
     let mut base = Bundle::new("base");
-    base.pending_context.insert(
-        "ns_a:file_a.md".to_string(),
-        "ns_a:file_a.md".to_string(),
-    );
+    base.pending_context
+        .insert("ns_a:file_a.md".to_string(), "ns_a:file_a.md".to_string());
 
     let mut child = Bundle::new("child");
-    child.pending_context.insert(
-        "ns_b:file_b.md".to_string(),
-        "ns_b:file_b.md".to_string(),
-    );
+    child
+        .pending_context
+        .insert("ns_b:file_b.md".to_string(), "ns_b:file_b.md".to_string());
 
     let mut result = base.compose(&[&child]);
 
@@ -620,10 +627,7 @@ fn test_raises_on_string_providers() {
     )]);
 
     let result = Bundle::from_dict(&data);
-    assert!(
-        result.is_err(),
-        "should reject string entries in providers"
-    );
+    assert!(result.is_err(), "should reject string entries in providers");
 }
 
 #[test]
@@ -634,10 +638,7 @@ fn test_raises_on_string_hooks() {
         "bundle",
         mapping(&[
             ("name", str_val("bad-hooks")),
-            (
-                "hooks",
-                seq(&[module_entry("hook-a"), str_val("hook-b")]),
-            ),
+            ("hooks", seq(&[module_entry("hook-a"), str_val("hook-b")])),
         ]),
     )]);
 
@@ -655,15 +656,9 @@ fn test_raises_on_string_hooks() {
 
 fn test_error_uses_base_path_when_no_name() {
     // Bundle has no name, but has a base_path -- error should show the path
-    let data = mapping(&[(
-        "bundle",
-        mapping(&[
-            ("tools", seq(&[str_val("bad-tool")])),
-        ]),
-    )]);
+    let data = mapping(&[("bundle", mapping(&[("tools", seq(&[str_val("bad-tool")]))]))]);
 
-    let result =
-        Bundle::from_dict_with_base_path(&data, Path::new("/path/to/bundle"));
+    let result = Bundle::from_dict_with_base_path(&data, Path::new("/path/to/bundle"));
     assert!(result.is_err(), "should reject string entries in tools");
 
     let err_msg = format!("{}", result.unwrap_err());

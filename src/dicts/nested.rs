@@ -54,16 +54,12 @@ pub fn set_nested(data: &mut Value, path: &[&str], value: Value) {
             if !current.is_mapping() {
                 *current = Value::Mapping(serde_yaml_ng::Mapping::new());
             }
-            current
-                .as_mapping_mut()
-                .unwrap()
-                .insert(key_val.clone(), Value::Mapping(serde_yaml_ng::Mapping::new()));
+            current.as_mapping_mut().unwrap().insert(
+                key_val.clone(),
+                Value::Mapping(serde_yaml_ng::Mapping::new()),
+            );
         }
-        current = current
-            .as_mapping_mut()
-            .unwrap()
-            .get_mut(&key_val)
-            .unwrap();
+        current = current.as_mapping_mut().unwrap().get_mut(&key_val).unwrap();
     }
 
     // Set the final value
@@ -71,8 +67,5 @@ pub fn set_nested(data: &mut Value, path: &[&str], value: Value) {
     if !current.is_mapping() {
         *current = Value::Mapping(serde_yaml_ng::Mapping::new());
     }
-    current
-        .as_mapping_mut()
-        .unwrap()
-        .insert(last_key, value);
+    current.as_mapping_mut().unwrap().insert(last_key, value);
 }

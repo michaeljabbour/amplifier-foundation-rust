@@ -241,10 +241,7 @@ fn remove_orphaned_tool_calls(messages: &[Value], orphaned_ids: &[String]) -> Ve
 /// - `assistant_content`: Truncated assistant response
 /// - `tool_count`: Number of tool calls in turn
 /// - `message_count`: Total messages in turn
-pub fn get_turn_summary(
-    messages: &[Value],
-    turn: usize,
-) -> crate::error::Result<Value> {
+pub fn get_turn_summary(messages: &[Value], turn: usize) -> crate::error::Result<Value> {
     let boundaries = get_turn_boundaries(messages);
     let max_turns = boundaries.len();
 

@@ -52,10 +52,7 @@ fn make_complex_bundle_value() -> Value {
     // providers: nested mapping
     let mut providers_map = serde_yaml_ng::Mapping::new();
     let mut openai = serde_yaml_ng::Mapping::new();
-    openai.insert(
-        Value::String("model".into()),
-        Value::String("gpt-4".into()),
-    );
+    openai.insert(Value::String("model".into()), Value::String("gpt-4".into()));
     openai.insert(
         Value::String("temperature".into()),
         Value::Number(serde_yaml_ng::Number::from(0)),
