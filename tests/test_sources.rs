@@ -5,6 +5,7 @@
 
 use std::fs;
 use std::io::Write;
+use std::path::PathBuf;
 
 use amplifier_foundation::paths::uri::ParsedURI;
 use amplifier_foundation::sources::file::FileSourceHandler;
@@ -311,4 +312,134 @@ async fn test_zip_uses_cache() {
     // Both resolves should yield the same active_path.
     assert_eq!(resolved1.active_path, resolved2.active_path);
     assert!(resolved2.active_path.join("bundle.yaml").exists());
+}
+
+// ===========================================================================
+// TestSimpleSourceResolver
+// ===========================================================================
+
+use amplifier_foundation::error::BundleError;
+use amplifier_foundation::sources::resolver::SimpleSourceResolver;
+
+#[test]
+fn test_resolver_default_creates_resolver() {
+    // Default::default() should produce the same result as new().
+    let _resolver: SimpleSourceResolver = Default::default();
+}
+
+#[tokio::test]
+async fn test_resolver_resolve_file_uri() {
+    let tmp = tempdir().expect("failed to create temp dir");
+
+    // Create a directory that looks like a bundle root.
+    let bundle_dir = tmp.path().join("resolver-test");
+    fs::create_dir_all(&bundle_dir).expect("mkdir");
+    fs::write(bundle_dir.join("bundle.yaml"), "name: test").expect("write");
+
+    let resolver = SimpleSourceResolver::with_base_path(tmp.path().to_path_buf());
+    let uri = format!("file://{}", bundle_dir.display());
+    let resolved = resolver.resolve(&uri).await.expect("resolve should succeed");
+
+    assert_eq!(resolved.active_path, bundle_dir);
+}
+
+#[tokio::test]
+async fn test_resolver_resolve_no_handler_returns_not_found() {
+    let resolver = SimpleSourceResolver::new();
+    // ftp:// is not handled by any default handler
+    let result = resolver.resolve("ftp://example.com/bundle").await;
+    assert!(result.is_err());
+    // Verify the error variant is NotFound
+    match result.unwrap_err() {
+        BundleError::NotFound { uri } => {
+            assert_eq!(uri, "ftp://example.com/bundle");
+        }
+        other => panic!("Expected NotFound, got: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn test_resolver_resolve_local_path() {
+    let tmp = tempdir().expect("failed to create temp dir");
+
+    // Create a directory at a local path
+    let file_path = tmp.path().join("my-bundle");
+    fs::create_dir_all(&file_path).expect("mkdir");
+    fs::write(file_path.join("bundle.yaml"), "name: test").expect("write");
+
+    let resolver = SimpleSourceResolver::with_base_path(tmp.path().to_path_buf());
+    // Local path (no scheme) is resolved by FileSourceHandler
+    let resolved = resolver
+        .resolve(file_path.to_str().unwrap())
+        .await
+        .expect("resolve should succeed");
+
+    assert_eq!(resolved.active_path, file_path);
+}
+
+#[tokio::test]
+async fn test_resolver_resolve_zip_file() {
+    let tmp = tempdir().expect("failed to create temp dir");
+    let cache_dir = tempdir().expect("failed to create cache dir");
+
+    let zip_path = tmp.path().join("test.zip");
+    create_test_zip(&zip_path, &[("bundle.yaml", "name: zipped")]);
+
+    let resolver = SimpleSourceResolver::with_cache_dir(cache_dir.path().to_path_buf());
+    let uri = format!("zip+file://{}", zip_path.display());
+    let resolved = resolver.resolve(&uri).await.expect("resolve should succeed");
+
+    assert!(resolved.active_path.join("bundle.yaml").exists());
+}
+
+#[tokio::test]
+async fn test_resolver_add_handler_takes_priority() {
+    use amplifier_foundation::paths::uri::{ParsedURI, ResolvedSource};
+    use async_trait::async_trait;
+    use std::path::Path;
+
+    /// A custom handler that claims all file:// URIs and returns a fixed path.
+    struct CustomFileHandler {
+        fixed_path: PathBuf,
+    }
+
+    #[async_trait]
+    impl SourceHandler for CustomFileHandler {
+        fn can_handle(&self, parsed: &ParsedURI) -> bool {
+            parsed.is_file()
+        }
+
+        async fn resolve(
+            &self,
+            _parsed: &ParsedURI,
+            _cache_dir: &Path,
+        ) -> amplifier_foundation::error::Result<ResolvedSource> {
+            Ok(ResolvedSource {
+                active_path: self.fixed_path.clone(),
+                source_root: self.fixed_path.clone(),
+            })
+        }
+    }
+
+    let tmp = tempdir().expect("failed to create temp dir");
+    let custom_path = tmp.path().join("custom-override");
+    fs::create_dir_all(&custom_path).expect("mkdir");
+
+    let real_path = tmp.path().join("real-bundle");
+    fs::create_dir_all(&real_path).expect("mkdir");
+    fs::write(real_path.join("bundle.yaml"), "name: real").expect("write");
+
+    let mut resolver = SimpleSourceResolver::with_base_path(tmp.path().to_path_buf());
+
+    // Add a custom handler that overrides file:// resolution
+    resolver.add_handler(Box::new(CustomFileHandler {
+        fixed_path: custom_path.clone(),
+    }));
+
+    // Resolve a file URI -- should hit the custom handler, not the default
+    let uri = format!("file://{}", real_path.display());
+    let resolved = resolver.resolve(&uri).await.expect("resolve should succeed");
+
+    // The custom handler should have been used (returns fixed_path, not real_path)
+    assert_eq!(resolved.active_path, custom_path);
 }

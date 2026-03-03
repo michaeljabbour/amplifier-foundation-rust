@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 6
-phase_name: "Wave 6 -- Hardening + Completeness"
-epoch: 7
-next_action: "Wave 6 COMPLETE. 298 tests passing, 0 clippy warnings, cargo fmt clean. Consider: implement remaining stubs (load_mentions, SimpleSourceResolver, updates), PyO3 bindings"
+phase: 7
+phase_name: "Wave 7 -- Remaining Stubs"
+epoch: 8
+next_action: "Implementing F-029 (SimpleSourceResolver), F-030 (load_mentions), F-031 (updates module)"
 blockers: []
 
 architecture_spec:
@@ -297,6 +297,26 @@ features:
     started_at: "2025-01-17T02:50:00Z"
     completed_at: "2025-01-17T03:10:00Z"
     commit: "0737b6f"
+
+  F-029-source-resolver:
+    name: "Implement SimpleSourceResolver (new + resolve dispatch + add_handler)"
+    module: "sources"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-017-sources"]
+    started_at: "2025-01-17T04:00:00Z"
+  F-030-load-mentions:
+    name: "Implement load_mentions pipeline (parse, resolve, read, deduplicate, recurse)"
+    module: "mentions"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-016-mentions", "F-028-dead-code-cleanup"]
+  F-031-updates-module:
+    name: "Implement updates module (BundleStatus properties, check_bundle_status, update_bundle)"
+    module: "updates"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-017-sources"]
 
 wave_gate:
   current_wave: 6
