@@ -1024,3 +1024,189 @@ fn test_bundle_module_resolver_debug() {
     assert!(debug_str.contains("BundleModuleResolver"));
     assert!(debug_str.contains("tool-bash"));
 }
+
+// ---------------------------------------------------------------------------
+// resolve_agent_path tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_resolve_agent_path_simple_name() {
+    let dir = tempdir().unwrap();
+    let agents_dir = dir.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+    fs::write(agents_dir.join("bug-hunter.md"), "# Bug Hunter").unwrap();
+
+    let mut bundle = Bundle::new("test-bundle");
+    bundle.base_path = Some(dir.path().to_path_buf());
+
+    let result = bundle.resolve_agent_path("bug-hunter");
+    assert!(result.is_some());
+    assert_eq!(result.unwrap(), agents_dir.join("bug-hunter.md"));
+}
+
+#[test]
+fn test_resolve_agent_path_simple_not_found() {
+    let dir = tempdir().unwrap();
+    let agents_dir = dir.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+
+    let mut bundle = Bundle::new("test-bundle");
+    bundle.base_path = Some(dir.path().to_path_buf());
+
+    let result = bundle.resolve_agent_path("nonexistent");
+    assert!(result.is_none());
+}
+
+#[test]
+fn test_resolve_agent_path_no_base_path() {
+    let bundle = Bundle::new("test-bundle");
+    let result = bundle.resolve_agent_path("bug-hunter");
+    assert!(result.is_none());
+}
+
+#[test]
+fn test_resolve_agent_path_namespaced() {
+    let dir = tempdir().unwrap();
+    let foundation_agents = dir.path().join("agents");
+    fs::create_dir_all(&foundation_agents).unwrap();
+    fs::write(foundation_agents.join("explorer.md"), "# Explorer").unwrap();
+
+    let mut bundle = Bundle::new("my-app");
+    bundle
+        .source_base_paths
+        .insert("foundation".to_string(), dir.path().to_path_buf());
+
+    let result = bundle.resolve_agent_path("foundation:explorer");
+    assert!(result.is_some());
+    assert_eq!(result.unwrap(), foundation_agents.join("explorer.md"));
+}
+
+#[test]
+fn test_resolve_agent_path_namespaced_not_found() {
+    let dir = tempdir().unwrap();
+    let agents_dir = dir.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+
+    let mut bundle = Bundle::new("my-app");
+    bundle
+        .source_base_paths
+        .insert("foundation".to_string(), dir.path().to_path_buf());
+
+    let result = bundle.resolve_agent_path("foundation:nonexistent");
+    assert!(result.is_none());
+}
+
+#[test]
+fn test_resolve_agent_path_namespaced_self_fallback() {
+    let dir = tempdir().unwrap();
+    let agents_dir = dir.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+    fs::write(agents_dir.join("helper.md"), "# Helper").unwrap();
+
+    let mut bundle = Bundle::new("my-app");
+    bundle.base_path = Some(dir.path().to_path_buf());
+
+    // Namespace matches bundle name -- should fall back to base_path
+    let result = bundle.resolve_agent_path("my-app:helper");
+    assert!(result.is_some());
+    assert_eq!(result.unwrap(), agents_dir.join("helper.md"));
+}
+
+#[test]
+fn test_resolve_agent_path_namespaced_unknown_namespace() {
+    let mut bundle = Bundle::new("my-app");
+    bundle.base_path = Some(PathBuf::from("/some/path"));
+
+    // Unknown namespace, not matching bundle name
+    let result = bundle.resolve_agent_path("unknown:agent");
+    assert!(result.is_none());
+}
+
+#[test]
+fn test_resolve_agent_path_source_base_paths_priority() {
+    // source_base_paths should be checked before self-name fallback
+    let sbp_dir = tempdir().unwrap();
+    let sbp_agents = sbp_dir.path().join("agents");
+    fs::create_dir_all(&sbp_agents).unwrap();
+    fs::write(sbp_agents.join("agent.md"), "# SBP Agent").unwrap();
+
+    let bp_dir = tempdir().unwrap();
+    let bp_agents = bp_dir.path().join("agents");
+    fs::create_dir_all(&bp_agents).unwrap();
+    fs::write(bp_agents.join("agent.md"), "# BP Agent").unwrap();
+
+    let mut bundle = Bundle::new("my-app");
+    bundle.base_path = Some(bp_dir.path().to_path_buf());
+    bundle
+        .source_base_paths
+        .insert("my-app".to_string(), sbp_dir.path().to_path_buf());
+
+    // source_base_paths["my-app"] should win over base_path
+    let result = bundle.resolve_agent_path("my-app:agent");
+    assert!(result.is_some());
+    assert_eq!(result.unwrap(), sbp_agents.join("agent.md"));
+}
+
+#[test]
+fn test_resolve_agent_path_sbp_miss_self_fallthrough() {
+    // Scenario B: source_base_paths has the namespace, but file doesn't exist there.
+    // Should fall through to base_path since namespace == self.name.
+    let sbp_dir = tempdir().unwrap();
+    let sbp_agents = sbp_dir.path().join("agents");
+    fs::create_dir_all(&sbp_agents).unwrap();
+    // NOTE: no agent.md in sbp_agents
+
+    let bp_dir = tempdir().unwrap();
+    let bp_agents = bp_dir.path().join("agents");
+    fs::create_dir_all(&bp_agents).unwrap();
+    fs::write(bp_agents.join("agent.md"), "# BP Agent").unwrap();
+
+    let mut bundle = Bundle::new("my-app");
+    bundle.base_path = Some(bp_dir.path().to_path_buf());
+    bundle
+        .source_base_paths
+        .insert("my-app".to_string(), sbp_dir.path().to_path_buf());
+
+    // SBP lookup finds namespace but file missing -> falls through to self.name check
+    let result = bundle.resolve_agent_path("my-app:agent");
+    assert!(result.is_some());
+    assert_eq!(result.unwrap(), bp_agents.join("agent.md"));
+}
+
+#[test]
+fn test_resolve_agent_path_multiple_colons() {
+    // "ns:sub:path" -> namespace="ns", simple_name="sub:path"
+    // This matches Python's split(":", 1) behavior
+    let dir = tempdir().unwrap();
+    let agents_dir = dir.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+    // Can't create "sub:path.md" on all platforms, so test returns None
+    let mut bundle = Bundle::new("my-app");
+    bundle
+        .source_base_paths
+        .insert("ns".to_string(), dir.path().to_path_buf());
+
+    let result = bundle.resolve_agent_path("ns:sub:path");
+    // File "sub:path.md" doesn't exist, so None
+    assert!(result.is_none());
+}
+
+// ---------------------------------------------------------------------------
+// get_system_instruction tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_get_system_instruction_none() {
+    let bundle = Bundle::new("test");
+    assert!(bundle.get_system_instruction().is_none());
+}
+
+#[test]
+fn test_get_system_instruction_some() {
+    let mut bundle = Bundle::new("test");
+    bundle.instruction = Some("You are a helpful assistant.".to_string());
+    assert_eq!(
+        bundle.get_system_instruction(),
+        Some("You are a helpful assistant.")
+    );
+}

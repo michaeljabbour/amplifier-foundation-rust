@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 13
-phase_name: "Wave 13 -- Bundle-level update system (collect_source_uris, Bundle check_bundle_status, selective update_bundle)"
-epoch: 14
-next_action: "Wave 13 COMPLETE. 483 tests passing, 0 clippy warnings, cargo fmt clean. Consider: PreparedBundle port, PyO3 bindings, benchmarks, handler registry refactor"
+phase: 14
+phase_name: "Wave 14 -- Bundle API completeness (resolve_agent_path, agent metadata, registry find/validate)"
+epoch: 15
+next_action: "Implement F-050 (resolve_agent_path + get_system_instruction)"
 blockers: []
 
 architecture_spec:
@@ -502,16 +502,38 @@ features:
     completed_at: "2025-01-21T01:30:00Z"
     commit: "8272ae4"
 
+  F-050-resolve-agent-path:
+    name: "Port Bundle.resolve_agent_path() + Bundle.get_system_instruction()"
+    module: "bundle"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-018-bundle"]
+    started_at: "2025-01-22T00:00:00Z"
+
+  F-051-registry-find-validate:
+    name: "Port BundleState timestamps + BundleRegistry.find() + validate_cached_paths()"
+    module: "registry"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-020-registry"]
+
+  F-052-agent-metadata:
+    name: "Port Bundle.load_agent_metadata() + _load_agent_file_metadata()"
+    module: "bundle"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-050-resolve-agent-path"]
+
 wave_gate:
-  current_wave: 13
+  current_wave: 14
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
-  approval_status: "approved"
-  notes: "Wave 13 COMPLETE: 483 tests, 0 clippy warnings, cargo fmt clean. Bundle-level update system: collect_source_uris, check_bundle_status_for_bundle, update_bundle_for_bundle."
+  approval_status: "in-progress"
+  notes: "Wave 14: Bundle API completeness -- resolve_agent_path, agent metadata, registry find/validate"
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
   total_features_completed: 49
-  last_updated: "2025-01-21T01:30:00Z"
-  last_session: "session-018-wave13-bundle-updates"
+  last_updated: "2025-01-22T00:00:00Z"
+  last_session: "session-019-wave14-bundle-api"

@@ -573,6 +573,57 @@ impl Bundle {
         result
     }
 
+    /// Resolve agent file by name.
+    ///
+    /// Handles both namespaced and simple names:
+    /// - `"foundation:bug-hunter"` → looks in `source_base_paths["foundation"]/agents/`
+    /// - `"bug-hunter"` → looks in `self.base_path/agents/`
+    ///
+    /// For namespaced agents, `source_base_paths` is checked first. If the namespace
+    /// matches `self.name` and the source_base_paths lookup fails, falls back to
+    /// `self.base_path`.
+    ///
+    /// Returns `None` if the agent `.md` file does not exist at the resolved path.
+    pub fn resolve_agent_path(&self, name: &str) -> Option<PathBuf> {
+        if let Some((namespace, simple_name)) = name.split_once(':') {
+            // Namespaced agent (e.g., "foundation:bug-hunter")
+
+            // First, try source_base_paths for included bundles
+            if let Some(base) = self.source_base_paths.get(namespace) {
+                let agent_path = base.join("agents").join(format!("{simple_name}.md"));
+                if agent_path.exists() {
+                    return Some(agent_path);
+                }
+            }
+
+            // Fall back to self.base_path if namespace matches self.name
+            if namespace == self.name {
+                if let Some(bp) = &self.base_path {
+                    let agent_path = bp.join("agents").join(format!("{simple_name}.md"));
+                    if agent_path.exists() {
+                        return Some(agent_path);
+                    }
+                }
+            }
+        } else if let Some(bp) = &self.base_path {
+            // No namespace -- look in self.base_path
+            let agent_path = bp.join("agents").join(format!("{name}.md"));
+            if agent_path.exists() {
+                return Some(agent_path);
+            }
+        }
+
+        None
+    }
+
+    /// Get the system instruction for this bundle.
+    ///
+    /// Returns the instruction text, or `None` if not set.
+    /// This is the content from the markdown body of the bundle file.
+    pub fn get_system_instruction(&self) -> Option<&str> {
+        self.instruction.as_deref()
+    }
+
     /// Resolve a context file reference.
     /// 1. Check registered context dict (exact match)
     /// 2. Try constructing path from base_path
