@@ -6,6 +6,48 @@
 
 ---
 
+## Session 004 -- Wave 1 Implementation (F-007, F-008, F-009)
+
+### Work Completed
+- **F-007-paths** (ae90ca4): Implemented paths module -- parse_uri, normalize_path, get_amplifier_home, construct_agent_path, construct_context_path, find_files, find_bundle_root. 15 tests un-ignored, all pass.
+- **F-008-cache** (b18db8f): Implemented cache module -- SimpleCache (in-memory HashMap) and DiskCache (filesystem JSON with SHA-256 key hashing). 12 tests un-ignored, all pass.
+- **F-009-serialization** (0993c59): Implemented serialization module -- sanitize_for_json (recursive null filtering, max depth protection) and sanitize_message (thinking_block text extraction, content_blocks skipping). 16 tests un-ignored, all pass.
+
+### Test Counts
+- Wave 1 running: 18 (dicts) + 15 (paths) + 12 (cache) + 16 (serialization) = 61 passing
+- Wave 1 remaining ignored: 9 (tracing) + 17 (spawn) = 26
+- Wave 2 still ignored: 96
+- Wave 3 still ignored: 65
+
+### Design Decisions Made
+- **parse_uri uses manual string parsing**: No `url` crate. Handles git+, zip+, file://, http/s, local paths, package names via string operations and split/find. Query strings stripped from URL paths to match Python's urlparse behavior.
+- **normalize_path does NOT resolve symlinks**: Python's `Path.resolve()` resolves symlinks, but using `std::fs::canonicalize` would fail for non-existent paths and produce different results on macOS (where `/home` is a symlink). Uses pure lexical normalization (`normalize_components`) instead. Tests pass on all platforms.
+- **DiskCache serializes serde_yaml_ng::Value through serde_json**: The CacheProvider trait uses `serde_yaml_ng::Value` (not `Bundle`), so disk serialization goes through `serde_json::to_string_pretty`/`serde_json::from_str`. Round-trip is exact for the JSON-safe subset of YAML values (strings, numbers, bools, nulls, maps with string keys, arrays). Non-JSON-safe YAML features (NaN, Infinity, non-string keys, tagged values) would be lossy -- same limitation as Python's `json.dumps`.
+- **DiskCache cache_key_to_path uses sha2 crate**: SHA-256 hash of key, first 16 hex chars as hash portion. First 30 chars of key as safe prefix (non-alphanumeric except `-_` replaced with `_`).
+- **serialization module uses serde_json::Value**: NOT serde_yaml_ng::Value. This matches the spec and Python behavior -- serialization is specifically for JSON data.
+- **sanitize_for_json filters null from containers but passes null at top level**: `sanitize_for_json(&Value::Null)` returns `Value::Null`, but null values inside objects and arrays are filtered out. Matches Python behavior where `None` passes through as a return value but is filtered from dicts/lists.
+- **sanitize_message thinking_text extraction not re-sanitized**: The extracted `text` value from `thinking_block` is inserted directly without going through `sanitize_for_json`, matching Python's behavior exactly.
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- `parse_uri("")` returns a ParsedURI with empty fields where `is_package()` returns true. Same behavior as Python.
+- `construct_agent_path` appends `.md` even if name has a different extension (e.g., `.yaml`). Same behavior as Python.
+- `DiskCache.contains()` checks file existence, `get()` validates content and may delete corrupt files. These can disagree. Same pattern as Python.
+- `ResolvedSource` defined in `paths/uri.rs` not `sources/` -- spec explicitly says "defined here because it's a path type."
+
+### What's Next
+- F-010 (tracing_utils): generate_sub_session_id -- 9 tests
+- F-011 (spawn): ProviderPreference, apply_provider_preferences -- 17 tests
+- After those, all Wave 1 features (87 tests) should pass
+
+---
+
+## Session 003 -- Wave 1 Start (F-006)
+
+### Work Completed
+- **F-006-dicts** (23d1a7a): Implemented dicts module -- deep_merge, merge_module_lists, get_nested, set_nested. 18 tests un-ignored, all pass.
+
+---
+
 ## Session 002 -- Wave 0 Test Porting (F-004, F-005)
 
 ### Work Completed

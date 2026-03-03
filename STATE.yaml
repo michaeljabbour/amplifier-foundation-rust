@@ -13,7 +13,7 @@
 phase: 1
 phase_name: "Wave 1 -- Leaf Modules (all sync)"
 epoch: 2
-next_action: "Implement F-009-serialization"
+next_action: "Implement F-010-tracing-utils"
 blockers: []
 
 architecture_spec:
@@ -116,10 +116,12 @@ features:
   F-009-serialization:
     name: "Implement serialization module (sanitize_for_json, sanitize_message)"
     module: "serialization"
-    status: "in-progress"
+    status: "done"
     spec: "specs/modules/serialization.md"
     depends_on: ["F-003-test-port-wave1"]
     started_at: "2025-01-16T01:40:00Z"
+    completed_at: "2025-01-16T02:00:00Z"
+    commit: "0993c59"
   F-010-tracing-utils:
     name: "Implement tracing_utils module (generate_sub_session_id)"
     module: "tracing_utils"
@@ -143,6 +145,6 @@ wave_gate:
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 7
-  last_updated: "2025-01-16T01:00:00Z"
+  total_features_completed: 9
+  last_updated: "2025-01-16T02:00:00Z"
   last_session: "session-004-wave1-paths-cache-serialization"
