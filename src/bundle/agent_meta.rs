@@ -6,7 +6,7 @@ use super::Bundle;
 use crate::io::frontmatter::parse_frontmatter;
 
 impl Bundle {
-    /// Resolve agent file by name.
+    /// Resolve agent file by name using async I/O for existence checks.
     ///
     /// Handles both namespaced and simple names:
     /// - `"foundation:bug-hunter"` → looks in `source_base_paths["foundation"]/agents/`
@@ -17,14 +17,15 @@ impl Bundle {
     /// `self.base_path`.
     ///
     /// Returns `None` if the agent `.md` file does not exist at the resolved path.
-    pub fn resolve_agent_path(&self, name: &str) -> Option<PathBuf> {
+    /// Uses `tokio::fs::metadata` for non-blocking existence checks.
+    pub async fn resolve_agent_path(&self, name: &str) -> Option<PathBuf> {
         if let Some((namespace, simple_name)) = name.split_once(':') {
             // Namespaced agent (e.g., "foundation:bug-hunter")
 
             // First, try source_base_paths for included bundles
             if let Some(base) = self.source_base_paths.get(namespace) {
                 let agent_path = base.join("agents").join(format!("{simple_name}.md"));
-                if agent_path.exists() {
+                if tokio::fs::metadata(&agent_path).await.is_ok() {
                     return Some(agent_path);
                 }
             }
@@ -33,7 +34,7 @@ impl Bundle {
             if namespace == self.name {
                 if let Some(bp) = &self.base_path {
                     let agent_path = bp.join("agents").join(format!("{simple_name}.md"));
-                    if agent_path.exists() {
+                    if tokio::fs::metadata(&agent_path).await.is_ok() {
                         return Some(agent_path);
                     }
                 }
@@ -41,7 +42,7 @@ impl Bundle {
         } else if let Some(bp) = &self.base_path {
             // No namespace -- look in self.base_path
             let agent_path = bp.join("agents").join(format!("{name}.md"));
-            if agent_path.exists() {
+            if tokio::fs::metadata(&agent_path).await.is_ok() {
                 return Some(agent_path);
             }
         }
@@ -66,7 +67,9 @@ impl Bundle {
     ///
     /// Agents with inline definitions (description already set) are preserved;
     /// file metadata only fills in missing or falsy fields.
-    pub fn load_agent_metadata(&mut self) {
+    ///
+    /// Uses `tokio::fs` for non-blocking file reads.
+    pub async fn load_agent_metadata(&mut self) {
         if self.agents.is_empty() {
             return;
         }
@@ -74,16 +77,12 @@ impl Bundle {
         let agent_names: Vec<String> = self.agents.keys().cloned().collect();
 
         for agent_name in &agent_names {
-            // resolve_agent_path already checks .exists() at every return site.
-            // The guard here is a TOCTOU safety belt: the file could be deleted
-            // between resolution and read. load_agent_file_metadata handles that
-            // via read_to_string returning Err, but this avoids the round-trip.
-            let path = match self.resolve_agent_path(agent_name) {
-                Some(p) if p.exists() => p,
+            let path = match self.resolve_agent_path(agent_name).await {
+                Some(p) => p,
                 _ => continue,
             };
 
-            match load_agent_file_metadata(&path, agent_name) {
+            match load_agent_file_metadata(&path, agent_name).await {
                 Ok(file_metadata) => {
                     if let Some(agent_config) = self.agents.get_mut(agent_name) {
                         merge_agent_metadata(agent_config, &file_metadata);
@@ -97,7 +96,7 @@ impl Bundle {
     }
 }
 
-/// Load agent config from a `.md` file.
+/// Load agent config from a `.md` file using async I/O.
 ///
 /// Extracts both metadata (name, description) from the `meta:` section AND
 /// mount plan sections (tools, providers, hooks, session) from top-level
@@ -106,13 +105,15 @@ impl Bundle {
 ///
 /// Returns a `Value::Mapping` with name, description, instruction (from body),
 /// and optionally tools, providers, hooks, session if defined.
-pub(super) fn load_agent_file_metadata(
+pub(super) async fn load_agent_file_metadata(
     path: &std::path::Path,
     fallback_name: &str,
 ) -> crate::error::Result<Value> {
-    let text = std::fs::read_to_string(path).map_err(|e| crate::error::BundleError::LoadError {
-        reason: format!("Failed to read agent file {}: {}", path.display(), e),
-        source: Some(Box::new(e)),
+    let text = tokio::fs::read_to_string(path).await.map_err(|e| {
+        crate::error::BundleError::LoadError {
+            reason: format!("Failed to read agent file {}: {}", path.display(), e),
+            source: Some(Box::new(e)),
+        }
     })?;
 
     let (frontmatter_opt, body) = parse_frontmatter(&text)?;

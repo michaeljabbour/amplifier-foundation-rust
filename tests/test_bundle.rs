@@ -1029,8 +1029,8 @@ fn test_bundle_module_resolver_debug() {
 // resolve_agent_path tests
 // ---------------------------------------------------------------------------
 
-#[test]
-fn test_resolve_agent_path_simple_name() {
+#[tokio::test]
+async fn test_resolve_agent_path_simple_name() {
     let dir = tempdir().unwrap();
     let agents_dir = dir.path().join("agents");
     fs::create_dir_all(&agents_dir).unwrap();
@@ -1039,13 +1039,13 @@ fn test_resolve_agent_path_simple_name() {
     let mut bundle = Bundle::new("test-bundle");
     bundle.base_path = Some(dir.path().to_path_buf());
 
-    let result = bundle.resolve_agent_path("bug-hunter");
+    let result = bundle.resolve_agent_path("bug-hunter").await;
     assert!(result.is_some());
     assert_eq!(result.unwrap(), agents_dir.join("bug-hunter.md"));
 }
 
-#[test]
-fn test_resolve_agent_path_simple_not_found() {
+#[tokio::test]
+async fn test_resolve_agent_path_simple_not_found() {
     let dir = tempdir().unwrap();
     let agents_dir = dir.path().join("agents");
     fs::create_dir_all(&agents_dir).unwrap();
@@ -1053,19 +1053,19 @@ fn test_resolve_agent_path_simple_not_found() {
     let mut bundle = Bundle::new("test-bundle");
     bundle.base_path = Some(dir.path().to_path_buf());
 
-    let result = bundle.resolve_agent_path("nonexistent");
+    let result = bundle.resolve_agent_path("nonexistent").await;
     assert!(result.is_none());
 }
 
-#[test]
-fn test_resolve_agent_path_no_base_path() {
+#[tokio::test]
+async fn test_resolve_agent_path_no_base_path() {
     let bundle = Bundle::new("test-bundle");
-    let result = bundle.resolve_agent_path("bug-hunter");
+    let result = bundle.resolve_agent_path("bug-hunter").await;
     assert!(result.is_none());
 }
 
-#[test]
-fn test_resolve_agent_path_namespaced() {
+#[tokio::test]
+async fn test_resolve_agent_path_namespaced() {
     let dir = tempdir().unwrap();
     let foundation_agents = dir.path().join("agents");
     fs::create_dir_all(&foundation_agents).unwrap();
@@ -1076,13 +1076,13 @@ fn test_resolve_agent_path_namespaced() {
         .source_base_paths
         .insert("foundation".to_string(), dir.path().to_path_buf());
 
-    let result = bundle.resolve_agent_path("foundation:explorer");
+    let result = bundle.resolve_agent_path("foundation:explorer").await;
     assert!(result.is_some());
     assert_eq!(result.unwrap(), foundation_agents.join("explorer.md"));
 }
 
-#[test]
-fn test_resolve_agent_path_namespaced_not_found() {
+#[tokio::test]
+async fn test_resolve_agent_path_namespaced_not_found() {
     let dir = tempdir().unwrap();
     let agents_dir = dir.path().join("agents");
     fs::create_dir_all(&agents_dir).unwrap();
@@ -1092,12 +1092,12 @@ fn test_resolve_agent_path_namespaced_not_found() {
         .source_base_paths
         .insert("foundation".to_string(), dir.path().to_path_buf());
 
-    let result = bundle.resolve_agent_path("foundation:nonexistent");
+    let result = bundle.resolve_agent_path("foundation:nonexistent").await;
     assert!(result.is_none());
 }
 
-#[test]
-fn test_resolve_agent_path_namespaced_self_fallback() {
+#[tokio::test]
+async fn test_resolve_agent_path_namespaced_self_fallback() {
     let dir = tempdir().unwrap();
     let agents_dir = dir.path().join("agents");
     fs::create_dir_all(&agents_dir).unwrap();
@@ -1107,23 +1107,23 @@ fn test_resolve_agent_path_namespaced_self_fallback() {
     bundle.base_path = Some(dir.path().to_path_buf());
 
     // Namespace matches bundle name -- should fall back to base_path
-    let result = bundle.resolve_agent_path("my-app:helper");
+    let result = bundle.resolve_agent_path("my-app:helper").await;
     assert!(result.is_some());
     assert_eq!(result.unwrap(), agents_dir.join("helper.md"));
 }
 
-#[test]
-fn test_resolve_agent_path_namespaced_unknown_namespace() {
+#[tokio::test]
+async fn test_resolve_agent_path_namespaced_unknown_namespace() {
     let mut bundle = Bundle::new("my-app");
     bundle.base_path = Some(PathBuf::from("/some/path"));
 
     // Unknown namespace, not matching bundle name
-    let result = bundle.resolve_agent_path("unknown:agent");
+    let result = bundle.resolve_agent_path("unknown:agent").await;
     assert!(result.is_none());
 }
 
-#[test]
-fn test_resolve_agent_path_source_base_paths_priority() {
+#[tokio::test]
+async fn test_resolve_agent_path_source_base_paths_priority() {
     // source_base_paths should be checked before self-name fallback
     let sbp_dir = tempdir().unwrap();
     let sbp_agents = sbp_dir.path().join("agents");
@@ -1142,13 +1142,13 @@ fn test_resolve_agent_path_source_base_paths_priority() {
         .insert("my-app".to_string(), sbp_dir.path().to_path_buf());
 
     // source_base_paths["my-app"] should win over base_path
-    let result = bundle.resolve_agent_path("my-app:agent");
+    let result = bundle.resolve_agent_path("my-app:agent").await;
     assert!(result.is_some());
     assert_eq!(result.unwrap(), sbp_agents.join("agent.md"));
 }
 
-#[test]
-fn test_resolve_agent_path_sbp_miss_self_fallthrough() {
+#[tokio::test]
+async fn test_resolve_agent_path_sbp_miss_self_fallthrough() {
     // Scenario B: source_base_paths has the namespace, but file doesn't exist there.
     // Should fall through to base_path since namespace == self.name.
     let sbp_dir = tempdir().unwrap();
@@ -1168,13 +1168,13 @@ fn test_resolve_agent_path_sbp_miss_self_fallthrough() {
         .insert("my-app".to_string(), sbp_dir.path().to_path_buf());
 
     // SBP lookup finds namespace but file missing -> falls through to self.name check
-    let result = bundle.resolve_agent_path("my-app:agent");
+    let result = bundle.resolve_agent_path("my-app:agent").await;
     assert!(result.is_some());
     assert_eq!(result.unwrap(), bp_agents.join("agent.md"));
 }
 
-#[test]
-fn test_resolve_agent_path_multiple_colons() {
+#[tokio::test]
+async fn test_resolve_agent_path_multiple_colons() {
     // "ns:sub:path" -> namespace="ns", simple_name="sub:path"
     // This matches Python's split(":", 1) behavior
     let dir = tempdir().unwrap();
@@ -1186,7 +1186,7 @@ fn test_resolve_agent_path_multiple_colons() {
         .source_base_paths
         .insert("ns".to_string(), dir.path().to_path_buf());
 
-    let result = bundle.resolve_agent_path("ns:sub:path");
+    let result = bundle.resolve_agent_path("ns:sub:path").await;
     // File "sub:path.md" doesn't exist, so None
     assert!(result.is_none());
 }
@@ -1215,8 +1215,8 @@ fn test_get_system_instruction_some() {
 // load_agent_metadata tests
 // ---------------------------------------------------------------------------
 
-#[test]
-fn test_load_agent_metadata_basic() {
+#[tokio::test]
+async fn test_load_agent_metadata_basic() {
     let dir = tempdir().unwrap();
     let agents_dir = dir.path().join("agents");
     fs::create_dir_all(&agents_dir).unwrap();
@@ -1233,7 +1233,7 @@ fn test_load_agent_metadata_basic() {
         .agents
         .insert("helper".to_string(), Value::Mapping(Mapping::new()));
 
-    bundle.load_agent_metadata();
+    bundle.load_agent_metadata().await;
 
     let agent = bundle.agents.get("helper").unwrap();
     let agent_map = agent.as_mapping().unwrap();
@@ -1251,8 +1251,8 @@ fn test_load_agent_metadata_basic() {
     );
 }
 
-#[test]
-fn test_load_agent_metadata_fills_gaps_only() {
+#[tokio::test]
+async fn test_load_agent_metadata_fills_gaps_only() {
     let dir = tempdir().unwrap();
     let agents_dir = dir.path().join("agents");
     fs::create_dir_all(&agents_dir).unwrap();
@@ -1276,7 +1276,7 @@ fn test_load_agent_metadata_fills_gaps_only() {
         .agents
         .insert("agent".to_string(), Value::Mapping(existing));
 
-    bundle.load_agent_metadata();
+    bundle.load_agent_metadata().await;
 
     let agent = bundle.agents.get("agent").unwrap();
     let agent_map = agent.as_mapping().unwrap();
@@ -1296,16 +1296,16 @@ fn test_load_agent_metadata_fills_gaps_only() {
     );
 }
 
-#[test]
-fn test_load_agent_metadata_no_agents() {
+#[tokio::test]
+async fn test_load_agent_metadata_no_agents() {
     let mut bundle = Bundle::new("test-bundle");
     // Should not panic with no agents
-    bundle.load_agent_metadata();
+    bundle.load_agent_metadata().await;
     assert!(bundle.agents.is_empty());
 }
 
-#[test]
-fn test_load_agent_metadata_agent_file_not_found() {
+#[tokio::test]
+async fn test_load_agent_metadata_agent_file_not_found() {
     let dir = tempdir().unwrap();
     let agents_dir = dir.path().join("agents");
     fs::create_dir_all(&agents_dir).unwrap();
@@ -1318,15 +1318,15 @@ fn test_load_agent_metadata_agent_file_not_found() {
         .insert("missing".to_string(), Value::Mapping(Mapping::new()));
 
     // Should not panic, just skip the agent
-    bundle.load_agent_metadata();
+    bundle.load_agent_metadata().await;
 
     let agent = bundle.agents.get("missing").unwrap();
     // Agent should remain unchanged (empty mapping)
     assert!(agent.as_mapping().unwrap().is_empty());
 }
 
-#[test]
-fn test_load_agent_metadata_flat_frontmatter() {
+#[tokio::test]
+async fn test_load_agent_metadata_flat_frontmatter() {
     // Some agents have flat frontmatter (name/description at top level, not under meta:)
     let dir = tempdir().unwrap();
     let agents_dir = dir.path().join("agents");
@@ -1344,7 +1344,7 @@ fn test_load_agent_metadata_flat_frontmatter() {
         .agents
         .insert("flat".to_string(), Value::Mapping(Mapping::new()));
 
-    bundle.load_agent_metadata();
+    bundle.load_agent_metadata().await;
 
     let agent = bundle.agents.get("flat").unwrap();
     let agent_map = agent.as_mapping().unwrap();
@@ -1356,8 +1356,8 @@ fn test_load_agent_metadata_flat_frontmatter() {
     );
 }
 
-#[test]
-fn test_load_agent_metadata_with_mount_plan_sections() {
+#[tokio::test]
+async fn test_load_agent_metadata_with_mount_plan_sections() {
     // Agents can define their own tools/providers/hooks/session
     let dir = tempdir().unwrap();
     let agents_dir = dir.path().join("agents");
@@ -1375,7 +1375,7 @@ fn test_load_agent_metadata_with_mount_plan_sections() {
         .agents
         .insert("tooled".to_string(), Value::Mapping(Mapping::new()));
 
-    bundle.load_agent_metadata();
+    bundle.load_agent_metadata().await;
 
     let agent = bundle.agents.get("tooled").unwrap();
     let agent_map = agent.as_mapping().unwrap();
@@ -1385,8 +1385,8 @@ fn test_load_agent_metadata_with_mount_plan_sections() {
         .is_some());
 }
 
-#[test]
-fn test_load_agent_metadata_non_mapping_config_preserved() {
+#[tokio::test]
+async fn test_load_agent_metadata_non_mapping_config_preserved() {
     // If agent_config is not a mapping (e.g., null or string), it should be
     // preserved as-is (matching Python where TypeError is caught)
     let dir = tempdir().unwrap();
@@ -1402,14 +1402,14 @@ fn test_load_agent_metadata_non_mapping_config_preserved() {
     bundle.base_path = Some(dir.path().to_path_buf());
     bundle.agents.insert("nullagent".to_string(), Value::Null);
 
-    bundle.load_agent_metadata();
+    bundle.load_agent_metadata().await;
 
     // Non-mapping agent should be preserved (not replaced by file metadata)
     assert!(bundle.agents.get("nullagent").unwrap().is_null());
 }
 
-#[test]
-fn test_load_agent_metadata_malformed_yaml() {
+#[tokio::test]
+async fn test_load_agent_metadata_malformed_yaml() {
     // Malformed YAML frontmatter should be caught and logged, not panic
     let dir = tempdir().unwrap();
     let agents_dir = dir.path().join("agents");
@@ -1427,7 +1427,7 @@ fn test_load_agent_metadata_malformed_yaml() {
         .insert("broken".to_string(), Value::Mapping(Mapping::new()));
 
     // Should not panic -- error is caught and logged as warning
-    bundle.load_agent_metadata();
+    bundle.load_agent_metadata().await;
 
     // Agent should remain unchanged (empty mapping)
     assert!(bundle
@@ -1439,8 +1439,8 @@ fn test_load_agent_metadata_malformed_yaml() {
         .is_empty());
 }
 
-#[test]
-fn test_load_agent_metadata_empty_string_overwritten() {
+#[tokio::test]
+async fn test_load_agent_metadata_empty_string_overwritten() {
     // Empty string values should be considered falsy and overwritten by file metadata
     let dir = tempdir().unwrap();
     let agents_dir = dir.path().join("agents");
@@ -1463,7 +1463,7 @@ fn test_load_agent_metadata_empty_string_overwritten() {
         .agents
         .insert("agent".to_string(), Value::Mapping(existing));
 
-    bundle.load_agent_metadata();
+    bundle.load_agent_metadata().await;
 
     let agent = bundle.agents.get("agent").unwrap();
     let agent_map = agent.as_mapping().unwrap();
@@ -1476,8 +1476,8 @@ fn test_load_agent_metadata_empty_string_overwritten() {
     );
 }
 
-#[test]
-fn test_load_agent_metadata_no_frontmatter() {
+#[tokio::test]
+async fn test_load_agent_metadata_no_frontmatter() {
     // Agent .md with no frontmatter -- just body
     let dir = tempdir().unwrap();
     let agents_dir = dir.path().join("agents");
@@ -1491,7 +1491,7 @@ fn test_load_agent_metadata_no_frontmatter() {
         .agents
         .insert("plain".to_string(), Value::Mapping(Mapping::new()));
 
-    bundle.load_agent_metadata();
+    bundle.load_agent_metadata().await;
 
     let agent = bundle.agents.get("plain").unwrap();
     let agent_map = agent.as_mapping().unwrap();
