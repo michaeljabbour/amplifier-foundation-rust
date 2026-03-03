@@ -683,16 +683,19 @@ features:
   F-068-async-find-nearest:
     name: "Convert find_nearest_bundle_file to async (tokio::fs for exists/canonicalize)"
     module: "registry"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-059-registry-decompose"]
     started_at: "2025-01-28T00:00:00Z"
+    completed_at: "2025-01-28T00:30:00Z"
+    commit: "1cb2df6"
   F-069-async-find-resource:
     name: "Convert find_resource_path to async (tokio::fs for exists/canonicalize)"
     module: "registry"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-059-registry-decompose"]
+    started_at: "2025-01-28T00:30:00Z"
   F-070-async-resolve-include:
     name: "Convert resolve_include_source to async (uses async find_resource_path + is_file)"
     module: "registry"

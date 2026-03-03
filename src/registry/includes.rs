@@ -67,8 +67,11 @@ impl BundleRegistry {
     /// Returns `None` only when a `namespace:path` reference cannot be
     /// resolved (namespace not registered, or path not found within namespace).
     ///
+    /// Uses `tokio::fs` for non-blocking I/O (is_file checks and
+    /// find_resource_path existence probing).
+    ///
     /// Port of Python `_resolve_include_source`.
-    pub fn resolve_include_source(&self, source: &str) -> Option<String> {
+    pub async fn resolve_include_source(&self, source: &str) -> Option<String> {
         // Tier 1: Already a URI — return as-is
         if source.contains("://") || source.starts_with("git+") {
             return Some(source.to_string());
@@ -79,9 +82,8 @@ impl BundleRegistry {
             let (namespace, rel_path) = source.split_once(':')?;
 
             // Clone needed fields from BundleState and drop the read lock
-            // before any filesystem I/O (find_resource_path does Path::exists,
-            // fs::canonicalize, etc.). This prevents holding the lock during
-            // blocking syscalls.
+            // before any async filesystem I/O (find_resource_path, metadata
+            // checks). This prevents holding the lock across await points.
             let (state_uri, state_local_path) = {
                 let bundles = self.bundles.read().unwrap_or_else(|e| e.into_inner());
                 let state = bundles.get(namespace)?;
@@ -95,7 +97,11 @@ impl BundleRegistry {
                 if let Some(ref local_path) = state_local_path {
                     // local_path exists — try to find resource on disk
                     let namespace_path = Path::new(local_path);
-                    let resource_path = if namespace_path.is_file() {
+                    let is_file = tokio::fs::metadata(namespace_path)
+                        .await
+                        .map(|m| m.is_file())
+                        .unwrap_or(false);
+                    let resource_path = if is_file {
                         namespace_path
                             .parent()
                             .unwrap_or(namespace_path)
@@ -104,9 +110,9 @@ impl BundleRegistry {
                         namespace_path.join(rel_path)
                     };
 
-                    if let Some(found) = find_resource_path(&resource_path) {
+                    if let Some(found) = find_resource_path(&resource_path).await {
                         // Compute relative path from namespace root for subdirectory fragment
-                        let namespace_root = if namespace_path.is_file() {
+                        let namespace_root = if is_file {
                             namespace_path.parent().unwrap_or(namespace_path)
                         } else {
                             namespace_path
@@ -143,7 +149,11 @@ impl BundleRegistry {
             // Branch B: Non-git namespace — fall back to file:// path
             if let Some(ref local_path) = state_local_path {
                 let namespace_path = Path::new(local_path);
-                let resource_path = if namespace_path.is_file() {
+                let is_file = tokio::fs::metadata(namespace_path)
+                    .await
+                    .map(|m| m.is_file())
+                    .unwrap_or(false);
+                let resource_path = if is_file {
                     namespace_path
                         .parent()
                         .unwrap_or(namespace_path)
@@ -152,7 +162,7 @@ impl BundleRegistry {
                     namespace_path.join(rel_path)
                 };
 
-                if let Some(found) = find_resource_path(&resource_path) {
+                if let Some(found) = find_resource_path(&resource_path).await {
                     return Some(format!("file://{}", found.display()));
                 }
 
@@ -329,7 +339,7 @@ impl BundleRegistry {
                     }
                 };
 
-                match self.resolve_include_source(&source) {
+                match self.resolve_include_source(&source).await {
                     Some(uri) => include_sources.push(uri),
                     None => {
                         // Distinguish: namespace exists but path not found (error)

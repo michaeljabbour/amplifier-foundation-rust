@@ -866,16 +866,16 @@ fn test_parse_include_number() {
 }
 
 // ===========================================================================
-// find_resource_path tests (F-053)
+// find_resource_path tests (F-053, async since F-069)
 // ===========================================================================
 
-#[test]
-fn test_find_resource_path_exact() {
+#[tokio::test]
+async fn test_find_resource_path_exact() {
     let dir = tempdir().unwrap();
     let file_path = dir.path().join("myresource");
     fs::write(&file_path, "content").unwrap();
 
-    let result = find_resource_path(&file_path);
+    let result = find_resource_path(&file_path).await;
     assert!(result.is_some());
     let resolved = result.unwrap();
     assert!(resolved.is_absolute());
@@ -883,40 +883,40 @@ fn test_find_resource_path_exact() {
     assert!(resolved.ends_with("myresource"));
 }
 
-#[test]
-fn test_find_resource_path_yaml_ext() {
+#[tokio::test]
+async fn test_find_resource_path_yaml_ext() {
     let dir = tempdir().unwrap();
     let base = dir.path().join("myresource");
     // Don't create base, but create base.yaml
     fs::write(dir.path().join("myresource.yaml"), "content").unwrap();
 
-    let result = find_resource_path(&base);
+    let result = find_resource_path(&base).await;
     assert!(result.is_some());
     let resolved = result.unwrap();
     assert!(resolved.to_string_lossy().ends_with("myresource.yaml"));
 }
 
-#[test]
-fn test_find_resource_path_md_ext() {
+#[tokio::test]
+async fn test_find_resource_path_md_ext() {
     let dir = tempdir().unwrap();
     let base = dir.path().join("myresource");
     // Only create base.md
     fs::write(dir.path().join("myresource.md"), "content").unwrap();
 
-    let result = find_resource_path(&base);
+    let result = find_resource_path(&base).await;
     assert!(result.is_some());
     let resolved = result.unwrap();
     assert!(resolved.to_string_lossy().ends_with("myresource.md"));
 }
 
-#[test]
-fn test_find_resource_path_bundle_yaml() {
+#[tokio::test]
+async fn test_find_resource_path_bundle_yaml() {
     let dir = tempdir().unwrap();
     let base = dir.path().join("myresource");
     fs::create_dir_all(&base).unwrap();
     fs::write(base.join("bundle.yaml"), "name: test").unwrap();
 
-    let result = find_resource_path(&base);
+    let result = find_resource_path(&base).await;
     // base itself exists (it's a directory), so it should match as the first candidate
     assert!(result.is_some());
 
@@ -931,28 +931,28 @@ fn test_find_resource_path_bundle_yaml() {
     fs::create_dir_all(&base3).unwrap();
     fs::write(base3.join("bundle.yaml"), "name: test").unwrap();
 
-    let result3 = find_resource_path(&base3);
+    let result3 = find_resource_path(&base3).await;
     assert!(result3.is_some());
 }
 
-#[test]
-fn test_find_resource_path_none() {
+#[tokio::test]
+async fn test_find_resource_path_none() {
     let dir = tempdir().unwrap();
     let base = dir.path().join("totally_missing");
 
-    let result = find_resource_path(&base);
+    let result = find_resource_path(&base).await;
     assert!(result.is_none());
 }
 
-#[test]
-fn test_find_resource_path_priority() {
+#[tokio::test]
+async fn test_find_resource_path_priority() {
     // Both base.yaml and base.md exist — base.yaml should win (earlier in list)
     let dir = tempdir().unwrap();
     let base = dir.path().join("myresource");
     fs::write(dir.path().join("myresource.yaml"), "yaml content").unwrap();
     fs::write(dir.path().join("myresource.md"), "md content").unwrap();
 
-    let result = find_resource_path(&base);
+    let result = find_resource_path(&base).await;
     assert!(result.is_some());
     let resolved = result.unwrap();
     assert!(
@@ -963,59 +963,67 @@ fn test_find_resource_path_priority() {
 }
 
 // ===========================================================================
-// resolve_include_source tests (F-053)
+// resolve_include_source tests (F-053, async since F-069)
 // ===========================================================================
 
-#[test]
-fn test_resolve_include_source_uri_passthrough() {
+#[tokio::test]
+async fn test_resolve_include_source_uri_passthrough() {
     let dir = tempdir().unwrap();
     let registry = BundleRegistry::new(dir.path().to_path_buf());
 
-    let result = registry.resolve_include_source("git+https://github.com/org/repo@main");
+    let result = registry
+        .resolve_include_source("git+https://github.com/org/repo@main")
+        .await;
     assert_eq!(
         result,
         Some("git+https://github.com/org/repo@main".to_string())
     );
 }
 
-#[test]
-fn test_resolve_include_source_http_passthrough() {
+#[tokio::test]
+async fn test_resolve_include_source_http_passthrough() {
     let dir = tempdir().unwrap();
     let registry = BundleRegistry::new(dir.path().to_path_buf());
 
-    let result = registry.resolve_include_source("https://example.com/bundle.yaml");
+    let result = registry
+        .resolve_include_source("https://example.com/bundle.yaml")
+        .await;
     assert_eq!(result, Some("https://example.com/bundle.yaml".to_string()));
 }
 
-#[test]
-fn test_resolve_include_source_file_passthrough() {
+#[tokio::test]
+async fn test_resolve_include_source_file_passthrough() {
     let dir = tempdir().unwrap();
     let registry = BundleRegistry::new(dir.path().to_path_buf());
 
-    let result = registry.resolve_include_source("file:///path/to/bundle");
+    let result = registry
+        .resolve_include_source("file:///path/to/bundle")
+        .await;
     assert_eq!(result, Some("file:///path/to/bundle".to_string()));
 }
 
-#[test]
-fn test_resolve_include_source_plain_name() {
+#[tokio::test]
+async fn test_resolve_include_source_plain_name() {
     let dir = tempdir().unwrap();
     let registry = BundleRegistry::new(dir.path().to_path_buf());
 
-    let result = registry.resolve_include_source("my-bundle");
+    let result = registry.resolve_include_source("my-bundle").await;
     assert_eq!(result, Some("my-bundle".to_string()));
 }
 
-#[test]
-fn test_resolve_include_source_namespace_not_registered() {
+#[tokio::test]
+async fn test_resolve_include_source_namespace_not_registered() {
     let dir = tempdir().unwrap();
     let registry = BundleRegistry::new(dir.path().to_path_buf());
 
-    let result = registry.resolve_include_source("unknown:path/to/thing");
+    let result = registry
+        .resolve_include_source("unknown:path/to/thing")
+        .await;
     assert_eq!(result, None);
 }
 
-#[test]
-fn test_resolve_include_source_namespace_file_with_local_path() {
+#[tokio::test]
+async fn test_resolve_include_source_namespace_file_with_local_path() {
     let dir = tempdir().unwrap();
     let mut registry = BundleRegistry::new(dir.path().to_path_buf());
 
@@ -1029,7 +1037,9 @@ fn test_resolve_include_source_namespace_file_with_local_path() {
     register_one(&mut registry, "mybundle", "file:///original/path");
     registry.get_state("mybundle").local_path = Some(local_dir.to_string_lossy().to_string());
 
-    let result = registry.resolve_include_source("mybundle:skills/coding");
+    let result = registry
+        .resolve_include_source("mybundle:skills/coding")
+        .await;
     assert!(
         result.is_some(),
         "Should resolve namespace:path with local_path"
@@ -1047,8 +1057,8 @@ fn test_resolve_include_source_namespace_file_with_local_path() {
     );
 }
 
-#[test]
-fn test_resolve_include_source_namespace_no_local_path_git() {
+#[tokio::test]
+async fn test_resolve_include_source_namespace_no_local_path_git() {
     let dir = tempdir().unwrap();
     let mut registry = BundleRegistry::new(dir.path().to_path_buf());
 
@@ -1060,7 +1070,9 @@ fn test_resolve_include_source_namespace_no_local_path_git() {
     );
     // Deliberately no local_path set
 
-    let result = registry.resolve_include_source("mybundle:skills/coding");
+    let result = registry
+        .resolve_include_source("mybundle:skills/coding")
+        .await;
     assert_eq!(
         result,
         Some("git+https://github.com/org/repo@main#subdirectory=skills/coding".to_string())
@@ -1071,8 +1083,8 @@ fn test_resolve_include_source_namespace_no_local_path_git() {
 // extract_bundle_name tests (F-053)
 // ===========================================================================
 
-#[test]
-fn test_resolve_include_source_git_namespace_local_path_resource_found() {
+#[tokio::test]
+async fn test_resolve_include_source_git_namespace_local_path_resource_found() {
     // P0 test: Git namespace with local_path where resource exists should return
     // git+...#subdirectory=relative/path, NOT file://local/path
     let dir = tempdir().unwrap();
@@ -1090,7 +1102,7 @@ fn test_resolve_include_source_git_namespace_local_path_resource_found() {
     );
     registry.get_state("tools").local_path = Some(local_dir.to_string_lossy().to_string());
 
-    let result = registry.resolve_include_source("tools:skills/coding");
+    let result = registry.resolve_include_source("tools:skills/coding").await;
     assert!(result.is_some(), "Should resolve");
     let resolved = result.unwrap();
     // MUST be git URI, not file://
@@ -1111,8 +1123,8 @@ fn test_resolve_include_source_git_namespace_local_path_resource_found() {
     );
 }
 
-#[test]
-fn test_resolve_include_source_git_namespace_local_path_resource_not_found() {
+#[tokio::test]
+async fn test_resolve_include_source_git_namespace_local_path_resource_not_found() {
     // P0 test: Git namespace with local_path but resource NOT found should return None
     let dir = tempdir().unwrap();
     let mut registry = BundleRegistry::new(dir.path().to_path_buf());
@@ -1128,15 +1140,17 @@ fn test_resolve_include_source_git_namespace_local_path_resource_not_found() {
     );
     registry.get_state("tools").local_path = Some(local_dir.to_string_lossy().to_string());
 
-    let result = registry.resolve_include_source("tools:nonexistent/path");
+    let result = registry
+        .resolve_include_source("tools:nonexistent/path")
+        .await;
     assert_eq!(
         result, None,
         "Missing resource in git namespace should return None"
     );
 }
 
-#[test]
-fn test_resolve_include_source_namespace_local_path_is_file() {
+#[tokio::test]
+async fn test_resolve_include_source_namespace_local_path_is_file() {
     // P1 test: local_path pointing to a file should use parent directory
     let dir = tempdir().unwrap();
     let mut registry = BundleRegistry::new(dir.path().to_path_buf());
@@ -1152,7 +1166,9 @@ fn test_resolve_include_source_namespace_local_path_is_file() {
     register_one(&mut registry, "mybundle", "file:///original/path");
     registry.get_state("mybundle").local_path = Some(bundle_file.to_string_lossy().to_string());
 
-    let result = registry.resolve_include_source("mybundle:skills/coding");
+    let result = registry
+        .resolve_include_source("mybundle:skills/coding")
+        .await;
     assert!(
         result.is_some(),
         "Should resolve namespace:path when local_path is a file"
@@ -1170,8 +1186,8 @@ fn test_resolve_include_source_namespace_local_path_is_file() {
     );
 }
 
-#[test]
-fn test_resolve_include_source_namespace_no_local_path_non_git() {
+#[tokio::test]
+async fn test_resolve_include_source_namespace_no_local_path_non_git() {
     // Non-git namespace with no local_path should return None
     let dir = tempdir().unwrap();
     let mut registry = BundleRegistry::new(dir.path().to_path_buf());
@@ -1179,15 +1195,17 @@ fn test_resolve_include_source_namespace_no_local_path_non_git() {
     register_one(&mut registry, "mybundle", "https://example.com/bundle.yaml");
     // Deliberately no local_path
 
-    let result = registry.resolve_include_source("mybundle:skills/coding");
+    let result = registry
+        .resolve_include_source("mybundle:skills/coding")
+        .await;
     assert_eq!(
         result, None,
         "Non-git namespace with no local_path should return None"
     );
 }
 
-#[test]
-fn test_resolve_include_source_namespace_non_git_local_path_not_found() {
+#[tokio::test]
+async fn test_resolve_include_source_namespace_non_git_local_path_not_found() {
     // Non-git namespace with local_path but resource not found should return None
     let dir = tempdir().unwrap();
     let mut registry = BundleRegistry::new(dir.path().to_path_buf());
@@ -1198,26 +1216,28 @@ fn test_resolve_include_source_namespace_non_git_local_path_not_found() {
     register_one(&mut registry, "mybundle", "file:///original/path");
     registry.get_state("mybundle").local_path = Some(local_dir.to_string_lossy().to_string());
 
-    let result = registry.resolve_include_source("mybundle:nonexistent/path");
+    let result = registry
+        .resolve_include_source("mybundle:nonexistent/path")
+        .await;
     assert_eq!(
         result, None,
         "Non-git namespace with missing resource should return None"
     );
 }
 
-#[test]
-fn test_resolve_include_source_empty_namespace() {
+#[tokio::test]
+async fn test_resolve_include_source_empty_namespace() {
     // Edge case: ":path" (empty namespace)
     let dir = tempdir().unwrap();
     let registry = BundleRegistry::new(dir.path().to_path_buf());
 
     // split_once(':') returns ("", "path") — empty namespace won't be in bundles
-    let result = registry.resolve_include_source(":path");
+    let result = registry.resolve_include_source(":path").await;
     assert_eq!(result, None, "Empty namespace should return None");
 }
 
-#[test]
-fn test_resolve_include_source_git_namespace_existing_fragment() {
+#[tokio::test]
+async fn test_resolve_include_source_git_namespace_existing_fragment() {
     // Git URI with existing #fragment should strip it before adding subdirectory
     let dir = tempdir().unwrap();
     let mut registry = BundleRegistry::new(dir.path().to_path_buf());
@@ -1229,7 +1249,7 @@ fn test_resolve_include_source_git_namespace_existing_fragment() {
     );
     // No local_path
 
-    let result = registry.resolve_include_source("tools:new/path");
+    let result = registry.resolve_include_source("tools:new/path").await;
     assert_eq!(
         result,
         Some("git+https://github.com/org/tools@main#subdirectory=new/path".to_string()),

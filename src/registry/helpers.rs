@@ -63,8 +63,10 @@ pub fn parse_include(include: &Value) -> Option<String> {
 /// Returns the first existing candidate resolved to its canonical (absolute) path,
 /// or `None` if none exist.
 ///
+/// Uses `tokio::fs` for non-blocking I/O (metadata checks and canonicalize).
+///
 /// Port of Python `_find_resource_path`.
-pub fn find_resource_path(base_path: &Path) -> Option<PathBuf> {
+pub async fn find_resource_path(base_path: &Path) -> Option<PathBuf> {
     let candidates = [
         base_path.to_path_buf(),
         base_path.with_extension("yaml"),
@@ -75,10 +77,11 @@ pub fn find_resource_path(base_path: &Path) -> Option<PathBuf> {
     ];
 
     for candidate in &candidates {
-        if candidate.exists() {
-            return Some(std::fs::canonicalize(candidate).unwrap_or_else(|_| {
-                std::path::absolute(candidate).unwrap_or_else(|_| candidate.clone())
-            }));
+        // canonicalize returns Err for non-existent paths (ENOENT), so this
+        // is both an existence check and path resolution in one syscall —
+        // eliminating the TOCTOU between a separate exists() + canonicalize().
+        if let Ok(canonical) = tokio::fs::canonicalize(candidate).await {
+            return Some(canonical);
         }
     }
     None
