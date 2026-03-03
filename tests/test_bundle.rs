@@ -59,7 +59,7 @@ fn module_entry_with_config(module: &str, config_pairs: &[(&str, Value)]) -> Val
 // =====================================================================
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_create_minimal() {
     let bundle = Bundle::new("test");
     assert_eq!(bundle.name, "test");
@@ -68,7 +68,7 @@ fn test_create_minimal() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_from_dict_minimal() {
     let data = minimal_bundle_dict("test");
     let bundle = Bundle::from_dict(&data).expect("should parse minimal bundle");
@@ -76,7 +76,7 @@ fn test_from_dict_minimal() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_from_dict_full() {
     let data = mapping(&[(
         "bundle",
@@ -155,7 +155,7 @@ fn test_from_dict_full() {
 // =====================================================================
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_compose_empty_bundles() {
     let base = Bundle::new("base");
     let child = Bundle::new("child");
@@ -167,7 +167,7 @@ fn test_compose_empty_bundles() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_compose_session_deep_merge() {
     // Base has session with orchestrator + context
     let mut base = Bundle::new("base");
@@ -201,7 +201,7 @@ fn test_compose_session_deep_merge() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_compose_providers_merge_by_module() {
     // Same module "provider-a" in both; configs deep-merged
     let mut base = Bundle::new("base");
@@ -238,7 +238,7 @@ fn test_compose_providers_merge_by_module() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_compose_multiple_bundles() {
     let mut base = Bundle::new("base");
     base.providers = vec![module_entry("provider-base")];
@@ -272,7 +272,7 @@ fn test_compose_multiple_bundles() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_compose_instruction_replaced() {
     let mut base = Bundle::new("base");
     base.instruction = Some("base instruction".to_string());
@@ -294,7 +294,7 @@ fn test_compose_instruction_replaced() {
 // =====================================================================
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_minimal_mount_plan() {
     let bundle = Bundle::new("empty");
     let plan = bundle.to_mount_plan();
@@ -305,7 +305,7 @@ fn test_minimal_mount_plan() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_full_mount_plan() {
     let mut bundle = Bundle::new("full");
     bundle.session = mapping(&[("orchestrator", str_val("default"))]);
@@ -347,7 +347,7 @@ fn test_full_mount_plan() {
 // =====================================================================
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_resolve_registered_context() {
     let mut bundle = Bundle::new("ctx-test");
     bundle
@@ -359,7 +359,7 @@ fn test_resolve_registered_context() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_resolve_from_base_path() {
     let dir = tempdir().expect("failed to create tempdir");
     let context_dir = dir.path().join("context");
@@ -379,7 +379,7 @@ fn test_resolve_from_base_path() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_resolve_not_found() {
     let bundle = Bundle::new("empty");
     let resolved = bundle.resolve_context_path("unknown");
@@ -391,7 +391,7 @@ fn test_resolve_not_found() {
 // =====================================================================
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_parse_context_defers_namespaced_refs() {
     // Context includes local and namespaced references.
     // Local entries go into context, namespaced into pending_context.
@@ -426,7 +426,7 @@ fn test_parse_context_defers_namespaced_refs() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_resolve_pending_context_with_source_base_paths() {
     let dir = tempdir().expect("failed to create tempdir");
     let context_dir = dir.path().join("context");
@@ -456,7 +456,7 @@ fn test_resolve_pending_context_with_source_base_paths() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_resolve_pending_context_self_reference() {
     // Bundle name is "myns", pending_context has "myns:context/file.md"
     // Should resolve using own base_path.
@@ -484,7 +484,7 @@ fn test_resolve_pending_context_self_reference() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_compose_merges_pending_context() {
     let mut base = Bundle::new("base");
     base.pending_context.insert(
@@ -512,7 +512,7 @@ fn test_compose_merges_pending_context() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_pending_context_resolved_after_compose() {
     let dir_a = tempdir().expect("failed to create tmpdir a");
     let file_a = dir_a.path().join("file_a.md");
@@ -563,7 +563,7 @@ fn test_pending_context_resolved_after_compose() {
 // =====================================================================
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_raises_on_string_tools() {
     // tools list contains bare strings instead of dicts
     let data = mapping(&[(
@@ -609,7 +609,7 @@ fn test_raises_on_string_tools() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_raises_on_string_providers() {
     let data = mapping(&[(
         "bundle",
@@ -627,7 +627,7 @@ fn test_raises_on_string_providers() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_raises_on_string_hooks() {
     // First hook is valid dict, second is bare string
     let data = mapping(&[(
@@ -652,7 +652,7 @@ fn test_raises_on_string_hooks() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_error_uses_base_path_when_no_name() {
     // Bundle has no name, but has a base_path -- error should show the path
     let data = mapping(&[(
@@ -674,7 +674,7 @@ fn test_error_uses_base_path_when_no_name() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_error_shows_correct_format_example() {
     let data = mapping(&[(
         "bundle",
@@ -703,7 +703,7 @@ fn test_error_shows_correct_format_example() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_valid_config_passes() {
     let data = mapping(&[(
         "bundle",
@@ -736,7 +736,7 @@ fn test_valid_config_passes() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_empty_lists_pass() {
     let data = mapping(&[(
         "bundle",
@@ -762,7 +762,7 @@ fn test_empty_lists_pass() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_missing_lists_pass() {
     let data = minimal_bundle_dict("minimal");
 

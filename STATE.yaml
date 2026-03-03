@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 2
-phase_name: "Wave 2 -- Mid-tier Modules (mixed sync/async)"
-epoch: 3
-next_action: "Wave 2 COMPLETE. Proceed to Wave 3: bundle (26 tests), registry (21 tests), validator (18 tests)"
+phase: 3
+phase_name: "Wave 3 -- Core Modules (bundle, registry, validator)"
+epoch: 4
+next_action: "Implement F-018-bundle (26 tests), then F-019-validator (18 tests), then F-020-registry (21 tests)"
 blockers: []
 
 architecture_spec:
@@ -195,16 +195,36 @@ features:
     completed_at: "2025-01-16T07:30:00Z"
     commit: "61ef735"
 
+  F-018-bundle:
+    name: "Implement bundle module (Bundle struct, from_dict, compose, to_mount_plan, resolve_context_path, resolve_pending_context)"
+    module: "bundle"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-005-test-port-wave3", "F-006-dicts", "F-007-paths"]
+    started_at: "2025-01-16T08:00:00Z"
+  F-019-validator:
+    name: "Implement validator module (BundleValidator, ValidationResult, convenience functions)"
+    module: "bundle/validator"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-018-bundle"]
+  F-020-registry:
+    name: "Implement registry module (BundleRegistry, persistence, find_nearest, load_single)"
+    module: "registry"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-018-bundle"]
+
 wave_gate:
-  current_wave: 2
-  gate_criteria: "All 96 Wave 2 tests pass + Wave 1's 87 still passing = 183 total"
+  current_wave: 3
+  gate_criteria: "All 65 Wave 3 tests pass + Wave 1-2's 186 still passing = 251 total"
   approval_required: false
-  approval_status: "approved"
-  notes: "Wave 2 COMPLETE: 96/96 tests passing. io (6), mentions (21), sources (16), session (53). Total passing: 183 + 2 lib + 1 doc = 186."
+  approval_status: "pending"
+  notes: "Wave 3 started. Target: bundle (26 tests), validator (18 tests), registry (21 tests)."
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
   total_features_completed: 17
-  last_updated: "2025-01-16T07:30:00Z"
-  last_session: "session-007-wave2-completion"
+  last_updated: "2025-01-16T08:00:00Z"
+  last_session: "session-008-wave3-start"
