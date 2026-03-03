@@ -13,7 +13,7 @@
 phase: 8
 phase_name: "Wave 8 -- Source Handler Resolve + API Completion"
 epoch: 9
-next_action: "Implementing F-032 HttpSourceHandler.resolve"
+next_action: "Implementing F-033 GitSourceHandler.resolve"
 blockers: []
 
 architecture_spec:
@@ -329,16 +329,19 @@ features:
   F-032-http-resolve:
     name: "Implement HttpSourceHandler.resolve (HTTP download to cache with reqwest)"
     module: "sources"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-017-sources"]
     started_at: "2025-01-17T06:00:00Z"
+    completed_at: "2025-01-17T06:30:00Z"
+    commit: "57fb4e0"
   F-033-git-resolve:
     name: "Implement GitSourceHandler.resolve (git clone to cache via subprocess)"
     module: "sources"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-017-sources"]
+    started_at: "2025-01-17T06:35:00Z"
   F-034-dedup-registry:
     name: "ContentDeduplicator full Python API + BundleRegistry IndexMap"
     module: "mentions, registry"
