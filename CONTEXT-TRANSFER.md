@@ -6,6 +6,67 @@
 
 ---
 
+## Session 019 -- Wave 14 COMPLETE (F-050, F-051, F-052)
+
+### Work Completed
+- **F-050-resolve-agent-path** (883084a): Ported `Bundle.resolve_agent_path(name)` from Python bundle.py (lines 363-404). Namespaced lookup (`"foundation:bug-hunter"` → `source_base_paths["foundation"]/agents/bug-hunter.md`), self-name fallback (namespace == self.name → base_path), simple name lookup (base_path/agents/). `source_base_paths` checked before self-name fallback (priority order). Returns `None` if `.md` file doesn't exist. Also ported trivial `get_system_instruction()` accessor returning `Option<&str>`. 12 new tests including SBP miss fallthrough and multiple colons edge cases.
+- **F-051-registry-find-validate** (a5098e9): Added `loaded_at`/`checked_at` timestamp fields to `BundleState` (ISO 8601 strings). Empty strings filtered to `None` on deserialization (Python falsy parity). New `BundleRegistry` methods: `find(name)` → URI lookup, `find_state(name)` → immutable state lookup, `get_all_states()` → read-only reference to all states, `validate_cached_paths()` → clear stale local_path refs with auto-persist. 17 new tests including null/empty timestamp handling and mixed stale/valid paths.
+- **F-052-agent-metadata** (f9b82c9): Ported `Bundle.load_agent_metadata()` and `_load_agent_file_metadata()`. Loads `.md` files for all agents via `parse_frontmatter()`, extracts `meta:` section (with flat frontmatter fallback), mount plan sections (tools/providers/hooks/session), and instruction from body. Merge fills gaps only (doesn't override existing truthy values). `is_falsy_value()` matches Python's truthiness for all types. 10 new tests including non-mapping config, malformed YAML, and empty string override.
+
+### Wave 14 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 522 passing, 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **`resolve_agent_path` uses `split_once(':')` instead of Python's `":" in name` + `split(":", 1)`**: Semantically identical for all inputs. `split_once` is more idiomatic Rust.
+- **`get_system_instruction()` returns `Option<&str>` not `Option<String>`**: Zero-cost borrow. Callers can `.map(|s| s.to_owned())` if ownership needed. Matches Rust API conventions.
+- **BundleState timestamps stored as `Option<String>` not chrono::DateTime**: Consistent with existing codebase pattern (`SourceStatus.cached_at` is also `String`). Avoids forcing chrono dependency on consumers.
+- **BundleState `to_dict()` omits keys when None**: Matches existing Rust codebase pattern for `version`, `local_path`, etc. Python always includes keys with null values. Documented as known divergence — both `from_dict` implementations handle both absent and null keys via `.get()`.
+- **Empty string timestamps filtered to None on deserialization**: Python's `if data.get("loaded_at")` treats `""` as falsy → `None`. Rust `from_dict` uses `.filter(|s| !s.is_empty())` for parity.
+- **`get_all_states()` returns `&IndexMap` not a clone**: More efficient than Python's `dict(self._registry)` shallow copy. Mutations require going through `get_state()`.
+- **`find_state(name)` added alongside existing `get_state(name)`**: `get_state` is `&mut self` and creates defaults. `find_state` is `&self` and returns `Option<&BundleState>`. Matches Python's `get_state(name)` return-None-if-missing semantics.
+- **`validate_cached_paths()` uses two-phase collect-then-mutate**: Avoids borrow conflict (can't mutate while iterating). Functionally equivalent to Python's in-place mutation.
+- **`load_agent_metadata` collects agent names first**: Avoids borrow conflict between `resolve_agent_path(&self)` (immutable) and `agents.get_mut()` (mutable). Sequential borrows don't overlap.
+- **Non-mapping agent configs preserved, not replaced**: Python's merge on non-dict agents raises `TypeError` caught by `except Exception`. Rust matches by returning early when config is not a mapping.
+- **Mount plan keys filtered from extra-meta loop**: Prevents double-processing when flat frontmatter contains both meta fields and mount plan sections. Python has the same double-write but it's benign (same source, insert overwrites). Rust explicitly prevents it.
+- **`is_falsy_value()` covers all Python falsy types**: Null, false, 0, empty string, empty list, empty mapping. Note: legitimate config values like `retries: 0` or `enabled: false` get treated as "missing" and overwritten by file metadata — faithfully ported Python behavior.
+- **Redundant `.exists()` in `load_agent_metadata`**: `resolve_agent_path` already checks exists at every return site. Guard kept as TOCTOU safety belt — file could be deleted between resolution and read.
+
+### Antagonistic Review Issues Found & Fixed
+- F-050: Collapsed `else { if let` to `else if let` (review caught clippy-style issue)
+- F-050: Added SBP-miss-self-fallthrough test (review caught untested Scenario B where SBP has namespace but file missing)
+- F-050: Added multiple-colons edge case test (review caught untested `split_once` vs `split(":", 1)` parity)
+- F-051: Added `.filter(|s| !s.is_empty())` to timestamp deserialization (review caught `Some("")` bug from Python falsy parity)
+- F-051: Changed `get_all_states()` from clone to reference return (review caught unnecessary deep copy)
+- F-051: Added `find_state()` for immutable single-name lookup (review caught missing Python `get_state(name)` equivalent)
+- F-051: Added tests for null and empty-string timestamps (review caught missing coverage)
+- F-052: Changed non-mapping agent_config from silent replace to skip (review caught spec violation vs Python TypeError behavior)
+- F-052: Filtered mount plan keys from extra-meta loop (review caught double-processing architectural smell)
+- F-052: Added TOCTOU comment on redundant exists() check
+- F-052: Added 3 edge case tests: non-mapping config, malformed YAML, empty string override
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-050: Path traversal (`"ns:../../etc/passwd"`) not guarded — matches Python behavior, documented as known limitation
+- F-050: Leading colon (`:foo`) produces namespace="" — degenerate input, matches Python
+- F-051: `to_dict()` omits keys instead of writing null — pre-existing Rust pattern for all optional fields
+- F-051: No timestamp validation (stored as raw String) — matches codebase pattern, documented
+- F-052: `is_falsy_value` overwrites legitimate config values like `retries: 0` — faithful Python port, documented
+- F-052: Flat frontmatter with tools — tested that tools appear, double-write prevented by filter
+
+### What's Next
+- All 14 waves complete. 522 tests, 0 clippy warnings, 52 features delivered.
+- Bundle API now has: resolve_agent_path, get_system_instruction, load_agent_metadata
+- Registry API now has: find, find_state, get_all_states, validate_cached_paths, BundleState timestamps
+- Remaining unported Python functionality:
+  - `PreparedBundle` (bundle.py:845-1289) — session lifecycle controller. Depends on AmplifierRuntime traits being concrete. Major: create_session, spawn, _build_bundles_for_resolver, _create_system_prompt_factory.
+  - `BundleRegistry` advanced features: namespace:path resolution (_preload_namespace_bundles, _resolve_include_source), diamond dedup (_pending_loads), auto-register, check_update/update lifecycle
+- Consider: PyO3 bindings (feature flag exists, no `#[pyclass]`/`#[pymodule]` code)
+- Consider: Benchmarks (bundle compose, cache operations, fingerprint computation)
+
+---
+
 ## Session 018 -- Wave 13 COMPLETE (F-047, F-048, F-049)
 
 ### Work Completed

@@ -13,7 +13,7 @@
 phase: 14
 phase_name: "Wave 14 -- Bundle API completeness (resolve_agent_path, agent metadata, registry find/validate)"
 epoch: 15
-next_action: "Implement F-052 (Bundle.load_agent_metadata + _load_agent_file_metadata)"
+next_action: "Wave 14 COMPLETE. 522 tests passing, 0 clippy warnings, cargo fmt clean. Consider: PreparedBundle port, PyO3 bindings, benchmarks, BundleRegistry namespace resolution"
 blockers: []
 
 architecture_spec:
@@ -525,21 +525,23 @@ features:
   F-052-agent-metadata:
     name: "Port Bundle.load_agent_metadata() + _load_agent_file_metadata()"
     module: "bundle"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-050-resolve-agent-path"]
     started_at: "2025-01-22T01:00:00Z"
+    completed_at: "2025-01-22T01:30:00Z"
+    commit: "f9b82c9"
 
 wave_gate:
   current_wave: 14
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
-  approval_status: "in-progress"
-  notes: "Wave 14: Bundle API completeness -- resolve_agent_path, agent metadata, registry find/validate"
+  approval_status: "approved"
+  notes: "Wave 14 COMPLETE: 522 tests, 0 clippy warnings, cargo fmt clean. Bundle API completeness: resolve_agent_path, get_system_instruction, load_agent_metadata, BundleRegistry.find/find_state/validate_cached_paths, BundleState timestamps."
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 49
-  last_updated: "2025-01-22T00:00:00Z"
+  total_features_completed: 52
+  last_updated: "2025-01-22T01:30:00Z"
   last_session: "session-019-wave14-bundle-api"
