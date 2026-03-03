@@ -2,9 +2,8 @@
 //!
 //! This module provides:
 //! - [`state::InstallStateManager`]: Fingerprint-based module install tracking
-//!
-//! Future: `ModuleActivator` (async module activation via subprocess install)
-//! will be added when the runtime layer supports it. The activator depends on
-//! `SimpleSourceResolver` (already ported) and external tooling (uv/pip).
+//! - [`activator::ModuleActivator`]: Async module activation via URI resolution
+//!   and optional dependency installation
 
+pub mod activator;
 pub mod state;

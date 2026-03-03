@@ -147,6 +147,7 @@ pub use updates::{check_bundle_status, update_bundle, BundleStatus};
 pub use bundle::module_resolver::{BundleModuleResolver, BundleModuleSource, ModuleActivate};
 
 // -- Modules --
+pub use modules::activator::ModuleActivator;
 pub use modules::state::InstallStateManager;
 
 // -- Runtime traits --

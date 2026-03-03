@@ -64,6 +64,15 @@ impl SimpleSourceResolver {
         }
     }
 
+    /// Create a resolver with explicit base path and cache directory.
+    pub fn with_base_path_and_cache_dir(base_path: PathBuf, cache_dir: PathBuf) -> Self {
+        Self {
+            handlers: Self::default_handlers(base_path.clone()),
+            cache_dir,
+            base_path,
+        }
+    }
+
     /// Create a resolver with an explicit cache directory.
     pub fn with_cache_dir(cache_dir: PathBuf) -> Self {
         let base_path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));

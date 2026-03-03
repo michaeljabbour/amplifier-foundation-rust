@@ -425,18 +425,20 @@ features:
   F-042-module-resolver:
     name: "Port BundleModuleSource + BundleModuleResolver (module ID to path resolution)"
     module: "bundle"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-018-bundle"]
     started_at: "2025-01-19T02:35:00Z"
+    completed_at: "2025-01-19T03:10:00Z"
+    commit: "643930e"
 
   F-043-module-activator:
     name: "Port ModuleActivator (async module activation with abstracted install mechanism)"
     module: "modules"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-035-install-state", "F-029-source-resolver"]
-    started_at: null
+    started_at: "2025-01-19T03:15:00Z"
 
 wave_gate:
   current_wave: 11

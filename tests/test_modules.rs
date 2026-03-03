@@ -1,11 +1,14 @@
-//! Tests for the modules crate -- InstallStateManager.
+//! Tests for the modules crate -- InstallStateManager + ModuleActivator.
 //!
 //! Ported from Python's InstallStateManager behavior (no Python test file exists;
 //! tests written from behavioral specification in install_state.py).
+//! ModuleActivator tests written from Python's modules/activator.py specification.
 
 use std::fs;
 use tempfile::TempDir;
 
+use amplifier_foundation::bundle::module_resolver::ModuleActivate;
+use amplifier_foundation::modules::activator::ModuleActivator;
 use amplifier_foundation::InstallStateManager;
 
 // ── Construction & Fresh State ──────────────────────────────────────────
@@ -346,4 +349,166 @@ fn test_invalidate_all_modules() {
     mgr.invalidate(None);
     assert!(!mgr.is_installed(&mod_a));
     assert!(!mgr.is_installed(&mod_b));
+}
+
+// ── ModuleActivator ──────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn test_module_activator_new_defaults() {
+    let activator = ModuleActivator::new(None, false, None);
+    assert!(activator.bundle_package_paths().is_empty());
+}
+
+#[tokio::test]
+async fn test_module_activator_activate_file_uri() {
+    let tmp = TempDir::new().unwrap();
+    let module_dir = tmp.path().join("test-module");
+    fs::create_dir_all(&module_dir).unwrap();
+    fs::write(module_dir.join("__init__.py"), "# module").unwrap();
+
+    let cache_dir = tmp.path().join("cache");
+    let activator = ModuleActivator::new(Some(cache_dir), false, Some(tmp.path().to_path_buf()));
+
+    // Activate via file URI (resolves locally, no install)
+    let result = activator
+        .activate("test-module", &format!("file://{}", module_dir.display()))
+        .await;
+    assert!(
+        result.is_ok(),
+        "activate failed: {:?}",
+        result.as_ref().err()
+    );
+    let path = result.unwrap();
+    assert!(path.exists());
+}
+
+#[tokio::test]
+async fn test_module_activator_activate_dedup() {
+    let tmp = TempDir::new().unwrap();
+    let module_dir = tmp.path().join("test-module");
+    fs::create_dir_all(&module_dir).unwrap();
+    fs::write(module_dir.join("__init__.py"), "# module").unwrap();
+
+    let cache_dir = tmp.path().join("cache");
+    let activator = ModuleActivator::new(Some(cache_dir), false, Some(tmp.path().to_path_buf()));
+
+    let uri = format!("file://{}", module_dir.display());
+
+    // First activation
+    let path1 = activator.activate("test-module", &uri).await.unwrap();
+
+    // Second activation should return same path (dedup)
+    let path2 = activator.activate("test-module", &uri).await.unwrap();
+    assert_eq!(path1, path2);
+}
+
+#[tokio::test]
+async fn test_module_activator_activate_all_empty() {
+    let activator = ModuleActivator::new(None, false, None);
+    let result = activator.activate_all(&[]).await;
+    assert!(result.is_empty());
+}
+
+#[tokio::test]
+async fn test_module_activator_activate_all_with_modules() {
+    let tmp = TempDir::new().unwrap();
+    let mod_a = tmp.path().join("mod-a");
+    let mod_b = tmp.path().join("mod-b");
+    fs::create_dir_all(&mod_a).unwrap();
+    fs::create_dir_all(&mod_b).unwrap();
+    fs::write(mod_a.join("__init__.py"), "# mod a").unwrap();
+    fs::write(mod_b.join("__init__.py"), "# mod b").unwrap();
+
+    let cache_dir = tmp.path().join("cache");
+    let activator = ModuleActivator::new(Some(cache_dir), false, Some(tmp.path().to_path_buf()));
+
+    let modules = vec![
+        ("mod-a".to_string(), format!("file://{}", mod_a.display())),
+        ("mod-b".to_string(), format!("file://{}", mod_b.display())),
+    ];
+
+    let result = activator.activate_all(&modules).await;
+    assert_eq!(result.len(), 2);
+    assert!(result.contains_key("mod-a"));
+    assert!(result.contains_key("mod-b"));
+}
+
+#[tokio::test]
+async fn test_module_activator_activate_all_skips_failures() {
+    let tmp = TempDir::new().unwrap();
+    let mod_a = tmp.path().join("mod-a");
+    fs::create_dir_all(&mod_a).unwrap();
+    fs::write(mod_a.join("__init__.py"), "# mod a").unwrap();
+
+    let cache_dir = tmp.path().join("cache");
+    let activator = ModuleActivator::new(Some(cache_dir), false, Some(tmp.path().to_path_buf()));
+
+    let modules = vec![
+        ("mod-a".to_string(), format!("file://{}", mod_a.display())),
+        (
+            "mod-bad".to_string(),
+            "file:///nonexistent/path".to_string(),
+        ),
+    ];
+
+    let result = activator.activate_all(&modules).await;
+    // mod-a succeeds, mod-bad fails silently
+    assert_eq!(result.len(), 1);
+    assert!(result.contains_key("mod-a"));
+}
+
+#[tokio::test]
+async fn test_module_activator_finalize() {
+    let tmp = TempDir::new().unwrap();
+    let cache_dir = tmp.path().join("cache");
+    let activator = ModuleActivator::new(Some(cache_dir.clone()), false, None);
+    // finalize should not panic even with no activations
+    activator.finalize();
+
+    // Check that install state file exists after finalize
+    let state_file = cache_dir.join("install-state.json");
+    assert!(state_file.exists());
+}
+
+#[tokio::test]
+async fn test_module_activator_activate_bundle_package_no_pyproject() {
+    let tmp = TempDir::new().unwrap();
+    let bundle_path = tmp.path().join("my-bundle");
+    fs::create_dir_all(&bundle_path).unwrap();
+    // No pyproject.toml — should be a no-op
+
+    let cache_dir = tmp.path().join("cache");
+    let activator = ModuleActivator::new(Some(cache_dir), false, None);
+    let result = activator.activate_bundle_package(&bundle_path).await;
+    assert!(result.is_ok());
+    // No package paths should be tracked
+    assert!(activator.bundle_package_paths().is_empty());
+}
+
+#[tokio::test]
+async fn test_module_activator_activate_bundle_package_nonexistent() {
+    let activator = ModuleActivator::new(None, false, None);
+    let result = activator
+        .activate_bundle_package(std::path::Path::new("/nonexistent/bundle"))
+        .await;
+    assert!(result.is_ok()); // No-op for nonexistent paths
+}
+
+#[tokio::test]
+async fn test_module_activator_implements_module_activate_trait() {
+    use amplifier_foundation::bundle::module_resolver::ModuleActivate;
+
+    let tmp = TempDir::new().unwrap();
+    let module_dir = tmp.path().join("test-module");
+    fs::create_dir_all(&module_dir).unwrap();
+
+    let cache_dir = tmp.path().join("cache");
+    let activator = ModuleActivator::new(Some(cache_dir), false, Some(tmp.path().to_path_buf()));
+
+    // ModuleActivator should implement ModuleActivate
+    let trait_obj: &dyn ModuleActivate = &activator;
+    let result = trait_obj
+        .activate("test-module", &format!("file://{}", module_dir.display()))
+        .await;
+    assert!(result.is_ok());
 }
