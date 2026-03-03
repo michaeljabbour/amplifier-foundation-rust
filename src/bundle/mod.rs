@@ -307,6 +307,18 @@ impl Bundle {
         result
     }
 
+    /// Serialize this Bundle to a Value that `from_dict()` can reconstruct.
+    ///
+    /// All fields are nested under the `"bundle"` key to match `from_dict()` expectations.
+    /// `Bundle::from_dict(&bundle.to_dict())` preserves: name, version, description,
+    /// providers, tools, hooks, session, spawn, agents, context, includes.
+    ///
+    /// **Not serialized** (by design): `instruction` (from_dict always sets None),
+    /// `pending_context` (unresolved refs should be resolved before serializing),
+    /// `base_path`, `source_base_paths`, `extra`, `source_uri` (internal state).
+    ///
+    /// **Edge case**: empty Mapping values for session/spawn are treated as absent
+    /// and will deserialize as Value::Null (semantically equivalent).
     pub fn to_dict(&self) -> Value {
         let mut map = Mapping::new();
 
@@ -326,29 +338,73 @@ impl Bundle {
             );
         }
 
-        map.insert(
-            Value::String("bundle".to_string()),
-            Value::Mapping(bundle_meta),
-        );
-
+        // Module lists
         if !self.providers.is_empty() {
-            map.insert(
+            bundle_meta.insert(
                 Value::String("providers".to_string()),
                 Value::Sequence(self.providers.clone()),
             );
         }
         if !self.tools.is_empty() {
-            map.insert(
+            bundle_meta.insert(
                 Value::String("tools".to_string()),
                 Value::Sequence(self.tools.clone()),
             );
         }
         if !self.hooks.is_empty() {
-            map.insert(
+            bundle_meta.insert(
                 Value::String("hooks".to_string()),
                 Value::Sequence(self.hooks.clone()),
             );
         }
+
+        // Session and spawn configs
+        if !is_null_or_empty_mapping(&self.session) {
+            bundle_meta.insert(Value::String("session".to_string()), self.session.clone());
+        }
+        if !is_null_or_empty_mapping(&self.spawn) {
+            bundle_meta.insert(Value::String("spawn".to_string()), self.spawn.clone());
+        }
+
+        // Agents
+        if !self.agents.is_empty() {
+            let mut agents_map = Mapping::new();
+            for (name, agent) in &self.agents {
+                agents_map.insert(Value::String(name.clone()), agent.clone());
+            }
+            bundle_meta.insert(
+                Value::String("agents".to_string()),
+                Value::Mapping(agents_map),
+            );
+        }
+
+        // Context (serialize paths as strings)
+        if !self.context.is_empty() {
+            let mut context_map = Mapping::new();
+            for (name, path) in &self.context {
+                context_map.insert(
+                    Value::String(name.clone()),
+                    Value::String(path.display().to_string()),
+                );
+            }
+            bundle_meta.insert(
+                Value::String("context".to_string()),
+                Value::Mapping(context_map),
+            );
+        }
+
+        // Includes
+        if !self.includes.is_empty() {
+            bundle_meta.insert(
+                Value::String("includes".to_string()),
+                Value::Sequence(self.includes.clone()),
+            );
+        }
+
+        map.insert(
+            Value::String("bundle".to_string()),
+            Value::Mapping(bundle_meta),
+        );
 
         Value::Mapping(map)
     }

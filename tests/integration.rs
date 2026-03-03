@@ -645,44 +645,127 @@ fn test_compose_non_commutative() {
 }
 
 // ============================================================================
-// Test 14: to_dict nesting structure (documents known limitation)
+// Test 14: to_dict produces from_dict-compatible structure (roundtrip)
 // ============================================================================
 
 #[test]
-fn test_to_dict_structure() {
-    // KNOWN LIMITATION (documented in Session 008 CONTEXT-TRANSFER.md):
-    // to_dict() puts providers/tools OUTSIDE the "bundle" key,
-    // but from_dict() expects them INSIDE the "bundle" key.
-    // So from_dict(bundle.to_dict()) loses providers/tools/hooks.
-    // This test documents the current behavior.
+fn test_to_dict_from_dict_roundtrip() {
+    // to_dict() should produce output that from_dict() can consume.
+    // All fields are nested under the "bundle" key to match from_dict expectations.
 
-    let data = load_yaml_fixture("full-bundle.yaml");
-    let bundle = Bundle::from_dict(&data).unwrap();
-    let dict = bundle.to_dict();
+    // Use inline YAML with ALL roundtrippable fields populated
+    let yaml = r#"
+bundle:
+  name: roundtrip-test
+  version: "3.0.0"
+  description: "Full roundtrip test"
+  session:
+    orchestrator:
+      module: loop-streaming
+      config:
+        max_tokens: 200000
+    debug: true
+  providers:
+    - module: provider-anthropic
+      config:
+        model: claude-sonnet-4-20250514
+    - module: provider-openai
+      config:
+        model: gpt-4o
+  tools:
+    - module: tool-filesystem
+    - module: tool-bash
+  hooks:
+    - module: hook-shell
+  agents:
+    explorer:
+      description: "Exploration agent"
+    builder:
+      description: "Build agent"
+  spawn:
+    default_provider: anthropic
+  context:
+    readme: readme.md
+    guide: guide.md
+  includes:
+    - "./base-bundle.yaml"
+    - "./extra-bundle.yaml"
+"#;
+    let data: Value = serde_yaml_ng::from_str(yaml).unwrap();
+    let original = Bundle::from_dict(&data).unwrap();
+    let dict = original.to_dict();
 
+    // Verify structure: everything should be under "bundle" key
     let dict_map = dict.as_mapping().unwrap();
-
-    // to_dict puts metadata under "bundle" key
     let bundle_meta = dict_map.get("bundle").unwrap().as_mapping().unwrap();
-    assert_eq!(
-        bundle_meta.get("name").unwrap().as_str(),
-        Some("test-full-bundle")
-    );
-    assert_eq!(bundle_meta.get("version").unwrap().as_str(), Some("2.1.0"));
 
-    // to_dict puts providers/tools at the TOP level (not under "bundle")
-    assert!(
-        dict_map.get("providers").is_some(),
-        "to_dict puts providers at top level"
-    );
-    assert!(
-        dict_map.get("tools").is_some(),
-        "to_dict puts tools at top level"
-    );
+    // All fields should be nested inside "bundle"
+    for key in &[
+        "name",
+        "version",
+        "description",
+        "providers",
+        "tools",
+        "hooks",
+        "session",
+        "spawn",
+        "agents",
+        "context",
+        "includes",
+    ] {
+        assert!(
+            bundle_meta.get(*key).is_some(),
+            "{} should be inside bundle key",
+            key
+        );
+    }
 
-    // This means from_dict → to_dict → from_dict is NOT a lossless roundtrip
-    // (providers/tools would be lost on the second from_dict).
-    // This is a known design limitation, not a bug to fix in integration tests.
+    // Now roundtrip: from_dict(bundle.to_dict()) should produce equivalent bundle
+    let roundtripped = Bundle::from_dict(&dict).unwrap();
+
+    // Metadata
+    assert_eq!(roundtripped.name, original.name);
+    assert_eq!(roundtripped.version, original.version);
+    assert_eq!(roundtripped.description, original.description);
+
+    // Module lists -- compare content, not just length
+    assert_eq!(roundtripped.providers, original.providers);
+    assert_eq!(roundtripped.tools, original.tools);
+    assert_eq!(roundtripped.hooks, original.hooks);
+
+    // Session and spawn (Value equality)
+    assert_eq!(roundtripped.session, original.session);
+    assert_eq!(roundtripped.spawn, original.spawn);
+
+    // Agents (same keys and values)
+    assert_eq!(roundtripped.agents.len(), original.agents.len());
+    for (name, agent) in &original.agents {
+        assert_eq!(roundtripped.agents.get(name), Some(agent));
+    }
+
+    // Context (keys survive, values are path strings)
+    assert_eq!(roundtripped.context.len(), original.context.len());
+    let orig_keys: Vec<&String> = original.context.keys().collect();
+    let rt_keys: Vec<&String> = roundtripped.context.keys().collect();
+    assert_eq!(rt_keys, orig_keys, "context keys should roundtrip");
+
+    // Includes
+    assert_eq!(roundtripped.includes, original.includes);
+}
+
+#[test]
+fn test_to_dict_roundtrip_minimal() {
+    // Even a minimal bundle should roundtrip correctly
+    let bundle = Bundle::new("minimal");
+    let dict = bundle.to_dict();
+    let roundtripped = Bundle::from_dict(&dict).unwrap();
+
+    assert_eq!(roundtripped.name, "minimal");
+    assert_eq!(roundtripped.version, "1.0.0");
+    assert!(roundtripped.providers.is_empty());
+    assert!(roundtripped.tools.is_empty());
+    assert!(roundtripped.hooks.is_empty());
+    assert!(roundtripped.agents.is_empty());
 }
 
 // ============================================================================
