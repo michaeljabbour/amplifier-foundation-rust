@@ -817,9 +817,11 @@ impl BundleRegistry {
     /// implementation loads sequentially. Parallelism can be added later with
     /// `futures::join_all` if needed.
     ///
-    /// `record_include_relationships` now takes `&self` (using `RwLock` for
-    /// interior mutability on `bundles`) and can be called from within
-    /// `compose_includes` when auto-wiring is implemented.
+    /// After successful include loading, automatically calls
+    /// `record_include_relationships` to persist the include graph
+    /// (parent → children, children → parent). This was previously a
+    /// documented limitation due to the `&self`/`&mut self` borrow
+    /// constraint, resolved by wrapping `bundles` in `RwLock` (F-056).
     fn compose_includes<'a>(
         &'a self,
         bundle: Bundle,
@@ -892,6 +894,25 @@ impl BundleRegistry {
 
             if loaded_includes.is_empty() {
                 return Ok(bundle);
+            }
+
+            // Record include relationships in registry state.
+            // Matches Python: self._record_include_relationships(parent_name, included_names)
+            //
+            // SAFETY: No self.bundles locks are held at this point.
+            // record_include_relationships acquires a write lock internally.
+            // Holding any bundles lock across the Phase 2 await calls above
+            // would deadlock here.
+            let parent_name = &bundle.name;
+            if !parent_name.is_empty() {
+                let included_names: Vec<String> = loaded_includes
+                    .iter()
+                    .filter(|b| !b.name.is_empty())
+                    .map(|b| b.name.clone())
+                    .collect();
+                if !included_names.is_empty() {
+                    self.record_include_relationships(parent_name, &included_names);
+                }
             }
 
             // Compose: includes first (as base), then bundle on top (bundle wins)

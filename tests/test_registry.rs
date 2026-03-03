@@ -1612,6 +1612,102 @@ async fn test_compose_includes_registered_namespace_missing_path_is_error() {
 }
 
 // ===========================================================================
+// compose_includes auto-wiring tests (F-057)
+// ===========================================================================
+
+#[tokio::test]
+async fn test_compose_includes_auto_records_relationships() {
+    // When compose_includes loads includes, it should automatically call
+    // record_include_relationships to persist the include graph.
+    let tmp = tempdir().unwrap();
+    let root = tmp.path();
+
+    // Create parent bundle
+    let parent_dir = root.join("parent-bundle");
+    fs::create_dir_all(&parent_dir).unwrap();
+
+    // Create child bundle
+    let child_dir = root.join("child-bundle");
+    fs::create_dir_all(&child_dir).unwrap();
+    write_simple_bundle_yaml(&child_dir, "child-bundle");
+
+    // Parent includes child via file:// URI
+    let child_uri = format!("file://{}", child_dir.display());
+    write_bundle_yaml_with_includes(&parent_dir, "parent-bundle", &[&child_uri]);
+
+    let parent_uri = format!("file://{}", parent_dir.display());
+
+    // Register both bundles
+    let mut registry = BundleRegistry::new(root.to_path_buf());
+    register_one(&mut registry, "parent-bundle", &parent_uri);
+    register_one(&mut registry, "child-bundle", &child_uri);
+
+    // Load parent (triggers compose_includes with child)
+    let bundle = registry.load_single(&parent_uri).await.unwrap();
+    assert_eq!(bundle.name, "parent-bundle");
+
+    // Verify include relationships were auto-recorded
+    let parent_state = registry.find_state("parent-bundle").unwrap();
+    assert!(
+        parent_state.includes.contains(&"child-bundle".to_string()),
+        "Parent should list child in includes after load. Got: {:?}",
+        parent_state.includes
+    );
+
+    let child_state = registry.find_state("child-bundle").unwrap();
+    assert!(
+        child_state
+            .included_by
+            .contains(&"parent-bundle".to_string()),
+        "Child should list parent in included_by after load. Got: {:?}",
+        child_state.included_by
+    );
+}
+
+#[tokio::test]
+async fn test_compose_includes_auto_records_skips_empty_names() {
+    // If include bundles have empty names, they should not be recorded
+    // in the relationships (matching Python's `if parent_name and included_names:`)
+    let tmp = tempdir().unwrap();
+    let root = tmp.path();
+
+    // Create a parent bundle with an empty name
+    let parent_dir = root.join("no-name-parent");
+    fs::create_dir_all(&parent_dir).unwrap();
+
+    // Create child
+    let child_dir = root.join("child-bundle");
+    fs::create_dir_all(&child_dir).unwrap();
+    write_simple_bundle_yaml(&child_dir, "child-bundle");
+
+    // Write parent with empty name but includes
+    let child_uri = format!("file://{}", child_dir.display());
+    let content = format!(
+        "name: \"\"\nversion: \"1.0.0\"\nincludes:\n  - \"{}\"\n",
+        child_uri
+    );
+    write_bundle_yaml(&parent_dir, &content);
+
+    let parent_uri = format!("file://{}", parent_dir.display());
+    let mut registry = BundleRegistry::new(root.to_path_buf());
+    // Register the child so we can verify its state after load
+    register_one(&mut registry, "child-bundle", &child_uri);
+
+    // Load should succeed (includes still work)
+    let _bundle = registry.load_single(&parent_uri).await.unwrap();
+
+    // Child should NOT have an included_by entry for the empty-name parent
+    let child_state = registry
+        .find_state("child-bundle")
+        .expect("child-bundle should exist in registry");
+    assert!(
+        child_state.included_by.is_empty(),
+        "Empty-name parent should not record include relationships. Got: {:?}",
+        child_state.included_by
+    );
+}
+
+// ===========================================================================
 // check_update / update lifecycle tests (F-055)
 // ===========================================================================
 
