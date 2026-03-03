@@ -1,7 +1,9 @@
 use serde_yaml_ng::{Mapping, Value};
 
 use amplifier_foundation::spawn::glob::is_glob_pattern;
-use amplifier_foundation::spawn::{apply_provider_preferences, ProviderPreference};
+use amplifier_foundation::spawn::{
+    apply_provider_preferences, apply_provider_preferences_with_resolution, ProviderPreference,
+};
 
 // -- helpers ----------------------------------------------------------
 
@@ -354,4 +356,217 @@ fn test_mount_plan_not_mutated() {
         .unwrap();
     assert_eq!(orig_config.get(str_val("priority")), Some(&int(10)));
     assert!(orig_config.get(str_val("model")).is_none());
+}
+
+// ==========================================================================
+// apply_provider_preferences_with_resolution (async, glob resolution)
+// ==========================================================================
+
+#[tokio::test]
+async fn test_with_resolution_empty_preferences() {
+    let mount_plan = mapping(&[(
+        "providers",
+        Value::Sequence(vec![provider_entry("provider-openai", &[])]),
+    )]);
+
+    let result =
+        apply_provider_preferences_with_resolution(&mount_plan, &[], |_provider: &str| async {
+            vec![]
+        })
+        .await;
+
+    // Empty prefs -> return clone of original
+    assert_eq!(result, mount_plan);
+}
+
+#[tokio::test]
+async fn test_with_resolution_no_glob() {
+    let mount_plan = mapping(&[(
+        "providers",
+        Value::Sequence(vec![provider_entry(
+            "provider-anthropic",
+            &[("priority", int(10))],
+        )]),
+    )]);
+
+    let prefs = vec![ProviderPreference::new(
+        "anthropic",
+        "claude-3-haiku-20240307",
+    )];
+
+    // Not a glob, so list_models should NOT be called
+    let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let called_clone = called.clone();
+    let result = apply_provider_preferences_with_resolution(&mount_plan, &prefs, |_| {
+        let c = called_clone.clone();
+        async move {
+            c.store(true, std::sync::atomic::Ordering::SeqCst);
+            vec![]
+        }
+    })
+    .await;
+
+    assert!(!called.load(std::sync::atomic::Ordering::SeqCst));
+
+    // Should still apply the override (exact model name)
+    let providers = result
+        .as_mapping()
+        .unwrap()
+        .get(str_val("providers"))
+        .unwrap()
+        .as_sequence()
+        .unwrap();
+    let config = providers[0]
+        .as_mapping()
+        .unwrap()
+        .get(str_val("config"))
+        .unwrap()
+        .as_mapping()
+        .unwrap();
+    assert_eq!(
+        config.get(str_val("model")),
+        Some(&str_val("claude-3-haiku-20240307"))
+    );
+    assert_eq!(config.get(str_val("priority")), Some(&int(0)));
+}
+
+#[tokio::test]
+async fn test_with_resolution_glob_resolved() {
+    let mount_plan = mapping(&[(
+        "providers",
+        Value::Sequence(vec![provider_entry(
+            "provider-anthropic",
+            &[("priority", int(5))],
+        )]),
+    )]);
+
+    let prefs = vec![ProviderPreference::new("anthropic", "claude-haiku-*")];
+
+    let result = apply_provider_preferences_with_resolution(&mount_plan, &prefs, |provider| {
+        assert_eq!(provider, "anthropic");
+        async {
+            vec![
+                "claude-haiku-20240101".to_string(),
+                "claude-haiku-20240307".to_string(),
+                "claude-haiku-20240201".to_string(),
+            ]
+        }
+    })
+    .await;
+
+    // Should resolve glob to latest matching model (descending sort)
+    let providers = result
+        .as_mapping()
+        .unwrap()
+        .get(str_val("providers"))
+        .unwrap()
+        .as_sequence()
+        .unwrap();
+    let config = providers[0]
+        .as_mapping()
+        .unwrap()
+        .get(str_val("config"))
+        .unwrap()
+        .as_mapping()
+        .unwrap();
+    assert_eq!(
+        config.get(str_val("model")),
+        Some(&str_val("claude-haiku-20240307"))
+    );
+}
+
+#[tokio::test]
+async fn test_with_resolution_glob_no_match_uses_original() {
+    let mount_plan = mapping(&[(
+        "providers",
+        Value::Sequence(vec![provider_entry("provider-openai", &[])]),
+    )]);
+
+    let prefs = vec![ProviderPreference::new("openai", "gpt-5-*")];
+
+    let result = apply_provider_preferences_with_resolution(&mount_plan, &prefs, |_| async {
+        vec!["gpt-4o".to_string(), "gpt-4o-mini".to_string()]
+    })
+    .await;
+
+    // Glob found no match -> use original pattern as-is
+    let providers = result
+        .as_mapping()
+        .unwrap()
+        .get(str_val("providers"))
+        .unwrap()
+        .as_sequence()
+        .unwrap();
+    let config = providers[0]
+        .as_mapping()
+        .unwrap()
+        .get(str_val("config"))
+        .unwrap()
+        .as_mapping()
+        .unwrap();
+    assert_eq!(config.get(str_val("model")), Some(&str_val("gpt-5-*")));
+}
+
+#[tokio::test]
+async fn test_with_resolution_no_matching_provider() {
+    let mount_plan = mapping(&[(
+        "providers",
+        Value::Sequence(vec![provider_entry("provider-openai", &[])]),
+    )]);
+
+    let prefs = vec![ProviderPreference::new("anthropic", "claude-*")];
+
+    let result =
+        apply_provider_preferences_with_resolution(&mount_plan, &prefs, |_| async { vec![] }).await;
+
+    // No matching provider -> return clone of original
+    assert_eq!(result, mount_plan);
+}
+
+#[tokio::test]
+async fn test_with_resolution_empty_model_list_from_callback() {
+    let mount_plan = mapping(&[(
+        "providers",
+        Value::Sequence(vec![provider_entry(
+            "provider-anthropic",
+            &[("priority", int(5))],
+        )]),
+    )]);
+
+    let prefs = vec![ProviderPreference::new("anthropic", "claude-*")];
+
+    // Callback returns empty list -- glob can't resolve, falls back to original pattern
+    let result =
+        apply_provider_preferences_with_resolution(&mount_plan, &prefs, |_| async { vec![] }).await;
+
+    let providers = result
+        .as_mapping()
+        .unwrap()
+        .get(str_val("providers"))
+        .unwrap()
+        .as_sequence()
+        .unwrap();
+    let config = providers[0]
+        .as_mapping()
+        .unwrap()
+        .get(str_val("config"))
+        .unwrap()
+        .as_mapping()
+        .unwrap();
+    // Falls back to the original glob pattern
+    assert_eq!(config.get(str_val("model")), Some(&str_val("claude-*")));
+    assert_eq!(config.get(str_val("priority")), Some(&int(0)));
+}
+
+#[tokio::test]
+async fn test_with_resolution_no_providers_in_plan() {
+    // Mount plan with empty providers list
+    let mount_plan = mapping(&[("providers", Value::Sequence(vec![]))]);
+
+    let prefs = vec![ProviderPreference::new("anthropic", "claude-*")];
+
+    let result =
+        apply_provider_preferences_with_resolution(&mount_plan, &prefs, |_| async { vec![] }).await;
+
+    assert_eq!(result, mount_plan);
 }

@@ -13,7 +13,7 @@
 phase: 9
 phase_name: "Wave 9 -- Module Infrastructure + API Gaps"
 epoch: 10
-next_action: "Implementing F-035 (InstallStateManager)"
+next_action: "Implementing F-036 (apply_provider_preferences_with_resolution)"
 blockers: []
 
 architecture_spec:
@@ -357,16 +357,19 @@ features:
   F-035-install-state:
     name: "Port InstallStateManager (fingerprint-based module install tracking)"
     module: "modules"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-001-cargo-scaffold"]
     started_at: "2025-01-18T00:00:00Z"
+    completed_at: "2025-01-18T00:30:00Z"
+    commit: "56af148"
   F-036-provider-prefs-resolution:
     name: "Port apply_provider_preferences_with_resolution (async glob pattern resolution)"
     module: "spawn"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-011-spawn"]
+    started_at: "2025-01-18T00:35:00Z"
   F-037-dead-stub-cleanup:
     name: "Clean up empty TODO stub files (registry/persistence, registry/includes, bundle/prompt)"
     module: "bundle, registry"
@@ -384,6 +387,6 @@ wave_gate:
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 34
-  last_updated: "2025-01-18T00:00:00Z"
+  total_features_completed: 35
+  last_updated: "2025-01-18T00:30:00Z"
   last_session: "session-014-wave9-modules"

@@ -135,7 +135,10 @@ pub use session::{
 
 // -- Spawn utilities --
 pub use spawn::glob::{is_glob_pattern, resolve_model_pattern};
-pub use spawn::{apply_provider_preferences, ModelResolutionResult, ProviderPreference};
+pub use spawn::{
+    apply_provider_preferences, apply_provider_preferences_with_resolution, ModelResolutionResult,
+    ProviderPreference,
+};
 
 // -- Updates --
 pub use updates::{check_bundle_status, update_bundle, BundleStatus};

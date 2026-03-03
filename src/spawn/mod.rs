@@ -160,6 +160,101 @@ fn apply_single_override(
 /// Returns a new mount plan with the first matching provider promoted.
 /// Returns a clone of the original mount plan if no preferences match.
 /// Returns the original mount plan unchanged if preferences is empty.
+/// Apply provider preferences to a mount plan, resolving glob model patterns.
+///
+/// Like [`apply_provider_preferences`], but also resolves glob patterns in
+/// model names (e.g., `"claude-haiku-*"` -> `"claude-3-haiku-20240307"`)
+/// by querying available models from the provider.
+///
+/// The `list_models` callback is called with the provider name (e.g., `"anthropic"`)
+/// and should return a list of available model names for that provider. It is only
+/// called when the model preference contains a glob pattern.
+///
+/// # Resolution strategy
+///
+/// 1. If model is not a glob pattern, use as-is (no callback invoked)
+/// 2. If model is a glob, call `list_models(provider_name)` to get available models
+/// 3. Filter available models with fnmatch-style glob matching
+/// 4. Sort matches descending (latest date/version wins)
+/// 5. Use first match, or original pattern if no matches
+///
+/// # Error handling
+///
+/// The `list_models` callback returns `Vec<String>` (not `Result`). Callers
+/// that query models over the network should handle errors internally and
+/// return an empty vec as fallback, matching Python's behavior where
+/// `resolve_model_pattern` catches exceptions and falls back gracefully.
+///
+/// # Example
+///
+/// ```ignore
+/// let result = apply_provider_preferences_with_resolution(
+///     &mount_plan,
+///     &prefs,
+///     |provider| async move {
+///         query_provider_models(provider).await.unwrap_or_default()
+///     },
+/// ).await;
+/// ```
+pub async fn apply_provider_preferences_with_resolution<F, Fut>(
+    mount_plan: &Value,
+    preferences: &[ProviderPreference],
+    list_models: F,
+) -> Value
+where
+    F: Fn(&str) -> Fut + Send + Sync,
+    Fut: std::future::Future<Output = Vec<String>> + Send,
+{
+    if preferences.is_empty() {
+        return mount_plan.clone();
+    }
+
+    let providers = mount_plan
+        .as_mapping()
+        .and_then(|m| m.get(Value::String("providers".to_string())))
+        .and_then(|v| v.as_sequence());
+
+    let providers = match providers {
+        Some(p) if !p.is_empty() => p,
+        _ => {
+            tracing::warn!("Provider preferences specified but no providers in mount plan");
+            return mount_plan.clone();
+        }
+    };
+
+    let lookup = build_provider_lookup(providers);
+
+    for pref in preferences {
+        if let Some(&target_idx) = lookup.get(&pref.provider) {
+            // Resolve model pattern if it's a glob
+            let resolved_model = if glob::is_glob_pattern(&pref.model) {
+                let available = list_models(&pref.provider).await;
+                glob::resolve_model_pattern(&pref.model, &available)
+                    .unwrap_or_else(|| pref.model.clone())
+            } else {
+                pref.model.clone()
+            };
+
+            return apply_single_override(mount_plan, providers, target_idx, &resolved_model);
+        }
+    }
+
+    // No preferences matched
+    tracing::warn!(
+        preferences = ?preferences.iter().map(|p| &p.provider).collect::<Vec<_>>(),
+        "No preferred providers found in mount plan"
+    );
+    mount_plan.clone()
+}
+
+/// Apply provider preferences to a mount plan.
+///
+/// Finds the first preferred provider that exists in the mount plan,
+/// promotes it to priority 0 (highest), and sets its model.
+///
+/// Returns a new mount plan with the first matching provider promoted.
+/// Returns a clone of the original mount plan if no preferences match.
+/// Returns the original mount plan unchanged if preferences is empty.
 pub fn apply_provider_preferences(mount_plan: &Value, preferences: &[ProviderPreference]) -> Value {
     if preferences.is_empty() {
         return mount_plan.clone();
