@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 16
-phase_name: "Wave 16 -- Registry interior mutability, auto-wiring, namespace preload"
-epoch: 17
-next_action: "Wave 16 COMPLETE. 576 tests passing, 0 clippy warnings, cargo fmt clean. Consider: PreparedBundle foundations (struct + _build_bundles_for_resolver + _create_system_prompt_factory), PyO3 bindings, batch-save optimization for record_include_relationships"
+phase: 17
+phase_name: "Wave 17 -- Registry decomposition, batch-save, PreparedBundle foundations"
+epoch: 18
+next_action: "Implement F-059, F-060, F-061"
 blockers: []
 
 architecture_spec:
@@ -590,16 +590,38 @@ features:
     completed_at: "2025-01-24T01:30:00Z"
     commit: "3b1a355"
 
+  F-059-registry-decompose:
+    name: "Decompose registry/mod.rs (1,353 lines) into submodules"
+    module: "registry"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-058-preload-namespace-bundles"]
+    started_at: "2025-01-25T00:00:00Z"
+
+  F-060-batch-save:
+    name: "Batch-save optimization for record_include_relationships"
+    module: "registry"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-059-registry-decompose"]
+
+  F-061-prepared-bundle:
+    name: "PreparedBundle struct + _build_bundles_for_resolver + _create_system_prompt_factory"
+    module: "bundle"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-059-registry-decompose"]
+
 wave_gate:
-  current_wave: 16
+  current_wave: 17
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
   approval_status: "approved"
-  notes: "Wave 16 COMPLETE: 576 tests, 0 clippy warnings, cargo fmt clean. Registry interior mutability via RwLock, auto-record include relationships, namespace preload for cold-start resolution."
+  notes: "Wave 17 in progress: Registry decomposition, batch-save optimization, PreparedBundle foundations."
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
   total_features_completed: 58
-  last_updated: "2025-01-24T01:30:00Z"
-  last_session: "session-021-wave16-registry-rwlock"
+  last_updated: "2025-01-25T00:00:00Z"
+  last_session: "session-022-wave17-decompose-prepared"
