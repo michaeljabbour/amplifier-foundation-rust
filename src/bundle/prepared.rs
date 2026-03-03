@@ -1,1 +1,1 @@
-// TODO: PreparedBundle (session lifecycle)
+// TODO: PreparedBundle (session lifecycle) [ASYNC]

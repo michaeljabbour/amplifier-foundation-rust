@@ -1,1 +1,1 @@
-// TODO: JSON serialization for registry
+// TODO: JSON serialization for registry state

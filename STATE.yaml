@@ -71,19 +71,19 @@ features:
   F-004-test-port-wave2:
     name: "Port Wave 2 tests + stubs"
     module: "io, sources, mentions, session"
-    status: "in-progress"
+    status: "done"
     spec: "specs/features/wave-0/F-004-test-port-wave2.md"
     depends_on: ["F-001-cargo-scaffold", "F-002-error-types"]
     started_at: "2025-01-15T10:00:00Z"
-    completed_at: null
-    commit: null
+    completed_at: "2025-01-15T10:45:00Z"
+    commit: "190f9df"
   F-005-test-port-wave3:
     name: "Port Wave 3 tests + stubs"
     module: "bundle, registry, validator"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/features/wave-0/F-005-test-port-wave3.md"
     depends_on: ["F-001-cargo-scaffold", "F-002-error-types"]
-    started_at: null
+    started_at: "2025-01-15T10:50:00Z"
     completed_at: null
     commit: null
 
@@ -96,6 +96,6 @@ wave_gate:
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 3
-  last_updated: "2026-03-03T02:45:00Z"
-  last_session: "session-001-wave0-scaffold"
+  total_features_completed: 4
+  last_updated: "2025-01-15T10:45:00Z"
+  last_session: "session-002-wave0-f004-f005"
