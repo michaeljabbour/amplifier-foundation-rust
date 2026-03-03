@@ -65,7 +65,7 @@ fn create_test_zip(zip_path: &std::path::Path, entries: &[(&str, &str)]) {
 // ===========================================================================
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_file_can_handle_file_uri() {
     let handler = FileSourceHandler::new();
     let parsed = uri_with_scheme("file");
@@ -73,7 +73,7 @@ fn test_file_can_handle_file_uri() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_file_can_handle_absolute_path() {
     // Absolute paths are represented with scheme="file" after parsing.
     let handler = FileSourceHandler::new();
@@ -82,7 +82,7 @@ fn test_file_can_handle_absolute_path() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_file_cannot_handle_git() {
     let handler = FileSourceHandler::new();
     let parsed = uri_with_scheme("git+https");
@@ -94,7 +94,7 @@ fn test_file_cannot_handle_git() {
 // ===========================================================================
 
 #[tokio::test]
-#[ignore = "Wave 2"]
+
 async fn test_file_resolve_existing_file() {
     let tmp = tempdir().expect("failed to create temp dir");
     let cache_dir = tempdir().expect("failed to create cache dir");
@@ -117,7 +117,7 @@ async fn test_file_resolve_existing_file() {
 }
 
 #[tokio::test]
-#[ignore = "Wave 2"]
+
 async fn test_file_resolve_with_subpath() {
     let tmp = tempdir().expect("failed to create temp dir");
     let cache_dir = tempdir().expect("failed to create cache dir");
@@ -146,7 +146,7 @@ async fn test_file_resolve_with_subpath() {
 // ===========================================================================
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_http_can_handle_https() {
     let handler = HttpSourceHandler::new();
     let parsed = uri_with_scheme("https");
@@ -154,7 +154,7 @@ fn test_http_can_handle_https() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_http_can_handle_http() {
     let handler = HttpSourceHandler::new();
     let parsed = uri_with_scheme("http");
@@ -162,7 +162,7 @@ fn test_http_can_handle_http() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_http_cannot_handle_file() {
     let handler = HttpSourceHandler::new();
     let parsed = uri_with_scheme("file");
@@ -170,7 +170,7 @@ fn test_http_cannot_handle_file() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_http_cannot_handle_git() {
     let handler = HttpSourceHandler::new();
     let parsed = uri_with_scheme("git+https");
@@ -182,7 +182,7 @@ fn test_http_cannot_handle_git() {
 // ===========================================================================
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_zip_can_handle_zip_https() {
     let handler = ZipSourceHandler::new();
     let parsed = uri_with_scheme("zip+https");
@@ -190,7 +190,7 @@ fn test_zip_can_handle_zip_https() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_zip_can_handle_zip_file() {
     let handler = ZipSourceHandler::new();
     let parsed = uri_with_scheme("zip+file");
@@ -198,7 +198,7 @@ fn test_zip_can_handle_zip_file() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_zip_cannot_handle_plain_https() {
     let handler = ZipSourceHandler::new();
     let parsed = uri_with_scheme("https");
@@ -206,7 +206,7 @@ fn test_zip_cannot_handle_plain_https() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_zip_cannot_handle_git() {
     let handler = ZipSourceHandler::new();
     let parsed = uri_with_scheme("git+https");
@@ -218,7 +218,7 @@ fn test_zip_cannot_handle_git() {
 // ===========================================================================
 
 #[tokio::test]
-#[ignore = "Wave 2"]
+
 async fn test_zip_resolve_local_zip() {
     let tmp = tempdir().expect("failed to create temp dir");
     let cache_dir = tempdir().expect("failed to create cache dir");
@@ -247,7 +247,7 @@ async fn test_zip_resolve_local_zip() {
 }
 
 #[tokio::test]
-#[ignore = "Wave 2"]
+
 async fn test_zip_resolve_local_zip_with_subpath() {
     let tmp = tempdir().expect("failed to create temp dir");
     let cache_dir = tempdir().expect("failed to create cache dir");
@@ -281,7 +281,7 @@ async fn test_zip_resolve_local_zip_with_subpath() {
 }
 
 #[tokio::test]
-#[ignore = "Wave 2"]
+
 async fn test_zip_uses_cache() {
     let tmp = tempdir().expect("failed to create temp dir");
     let cache_dir = tempdir().expect("failed to create cache dir");

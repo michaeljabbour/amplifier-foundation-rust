@@ -1,10 +1,13 @@
 use std::path::{Path, PathBuf};
-use async_trait::async_trait;
-use crate::paths::uri::{ParsedURI, ResolvedSource};
-use super::SourceHandler;
 
+use async_trait::async_trait;
+
+use super::SourceHandler;
+use crate::paths::uri::{ParsedURI, ResolvedSource};
+
+/// Handler for file:// URIs and local paths.
 pub struct FileSourceHandler {
-    pub base_path: Option<PathBuf>,
+    pub base_path: PathBuf,
 }
 
 impl Default for FileSourceHandler {
@@ -15,25 +18,60 @@ impl Default for FileSourceHandler {
 
 impl FileSourceHandler {
     pub fn new() -> Self {
-        todo!()
+        Self {
+            base_path: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+        }
     }
 
-    pub fn with_base_path(_base_path: PathBuf) -> Self {
-        todo!()
+    pub fn with_base_path(base_path: PathBuf) -> Self {
+        Self { base_path }
     }
 }
 
 #[async_trait]
 impl SourceHandler for FileSourceHandler {
-    fn can_handle(&self, _parsed: &ParsedURI) -> bool {
-        todo!()
+    fn can_handle(&self, parsed: &ParsedURI) -> bool {
+        parsed.is_file()
     }
 
     async fn resolve(
         &self,
-        _parsed: &ParsedURI,
+        parsed: &ParsedURI,
         _cache_dir: &Path,
     ) -> crate::error::Result<ResolvedSource> {
-        todo!()
+        let path_str = &parsed.path;
+
+        // Handle relative paths
+        let resolved_path = if path_str.starts_with("./") || path_str.starts_with("../") {
+            self.base_path.join(path_str)
+        } else {
+            PathBuf::from(path_str)
+        };
+
+        // Apply subpath if specified
+        let active_path = if !parsed.subpath.is_empty() {
+            resolved_path.join(&parsed.subpath)
+        } else {
+            resolved_path.clone()
+        };
+
+        if !active_path.exists() {
+            return Err(crate::error::BundleError::NotFound {
+                uri: format!("File not found: {}", active_path.display()),
+            });
+        }
+
+        // Determine source_root
+        let source_root = if !parsed.subpath.is_empty() {
+            // Subdirectory URI: source_root is the base path (before subpath)
+            resolved_path
+        } else {
+            active_path.clone()
+        };
+
+        Ok(ResolvedSource {
+            active_path,
+            source_root,
+        })
     }
 }
