@@ -163,7 +163,7 @@ fn resolve_mention<'a>(
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'a>> {
     Box::pin(async move {
         // Resolve mention to path
-        let path = match resolver.resolve(&mention) {
+        let path = match resolver.resolve(&mention).await {
             Some(p) => p,
             None => {
                 result.failed.push(mention);

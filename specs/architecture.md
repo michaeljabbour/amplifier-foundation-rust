@@ -72,10 +72,10 @@ src/
     http.rs                 # HttpSourceHandler [ASYNC]
     zip.rs                  # ZipSourceHandler [ASYNC]
   mentions/
-    mod.rs                  # MentionResolver trait
+    mod.rs                  # MentionResolver trait [ASYNC]
     models.rs               # ContextFile, MentionResult [SYNC]
     parser.rs               # parse_mentions [SYNC]
-    resolver.rs             # BaseMentionResolver [SYNC]
+    resolver.rs             # BaseMentionResolver [ASYNC]
     loader.rs               # load_mentions pipeline [ASYNC]
     dedup.rs                # ContentDeduplicator [SYNC]
     utils.rs                # format_directory_listing [SYNC]

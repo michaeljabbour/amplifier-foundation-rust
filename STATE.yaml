@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 21
-phase_name: "Wave 21 -- Async persistence, validate_cached_paths, load_agent_metadata"
-epoch: 22
-next_action: "Wave 21 COMPLETE. 601 tests passing, 0 clippy warnings, cargo fmt clean. All persistence + agent metadata I/O now async. Consider: async MentionResolver::resolve(), PyO3 bindings, benchmarks, async load_persisted_state (requires async constructor)"
+phase: 22
+phase_name: "Wave 22 -- Async MentionResolver, async registry constructor, concurrent validate"
+epoch: 23
+next_action: "Implement F-074-async-mention-resolver"
 blockers: []
 
 architecture_spec:
@@ -736,16 +736,38 @@ features:
     completed_at: "2025-01-29T01:00:00Z"
     commit: "f50ead7"
 
+  F-074-async-mention-resolver:
+    name: "Convert MentionResolver trait to async_trait, BaseMentionResolver to async with tokio::fs"
+    module: "mentions, bundle"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-073-async-load-agent-metadata"]
+    started_at: "2025-01-30T00:00:00Z"
+
+  F-075-async-registry-constructor:
+    name: "Add BundleRegistry::new_async() with async load_persisted_state"
+    module: "registry"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-073-async-load-agent-metadata"]
+
+  F-076-concurrent-validate:
+    name: "Use futures::join_all in validate_cached_paths for concurrent metadata checks"
+    module: "registry"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-073-async-load-agent-metadata"]
+
 wave_gate:
-  current_wave: 21
+  current_wave: 22
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
-  approval_status: "approved"
-  notes: "Wave 21 COMPLETE: 601 tests (all passing), 0 clippy warnings, cargo fmt clean. Persistence save/load, validate_cached_paths, and agent metadata all now fully async."
+  approval_status: "in-progress"
+  notes: "Wave 22: Async MentionResolver trait, async registry constructor, concurrent validate_cached_paths"
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
   total_features_completed: 73
-  last_updated: "2025-01-29T01:00:00Z"
-  last_session: "session-026-wave21-async-persistence"
+  last_updated: "2025-01-30T00:00:00Z"
+  last_session: "session-027-wave22-async-mention-resolver"

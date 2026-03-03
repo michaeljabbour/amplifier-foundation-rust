@@ -153,7 +153,7 @@ impl SystemPromptFactory for BundleSystemPromptFactory {
             // Load and append all context files (re-read each call).
             // Uses tokio::fs::read_to_string for async I/O on context files.
             // Note: load_mentions() uses tokio::fs for file I/O (migrated in F-065).
-            // MentionResolver::resolve() still uses sync path.exists() checks (fast local stat).
+            // MentionResolver::resolve() uses async tokio::fs::metadata checks (F-074).
             for (context_name, context_path) in &self.bundle.context {
                 if let Ok(content) = tokio::fs::read_to_string(context_path).await {
                     instruction_parts.push(format!("# Context: {}\n\n{}", context_name, content));

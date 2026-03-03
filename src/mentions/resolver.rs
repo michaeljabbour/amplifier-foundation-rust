@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -69,7 +70,7 @@ impl BaseMentionResolver {
 
     /// Resolve a mention string to a file path.
     /// Returns None if the file doesn't exist.
-    pub fn resolve(&self, mention: &str) -> Option<PathBuf> {
+    pub async fn resolve(&self, mention: &str) -> Option<PathBuf> {
         if !mention.starts_with('@') {
             return None;
         }
@@ -99,12 +100,12 @@ impl BaseMentionResolver {
                 // that Python's resolve_context_path does not have.
                 if let Some(ns_base) = self.bundles.get(namespace) {
                     let path = ns_base.join(rel_path);
-                    if path.exists() {
+                    if tokio::fs::metadata(&path).await.is_ok() {
                         return Some(path);
                     }
                     // Try with .md extension
                     let path_md = ns_base.join(format!("{rel_path}.md"));
-                    if path_md.exists() {
+                    if tokio::fs::metadata(&path_md).await.is_ok() {
                         return Some(path_md);
                     }
                 }
@@ -117,12 +118,12 @@ impl BaseMentionResolver {
             let home = dirs::home_dir()?;
             let rest = mention_body.strip_prefix("~/").unwrap_or(mention_body);
             let path = home.join(rest);
-            if path.exists() {
+            if tokio::fs::metadata(&path).await.is_ok() {
                 return Some(path);
             }
             // Try with .md extension
             let path_md = home.join(format!("{rest}.md"));
-            if path_md.exists() {
+            if tokio::fs::metadata(&path_md).await.is_ok() {
                 return Some(path_md);
             }
             return None;
@@ -130,13 +131,13 @@ impl BaseMentionResolver {
 
         // Pattern 3: @./path or @path (relative to base_path)
         let path = self.base_path.join(mention_body);
-        if path.exists() {
+        if tokio::fs::metadata(&path).await.is_ok() {
             return Some(path);
         }
 
         // Try with .md extension
         let path_md = self.base_path.join(format!("{mention_body}.md"));
-        if path_md.exists() {
+        if tokio::fs::metadata(&path_md).await.is_ok() {
             return Some(path_md);
         }
 
@@ -144,8 +145,9 @@ impl BaseMentionResolver {
     }
 }
 
+#[async_trait]
 impl super::MentionResolver for BaseMentionResolver {
-    fn resolve(&self, mention: &str) -> Option<PathBuf> {
-        self.resolve(mention)
+    async fn resolve(&self, mention: &str) -> Option<PathBuf> {
+        self.resolve(mention).await
     }
 }

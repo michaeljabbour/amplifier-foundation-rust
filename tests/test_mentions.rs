@@ -112,9 +112,9 @@ fn test_explicit_relative_path() {
 // TestBaseMentionResolver
 // ---------------------------------------------------------------------------
 
-#[test]
+#[tokio::test]
 #[serial]
-fn test_resolve_simple_file() {
+async fn test_resolve_simple_file() {
     let tmp = tempfile::tempdir().unwrap();
     let file_path = tmp.path().join("AGENTS.md");
     fs::write(&file_path, "agent content").unwrap();
@@ -123,7 +123,7 @@ fn test_resolve_simple_file() {
     std::env::set_current_dir(tmp.path()).unwrap();
 
     let resolver = BaseMentionResolver::new();
-    let resolved = resolver.resolve("@AGENTS.md");
+    let resolved = resolver.resolve("@AGENTS.md").await;
     assert!(resolved.is_some());
     assert_eq!(
         resolved.unwrap().canonicalize().unwrap(),
@@ -133,9 +133,9 @@ fn test_resolve_simple_file() {
     std::env::set_current_dir(old_dir).unwrap();
 }
 
-#[test]
+#[tokio::test]
 #[serial]
-fn test_resolve_dot_directory() {
+async fn test_resolve_dot_directory() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join(".amplifier");
     fs::create_dir_all(&dir).unwrap();
@@ -146,7 +146,7 @@ fn test_resolve_dot_directory() {
     std::env::set_current_dir(tmp.path()).unwrap();
 
     let resolver = BaseMentionResolver::new();
-    let resolved = resolver.resolve("@.amplifier/AGENTS.md");
+    let resolved = resolver.resolve("@.amplifier/AGENTS.md").await;
     assert!(resolved.is_some());
     assert_eq!(
         resolved.unwrap().canonicalize().unwrap(),
@@ -156,9 +156,9 @@ fn test_resolve_dot_directory() {
     std::env::set_current_dir(old_dir).unwrap();
 }
 
-#[test]
+#[tokio::test]
 #[serial]
-fn test_resolve_explicit_relative() {
+async fn test_resolve_explicit_relative() {
     let tmp = tempfile::tempdir().unwrap();
     let file_path = tmp.path().join("AGENTS.md");
     fs::write(&file_path, "agent content").unwrap();
@@ -167,7 +167,7 @@ fn test_resolve_explicit_relative() {
     std::env::set_current_dir(tmp.path()).unwrap();
 
     let resolver = BaseMentionResolver::new();
-    let resolved = resolver.resolve("@./AGENTS.md");
+    let resolved = resolver.resolve("@./AGENTS.md").await;
     assert!(resolved.is_some());
     // Should resolve to the same canonical path as the file
     assert_eq!(
@@ -178,9 +178,9 @@ fn test_resolve_explicit_relative() {
     std::env::set_current_dir(old_dir).unwrap();
 }
 
-#[test]
+#[tokio::test]
 #[serial]
-fn test_resolve_explicit_relative_subdir() {
+async fn test_resolve_explicit_relative_subdir() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join(".amplifier");
     fs::create_dir_all(&dir).unwrap();
@@ -191,7 +191,7 @@ fn test_resolve_explicit_relative_subdir() {
     std::env::set_current_dir(tmp.path()).unwrap();
 
     let resolver = BaseMentionResolver::new();
-    let resolved = resolver.resolve("@./.amplifier/AGENTS.md");
+    let resolved = resolver.resolve("@./.amplifier/AGENTS.md").await;
     assert!(resolved.is_some());
     assert_eq!(
         resolved.unwrap().canonicalize().unwrap(),
@@ -201,9 +201,9 @@ fn test_resolve_explicit_relative_subdir() {
     std::env::set_current_dir(old_dir).unwrap();
 }
 
-#[test]
+#[tokio::test]
 #[serial]
-fn test_resolve_home_tilde_path() {
+async fn test_resolve_home_tilde_path() {
     let tmp = tempfile::tempdir().unwrap();
     let fake_home = tmp.path().join("fakehome");
     let amp_dir = fake_home.join(".amplifier");
@@ -215,7 +215,7 @@ fn test_resolve_home_tilde_path() {
     unsafe { std::env::set_var("HOME", &fake_home) };
 
     let resolver = BaseMentionResolver::new();
-    let resolved = resolver.resolve("@~/.amplifier/AGENTS.md");
+    let resolved = resolver.resolve("@~/.amplifier/AGENTS.md").await;
     assert!(resolved.is_some());
     assert_eq!(
         resolved.unwrap().canonicalize().unwrap(),
@@ -223,9 +223,9 @@ fn test_resolve_home_tilde_path() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[serial]
-fn test_resolve_home_tilde_md_fallback() {
+async fn test_resolve_home_tilde_md_fallback() {
     let tmp = tempfile::tempdir().unwrap();
     let fake_home = tmp.path().join("fakehome");
     let amp_dir = fake_home.join(".amplifier");
@@ -238,7 +238,7 @@ fn test_resolve_home_tilde_md_fallback() {
 
     let resolver = BaseMentionResolver::new();
     // Mention without .md extension should fall back to finding AGENTS.md
-    let resolved = resolver.resolve("@~/.amplifier/AGENTS");
+    let resolved = resolver.resolve("@~/.amplifier/AGENTS").await;
     assert!(resolved.is_some());
     assert_eq!(
         resolved.unwrap().canonicalize().unwrap(),
@@ -246,9 +246,9 @@ fn test_resolve_home_tilde_md_fallback() {
     );
 }
 
-#[test]
+#[tokio::test]
 #[serial]
-fn test_resolve_md_extension_fallback() {
+async fn test_resolve_md_extension_fallback() {
     let tmp = tempfile::tempdir().unwrap();
     let file_path = tmp.path().join("AGENTS.md");
     fs::write(&file_path, "agent content").unwrap();
@@ -258,7 +258,7 @@ fn test_resolve_md_extension_fallback() {
 
     let resolver = BaseMentionResolver::new();
     // Mention without .md extension should fall back to finding AGENTS.md
-    let resolved = resolver.resolve("@AGENTS");
+    let resolved = resolver.resolve("@AGENTS").await;
     assert!(resolved.is_some());
     assert_eq!(
         resolved.unwrap().canonicalize().unwrap(),
@@ -268,32 +268,31 @@ fn test_resolve_md_extension_fallback() {
     std::env::set_current_dir(old_dir).unwrap();
 }
 
-#[test]
+#[tokio::test]
 #[serial]
-fn test_resolve_not_found_returns_none() {
+async fn test_resolve_not_found_returns_none() {
     let tmp = tempfile::tempdir().unwrap();
 
     let old_dir = std::env::current_dir().unwrap();
     std::env::set_current_dir(tmp.path()).unwrap();
 
     let resolver = BaseMentionResolver::new();
-    let resolved = resolver.resolve("@nonexistent.md");
+    let resolved = resolver.resolve("@nonexistent.md").await;
     assert!(resolved.is_none());
 
     std::env::set_current_dir(old_dir).unwrap();
 }
 
-#[test]
-
-fn test_resolve_bundle_pattern_unchanged() {
+#[tokio::test]
+async fn test_resolve_bundle_pattern_unchanged() {
     let resolver = BaseMentionResolver::with_bundles(HashMap::new());
-    let resolved = resolver.resolve("@foundation:context/file.md");
+    let resolved = resolver.resolve("@foundation:context/file.md").await;
     assert!(resolved.is_none());
 }
 
-#[test]
+#[tokio::test]
 #[serial]
-fn test_resolve_uses_base_path_not_cwd() {
+async fn test_resolve_uses_base_path_not_cwd() {
     let tmp = tempfile::tempdir().unwrap();
     let base_dir = tmp.path().join("base");
     fs::create_dir_all(&base_dir).unwrap();
@@ -310,7 +309,7 @@ fn test_resolve_uses_base_path_not_cwd() {
     // Resolver with explicit base_path should resolve relative to base_dir,
     // NOT the current working directory (other_dir).
     let resolver = BaseMentionResolver::with_base_path(base_dir.clone());
-    let resolved = resolver.resolve("@AGENTS.md");
+    let resolved = resolver.resolve("@AGENTS.md").await;
     assert!(resolved.is_some());
     assert_eq!(
         resolved.unwrap().canonicalize().unwrap(),
@@ -319,7 +318,7 @@ fn test_resolve_uses_base_path_not_cwd() {
 
     // Verify that a default resolver (no base_path) would NOT find it from CWD
     let default_resolver = BaseMentionResolver::new();
-    let not_found = default_resolver.resolve("@AGENTS.md");
+    let not_found = default_resolver.resolve("@AGENTS.md").await;
     assert!(not_found.is_none());
 
     std::env::set_current_dir(old_dir).unwrap();
@@ -625,8 +624,8 @@ fn test_format_context_block_with_real_files() {
 // BaseMentionResolver -- context dict namespace resolution (F-063)
 // ==========================================================================
 
-#[test]
-fn test_resolve_namespace_via_context_dict() {
+#[tokio::test]
+async fn test_resolve_namespace_via_context_dict() {
     // When context dict has an entry for the name, it should resolve directly
     // without checking the filesystem (matching Python's resolve_context_path)
     let mut bundles = HashMap::new();
@@ -645,12 +644,12 @@ fn test_resolve_namespace_via_context_dict() {
     };
 
     // @foundation:overview should resolve via context dict, not base_path join
-    let result = resolver.resolve("@foundation:overview");
+    let result = resolver.resolve("@foundation:overview").await;
     assert_eq!(result, Some(PathBuf::from("/custom/path/overview.md")));
 }
 
-#[test]
-fn test_resolve_namespace_context_dict_takes_priority() {
+#[tokio::test]
+async fn test_resolve_namespace_context_dict_takes_priority() {
     // Context dict should take priority over base_path join even when file exists
     let tmp = tempfile::tempdir().unwrap();
     let ns_base = tmp.path().join("ns");
@@ -673,12 +672,12 @@ fn test_resolve_namespace_context_dict_takes_priority() {
     };
 
     // @myns:guide.md should resolve to custom path from context dict, not ns_base/guide.md
-    let result = resolver.resolve("@myns:guide.md");
+    let result = resolver.resolve("@myns:guide.md").await;
     assert_eq!(result, Some(custom_path));
 }
 
-#[test]
-fn test_resolve_namespace_falls_back_to_base_path_when_not_in_context() {
+#[tokio::test]
+async fn test_resolve_namespace_falls_back_to_base_path_when_not_in_context() {
     // When context dict doesn't have the name, fall back to base_path join
     let tmp = tempfile::tempdir().unwrap();
     let ns_base = tmp.path().join("ns");
@@ -699,12 +698,12 @@ fn test_resolve_namespace_falls_back_to_base_path_when_not_in_context() {
     };
 
     // @myns:readme.md should fall back to ns_base/readme.md
-    let result = resolver.resolve("@myns:readme.md");
+    let result = resolver.resolve("@myns:readme.md").await;
     assert_eq!(result, Some(ns_base.join("readme.md")));
 }
 
-#[test]
-fn test_resolve_namespace_empty_context_preserves_old_behavior() {
+#[tokio::test]
+async fn test_resolve_namespace_empty_context_preserves_old_behavior() {
     // With empty context (default), behavior should be exactly as before F-063
     let tmp = tempfile::tempdir().unwrap();
     let ns_base = tmp.path().join("ns");
@@ -716,12 +715,12 @@ fn test_resolve_namespace_empty_context_preserves_old_behavior() {
 
     let resolver = BaseMentionResolver::with_bundles(bundles);
 
-    let result = resolver.resolve("@ns:file.txt");
+    let result = resolver.resolve("@ns:file.txt").await;
     assert_eq!(result, Some(ns_base.join("file.txt")));
 }
 
-#[test]
-fn test_resolve_namespace_unknown_namespace_returns_none() {
+#[tokio::test]
+async fn test_resolve_namespace_unknown_namespace_returns_none() {
     // Unknown namespace should still return None even if context has the key
     let mut context = indexmap::IndexMap::new();
     context.insert(
@@ -736,6 +735,6 @@ fn test_resolve_namespace_unknown_namespace_returns_none() {
     };
 
     // @unknown:overview should return None because "unknown" is not in bundles
-    let result = resolver.resolve("@unknown:overview");
+    let result = resolver.resolve("@unknown:overview").await;
     assert!(result.is_none());
 }

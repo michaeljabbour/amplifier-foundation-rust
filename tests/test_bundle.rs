@@ -1700,8 +1700,8 @@ async fn test_create_system_prompt_factory_rereads_files() {
 }
 
 // Test for enhanced namespace resolution in BaseMentionResolver
-#[test]
-fn test_mention_resolver_namespace_resolution() {
+#[tokio::test]
+async fn test_mention_resolver_namespace_resolution() {
     let tmp = tempdir().unwrap();
     let ns_path = tmp.path().join("foundation");
     fs::create_dir_all(&ns_path).unwrap();
@@ -1717,14 +1717,14 @@ fn test_mention_resolver_namespace_resolution() {
     };
 
     // @foundation:context should resolve to foundation/context.md
-    let resolved = resolver.resolve("@foundation:context");
+    let resolved = resolver.resolve("@foundation:context").await;
     assert!(resolved.is_some());
     let path = resolved.unwrap();
     assert!(path.to_str().unwrap().contains("context.md"));
 }
 
-#[test]
-fn test_mention_resolver_namespace_not_found() {
+#[tokio::test]
+async fn test_mention_resolver_namespace_not_found() {
     let resolver = amplifier_foundation::BaseMentionResolver {
         base_path: PathBuf::from("/tmp"),
         bundles: HashMap::new(),
@@ -1732,6 +1732,6 @@ fn test_mention_resolver_namespace_not_found() {
     };
 
     // Unknown namespace should return None
-    let resolved = resolver.resolve("@unknown:path");
+    let resolved = resolver.resolve("@unknown:path").await;
     assert!(resolved.is_none());
 }
