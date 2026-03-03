@@ -7,12 +7,13 @@ use tracing::warn;
 /// Read a file with retry logic for cloud sync delays.
 ///
 /// Retries with exponential backoff when encountering I/O errors (errno 5).
+/// Uses `tokio::fs` for non-blocking file I/O.
 pub async fn read_with_retry(path: &Path, max_retries: u32) -> crate::error::Result<String> {
     let max_retries = max_retries.max(1); // At least one attempt
     let mut delay_ms: u64 = 100;
 
     for attempt in 0..max_retries {
-        match fs::read_to_string(path) {
+        match tokio::fs::read_to_string(path).await {
             Ok(content) => return Ok(content),
             Err(e) => {
                 let is_io_error = e.raw_os_error() == Some(5);
@@ -37,6 +38,8 @@ pub async fn read_with_retry(path: &Path, max_retries: u32) -> crate::error::Res
 }
 
 /// Write a file with retry logic for cloud sync delays.
+///
+/// Uses `tokio::fs` for non-blocking file I/O.
 pub async fn write_with_retry(
     path: &Path,
     content: &str,
@@ -46,14 +49,12 @@ pub async fn write_with_retry(
     let mut delay_ms: u64 = 100;
 
     for attempt in 0..max_retries {
-        // Ensure parent directory exists
+        // Ensure parent directory exists (create_dir_all is idempotent)
         if let Some(parent) = path.parent() {
-            if !parent.exists() {
-                let _ = fs::create_dir_all(parent);
-            }
+            let _ = tokio::fs::create_dir_all(parent).await;
         }
 
-        match fs::write(path, content) {
+        match tokio::fs::write(path, content).await {
             Ok(()) => return Ok(()),
             Err(e) => {
                 let is_io_error = e.raw_os_error() == Some(5);

@@ -1,6 +1,8 @@
 use std::fs;
 
-use amplifier_foundation::io::files::{write_with_backup, write_with_backup_bytes};
+use amplifier_foundation::io::files::{
+    read_with_retry, write_with_backup, write_with_backup_bytes, write_with_retry,
+};
 use tempfile::tempdir;
 
 // ---------------------------------------------------------------------------
@@ -115,4 +117,81 @@ fn test_binary_mode() {
     let backup_path = file_path.with_extension("bin.backup");
     assert!(backup_path.exists(), "binary backup file should exist");
     assert_eq!(fs::read(&backup_path).unwrap(), b"old bytes");
+}
+
+// ---------------------------------------------------------------------------
+// TestReadWithRetry (async)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_read_with_retry_success() {
+    let tmp = tempdir().unwrap();
+    let file_path = tmp.path().join("readable.txt");
+    fs::write(&file_path, "hello async").unwrap();
+
+    let content = read_with_retry(&file_path, 3).await.unwrap();
+    assert_eq!(content, "hello async");
+}
+
+#[tokio::test]
+async fn test_read_with_retry_missing_file() {
+    let tmp = tempdir().unwrap();
+    let file_path = tmp.path().join("nonexistent.txt");
+
+    let result = read_with_retry(&file_path, 1).await;
+    assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn test_read_with_retry_unicode() {
+    let tmp = tempdir().unwrap();
+    let file_path = tmp.path().join("unicode.txt");
+    let content = "Hello 世界 🌍";
+    fs::write(&file_path, content).unwrap();
+
+    let result = read_with_retry(&file_path, 1).await.unwrap();
+    assert_eq!(result, content);
+}
+
+// ---------------------------------------------------------------------------
+// TestWriteWithRetry (async)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_write_with_retry_success() {
+    let tmp = tempdir().unwrap();
+    let file_path = tmp.path().join("writable.txt");
+
+    write_with_retry(&file_path, "async content", 3)
+        .await
+        .unwrap();
+
+    assert_eq!(fs::read_to_string(&file_path).unwrap(), "async content");
+}
+
+#[tokio::test]
+async fn test_write_with_retry_creates_parent_dirs() {
+    let tmp = tempdir().unwrap();
+    let nested_path = tmp.path().join("x").join("y").join("z").join("deep.txt");
+
+    // Parent directories do not exist yet.
+    assert!(!nested_path.parent().unwrap().exists());
+
+    write_with_retry(&nested_path, "deep content", 1)
+        .await
+        .unwrap();
+
+    assert!(nested_path.exists());
+    assert_eq!(fs::read_to_string(&nested_path).unwrap(), "deep content");
+}
+
+#[tokio::test]
+async fn test_write_with_retry_overwrites() {
+    let tmp = tempdir().unwrap();
+    let file_path = tmp.path().join("overwrite.txt");
+
+    write_with_retry(&file_path, "first", 1).await.unwrap();
+    write_with_retry(&file_path, "second", 1).await.unwrap();
+
+    assert_eq!(fs::read_to_string(&file_path).unwrap(), "second");
 }

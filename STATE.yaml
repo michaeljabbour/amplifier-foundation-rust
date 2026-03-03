@@ -663,17 +663,20 @@ features:
   F-066-async-registry-loader:
     name: "Replace blocking std::fs with tokio::fs in registry/loader.rs (load_yaml_bundle, load_markdown_bundle)"
     module: "registry"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-059-registry-decompose"]
     started_at: "2025-01-27T00:35:00Z"
+    completed_at: "2025-01-27T01:00:00Z"
+    commit: "0535b13"
 
   F-067-async-io-files:
     name: "Replace blocking std::fs with tokio::fs in io/files.rs (read_with_retry, write_with_retry)"
     module: "io"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-015-io"]
+    started_at: "2025-01-27T01:05:00Z"
 
 wave_gate:
   current_wave: 19
