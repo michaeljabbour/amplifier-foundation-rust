@@ -62,7 +62,7 @@ fn write_bundle_yaml_with_includes(path: &std::path::Path, name: &str, includes:
 // ===========================================================================
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_finds_bundle_md_in_start_directory() {
     let tmp = tempdir().unwrap();
     let base = tmp.path();
@@ -75,7 +75,7 @@ fn test_finds_bundle_md_in_start_directory() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_finds_bundle_yaml_in_start_directory() {
     let tmp = tempdir().unwrap();
     let base = tmp.path();
@@ -88,7 +88,7 @@ fn test_finds_bundle_yaml_in_start_directory() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_prefers_bundle_md_over_bundle_yaml() {
     let tmp = tempdir().unwrap();
     let base = tmp.path();
@@ -103,7 +103,7 @@ fn test_prefers_bundle_md_over_bundle_yaml() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_walks_up_to_find_bundle() {
     let tmp = tempdir().unwrap();
     let root = tmp.path();
@@ -119,7 +119,7 @@ fn test_walks_up_to_find_bundle() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_returns_none_when_not_found() {
     let tmp = tempdir().unwrap();
     let base = tmp.path();
@@ -132,7 +132,7 @@ fn test_returns_none_when_not_found() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_stops_at_stop_directory() {
     let tmp = tempdir().unwrap();
     let root = tmp.path();
@@ -156,7 +156,7 @@ fn test_stops_at_stop_directory() {
 // ===========================================================================
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_unregister_existing_bundle_returns_true() {
     let tmp = tempdir().unwrap();
     let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
@@ -168,7 +168,7 @@ fn test_unregister_existing_bundle_returns_true() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_unregister_nonexistent_bundle_returns_false() {
     let tmp = tempdir().unwrap();
     let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
@@ -179,7 +179,7 @@ fn test_unregister_nonexistent_bundle_returns_false() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_unregister_removes_from_list_registered() {
     let tmp = tempdir().unwrap();
     let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
@@ -199,7 +199,7 @@ fn test_unregister_removes_from_list_registered() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_unregister_does_not_auto_persist() {
     let tmp = tempdir().unwrap();
     let home = tmp.path().to_path_buf();
@@ -230,7 +230,7 @@ fn test_unregister_does_not_auto_persist() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_unregister_cleans_up_includes_relationships() {
     // Parent includes [child-a, child-b]. Unregister parent.
     // Children's included_by should be cleared.
@@ -274,7 +274,7 @@ fn test_unregister_cleans_up_includes_relationships() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_unregister_cleans_up_included_by_relationships() {
     // child included_by [parent-a, parent-b]. Unregister child.
     // Parents' includes should be cleaned up.
@@ -318,7 +318,7 @@ fn test_unregister_cleans_up_included_by_relationships() {
 }
 
 #[test]
-#[ignore = "Wave 3"]
+
 fn test_unregister_handles_partial_relationships() {
     // Partial relationships (e.g. includes references a name that doesn't
     // exist in the registry) should not crash.
@@ -343,7 +343,7 @@ fn test_unregister_handles_partial_relationships() {
 // ===========================================================================
 
 #[tokio::test]
-#[ignore = "Wave 3"]
+
 async fn test_subdirectory_bundle_gets_source_base_paths() {
     let tmp = tempdir().unwrap();
     let root = tmp.path();
@@ -370,7 +370,7 @@ async fn test_subdirectory_bundle_gets_source_base_paths() {
 }
 
 #[tokio::test]
-#[ignore = "Wave 3"]
+
 async fn test_root_bundle_no_extra_source_base_paths() {
     let tmp = tempdir().unwrap();
     let root = tmp.path();
@@ -389,7 +389,7 @@ async fn test_root_bundle_no_extra_source_base_paths() {
 }
 
 #[tokio::test]
-#[ignore = "Wave 3"]
+
 async fn test_subdirectory_without_root_bundle_no_source_base_paths() {
     let tmp = tempdir().unwrap();
     let root = tmp.path();
@@ -451,7 +451,7 @@ fn setup_dependency_bundles(
 }
 
 #[tokio::test]
-#[ignore = "Wave 3"]
+
 async fn test_diamond_dependency_loads_successfully() {
     // Diamond: A -> B, A -> C, B -> C
     let includes = HashMap::from([
@@ -475,7 +475,7 @@ async fn test_diamond_dependency_loads_successfully() {
 }
 
 #[tokio::test]
-#[ignore = "Wave 3"]
+
 async fn test_circular_dependency_handled_gracefully() {
     // Circular: A -> B -> A
     let includes = HashMap::from([
@@ -500,7 +500,7 @@ async fn test_circular_dependency_handled_gracefully() {
 }
 
 #[tokio::test]
-#[ignore = "Wave 3"]
+
 async fn test_bundle_cached_after_first_load() {
     let tmp = tempdir().unwrap();
     let root = tmp.path();
@@ -518,7 +518,7 @@ async fn test_bundle_cached_after_first_load() {
 }
 
 #[tokio::test]
-#[ignore = "Wave 3"]
+
 async fn test_three_level_circular_dependency_handled_gracefully() {
     // Three-level circular: A -> B -> C -> A
     let includes = HashMap::from([
@@ -543,7 +543,7 @@ async fn test_three_level_circular_dependency_handled_gracefully() {
 }
 
 #[tokio::test]
-#[ignore = "Wave 3"]
+
 async fn test_circular_dependency_logs_warning() {
     // A -> B -> A should produce a warning about the cycle.
     // In Rust we skip log capture checks — just verify the bundle loads.
