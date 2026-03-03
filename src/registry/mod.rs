@@ -52,11 +52,25 @@ pub struct UpdateInfo {
 }
 
 /// Tracked state for a registered bundle.
+///
+/// Terminology:
+///   Root bundle: A bundle at /bundle.md or /bundle.yaml at the root of a repo
+///       or directory tree. Establishes the namespace and root directory for
+///       path resolution. Tracked via is_root=True.
+///
+///   Nested bundle: A bundle loaded via #subdirectory= URIs or @namespace:path
+///       references. Shares the namespace with its root bundle and resolves
+///       paths relative to its own location. Tracked via is_root=False.
 #[derive(Debug, Clone)]
 pub struct BundleState {
     pub uri: String,
     pub name: String,
     pub version: Option<String>,
+    /// When this bundle was last loaded (ISO 8601 string).
+    /// Stored as String to avoid forcing a chrono dependency on consumers.
+    pub loaded_at: Option<String>,
+    /// When this bundle was last checked for updates (ISO 8601 string).
+    pub checked_at: Option<String>,
     pub local_path: Option<String>,
     pub includes: Vec<String>,
     pub included_by: Vec<String>,
@@ -72,6 +86,8 @@ impl BundleState {
             uri: uri.to_string(),
             name: name.to_string(),
             version: None,
+            loaded_at: None,
+            checked_at: None,
             local_path: None,
             includes: Vec::new(),
             included_by: Vec::new(),
@@ -94,6 +110,18 @@ impl BundleState {
         );
         if let Some(v) = &self.version {
             map.insert("version".to_string(), serde_json::Value::String(v.clone()));
+        }
+        if let Some(la) = &self.loaded_at {
+            map.insert(
+                "loaded_at".to_string(),
+                serde_json::Value::String(la.clone()),
+            );
+        }
+        if let Some(ca) = &self.checked_at {
+            map.insert(
+                "checked_at".to_string(),
+                serde_json::Value::String(ca.clone()),
+            );
         }
         if let Some(lp) = &self.local_path {
             map.insert(
@@ -153,6 +181,16 @@ impl BundleState {
             version: obj
                 .and_then(|o| o.get("version"))
                 .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            loaded_at: obj
+                .and_then(|o| o.get("loaded_at"))
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string()),
+            checked_at: obj
+                .and_then(|o| o.get("checked_at"))
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
                 .map(|s| s.to_string()),
             local_path: obj
                 .and_then(|o| o.get("local_path"))
@@ -256,6 +294,13 @@ impl BundleRegistry {
         true
     }
 
+    /// Look up URI for a registered bundle name.
+    ///
+    /// Returns the URI string if found, or `None` if not registered.
+    pub fn find(&self, name: &str) -> Option<String> {
+        self.bundles.get(name).map(|state| state.uri.clone())
+    }
+
     /// List all registered bundle names (sorted).
     pub fn list_registered(&self) -> Vec<String> {
         let mut names: Vec<String> = self.bundles.keys().cloned().collect();
@@ -269,6 +314,57 @@ impl BundleRegistry {
         self.bundles
             .entry(name.to_string())
             .or_insert_with(|| BundleState::new(name, ""))
+    }
+
+    /// Get all tracked states as a name → BundleState map (read-only reference).
+    ///
+    /// Matches Python's `get_state(None)` which returns `dict(self._registry)`.
+    ///
+    /// **Divergence from Python:** Returns a reference to the internal map,
+    /// not a shallow copy. Mutations require going through `get_state()`.
+    pub fn get_all_states(&self) -> &IndexMap<String, BundleState> {
+        &self.bundles
+    }
+
+    /// Get immutable reference to a bundle's state.
+    ///
+    /// Returns `None` if the name isn't registered. Unlike `get_state()`,
+    /// this does not create a default entry. Matches Python's
+    /// `get_state(name)` which returns `self._registry.get(name)`.
+    pub fn find_state(&self, name: &str) -> Option<&BundleState> {
+        self.bundles.get(name)
+    }
+
+    /// Clear stale `local_path` references from registry entries.
+    ///
+    /// On startup, registry entries may reference cached paths that no longer
+    /// exist (e.g., user cleared cache but not registry.json). This clears
+    /// those stale references so bundles will be re-fetched when needed.
+    ///
+    /// Persists the cleanup if any stale entries were found.
+    pub fn validate_cached_paths(&mut self) {
+        let stale_names: Vec<String> = self
+            .bundles
+            .iter()
+            .filter_map(|(name, state)| {
+                if let Some(ref lp) = state.local_path {
+                    if !std::path::Path::new(lp).exists() {
+                        tracing::info!("Clearing stale cache reference for '{}'", name);
+                        return Some(name.clone());
+                    }
+                }
+                None
+            })
+            .collect();
+
+        if !stale_names.is_empty() {
+            for name in &stale_names {
+                if let Some(state) = self.bundles.get_mut(name) {
+                    state.local_path = None;
+                }
+            }
+            self.save();
+        }
     }
 
     /// Persist registry to disk as JSON.

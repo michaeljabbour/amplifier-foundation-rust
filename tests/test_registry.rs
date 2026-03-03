@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use tempfile::tempdir;
 
-use amplifier_foundation::registry::BundleRegistry;
+use amplifier_foundation::registry::{BundleRegistry, BundleState};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -554,4 +554,265 @@ async fn test_circular_dependency_logs_warning() {
     // Note: In a full implementation, we'd verify a tracing warning was
     // emitted about the circular dependency. For now, loading without
     // error is sufficient.
+}
+
+// ---------------------------------------------------------------------------
+// BundleRegistry.find() tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_registry_find_existing() {
+    let dir = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+    let mut bundles = HashMap::new();
+    bundles.insert(
+        "my-bundle".to_string(),
+        "git+https://example.com/repo@main".to_string(),
+    );
+    registry.register(&bundles);
+
+    let result = registry.find("my-bundle");
+    assert_eq!(
+        result,
+        Some("git+https://example.com/repo@main".to_string())
+    );
+}
+
+#[test]
+fn test_registry_find_missing() {
+    let dir = tempdir().unwrap();
+    let registry = BundleRegistry::new(dir.path().to_path_buf());
+    assert_eq!(registry.find("nonexistent"), None);
+}
+
+#[test]
+fn test_registry_find_after_unregister() {
+    let dir = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+    let mut bundles = HashMap::new();
+    bundles.insert(
+        "my-bundle".to_string(),
+        "file:///path/to/bundle".to_string(),
+    );
+    registry.register(&bundles);
+
+    assert!(registry.find("my-bundle").is_some());
+    registry.unregister("my-bundle");
+    assert!(registry.find("my-bundle").is_none());
+}
+
+// ---------------------------------------------------------------------------
+// BundleRegistry.get_all_states() tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_registry_get_all_states_empty() {
+    let dir = tempdir().unwrap();
+    let registry = BundleRegistry::new(dir.path().to_path_buf());
+    let states = registry.get_all_states();
+    assert!(states.is_empty());
+}
+
+#[test]
+fn test_registry_get_all_states_populated() {
+    let dir = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+    let mut bundles = HashMap::new();
+    bundles.insert("a".to_string(), "file:///a".to_string());
+    bundles.insert("b".to_string(), "file:///b".to_string());
+    registry.register(&bundles);
+
+    let states = registry.get_all_states();
+    assert_eq!(states.len(), 2);
+    assert!(states.contains_key("a"));
+    assert!(states.contains_key("b"));
+}
+
+// ---------------------------------------------------------------------------
+// BundleRegistry.validate_cached_paths() tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_validate_cached_paths_clears_stale() {
+    let dir = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+
+    // Register a bundle and set a local_path that doesn't exist
+    let mut bundles = HashMap::new();
+    bundles.insert("stale-bundle".to_string(), "file:///orig".to_string());
+    registry.register(&bundles);
+    registry.get_state("stale-bundle").local_path = Some("/nonexistent/path/to/bundle".to_string());
+
+    // validate_cached_paths should clear the stale reference
+    registry.validate_cached_paths();
+
+    assert!(
+        registry.get_state("stale-bundle").local_path.is_none(),
+        "Stale local_path should be cleared"
+    );
+}
+
+#[test]
+fn test_validate_cached_paths_keeps_valid() {
+    let dir = tempdir().unwrap();
+    let bundle_dir = dir.path().join("my-bundle");
+    fs::create_dir_all(&bundle_dir).unwrap();
+
+    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+    let mut bundles = HashMap::new();
+    bundles.insert("valid-bundle".to_string(), "file:///orig".to_string());
+    registry.register(&bundles);
+    registry.get_state("valid-bundle").local_path = Some(bundle_dir.to_string_lossy().to_string());
+
+    registry.validate_cached_paths();
+
+    assert!(
+        registry.get_state("valid-bundle").local_path.is_some(),
+        "Valid local_path should be preserved"
+    );
+}
+
+#[test]
+fn test_validate_cached_paths_mixed() {
+    let dir = tempdir().unwrap();
+    let valid_path = dir.path().join("exists");
+    fs::create_dir_all(&valid_path).unwrap();
+
+    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+    let mut b1 = HashMap::new();
+    b1.insert("valid".to_string(), "file:///a".to_string());
+    registry.register(&b1);
+    registry.get_state("valid").local_path = Some(valid_path.to_string_lossy().to_string());
+
+    let mut b2 = HashMap::new();
+    b2.insert("stale".to_string(), "file:///b".to_string());
+    registry.register(&b2);
+    registry.get_state("stale").local_path = Some("/definitely/not/here".to_string());
+
+    registry.validate_cached_paths();
+
+    assert!(registry.get_state("valid").local_path.is_some());
+    assert!(registry.get_state("stale").local_path.is_none());
+}
+
+// ---------------------------------------------------------------------------
+// BundleState timestamp fields tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_bundle_state_timestamps_default_none() {
+    let state = BundleState::new("test", "file:///test");
+    assert!(state.loaded_at.is_none());
+    assert!(state.checked_at.is_none());
+}
+
+#[test]
+fn test_bundle_state_timestamps_to_dict_from_dict_roundtrip() {
+    let mut state = BundleState::new("test", "file:///test");
+    state.loaded_at = Some("2025-01-22T00:00:00Z".to_string());
+    state.checked_at = Some("2025-01-22T01:00:00Z".to_string());
+
+    let dict = state.to_dict();
+    let restored = BundleState::from_dict("test", &dict);
+
+    assert_eq!(restored.loaded_at.as_deref(), Some("2025-01-22T00:00:00Z"));
+    assert_eq!(restored.checked_at.as_deref(), Some("2025-01-22T01:00:00Z"));
+}
+
+#[test]
+fn test_bundle_state_timestamps_to_dict_absent_when_none() {
+    let state = BundleState::new("test", "file:///test");
+    let dict = state.to_dict();
+    let obj = dict.as_object().unwrap();
+    // Timestamps should not appear in output when None
+    assert!(!obj.contains_key("loaded_at") || obj["loaded_at"].is_null());
+    assert!(!obj.contains_key("checked_at") || obj["checked_at"].is_null());
+}
+
+#[test]
+fn test_bundle_state_from_dict_missing_timestamps() {
+    // Old registry.json without timestamp fields should load fine
+    let data = serde_json::json!({
+        "uri": "file:///test",
+        "name": "test",
+        "is_root": true,
+        "explicitly_requested": false,
+        "app_bundle": false
+    });
+    let state = BundleState::from_dict("test", &data);
+    assert!(state.loaded_at.is_none());
+    assert!(state.checked_at.is_none());
+}
+
+#[test]
+fn test_bundle_state_from_dict_null_timestamps() {
+    // JSON null for timestamps should be treated as None
+    let data = serde_json::json!({
+        "uri": "file:///test",
+        "name": "test",
+        "loaded_at": null,
+        "checked_at": null,
+        "is_root": true,
+        "explicitly_requested": false,
+        "app_bundle": false
+    });
+    let state = BundleState::from_dict("test", &data);
+    assert!(state.loaded_at.is_none());
+    assert!(state.checked_at.is_none());
+}
+
+#[test]
+fn test_bundle_state_from_dict_empty_string_timestamps() {
+    // Empty string timestamps should be treated as None (Python falsy behavior)
+    let data = serde_json::json!({
+        "uri": "file:///test",
+        "name": "test",
+        "loaded_at": "",
+        "checked_at": "",
+        "is_root": true,
+        "explicitly_requested": false,
+        "app_bundle": false
+    });
+    let state = BundleState::from_dict("test", &data);
+    assert!(
+        state.loaded_at.is_none(),
+        "Empty string should be treated as None"
+    );
+    assert!(
+        state.checked_at.is_none(),
+        "Empty string should be treated as None"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// BundleRegistry.find_state() tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_registry_find_state_existing() {
+    let dir = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+    let mut bundles = HashMap::new();
+    bundles.insert("my-bundle".to_string(), "file:///path".to_string());
+    registry.register(&bundles);
+
+    let state = registry.find_state("my-bundle");
+    assert!(state.is_some());
+    assert_eq!(state.unwrap().uri, "file:///path");
+}
+
+#[test]
+fn test_registry_find_state_missing() {
+    let dir = tempdir().unwrap();
+    let registry = BundleRegistry::new(dir.path().to_path_buf());
+    assert!(registry.find_state("nonexistent").is_none());
+}
+
+#[test]
+fn test_validate_cached_paths_empty_registry() {
+    let dir = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+    // Should not panic or call save() on empty registry
+    registry.validate_cached_paths();
+    assert!(registry.get_all_states().is_empty());
 }

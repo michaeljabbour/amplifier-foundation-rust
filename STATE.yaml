@@ -13,7 +13,7 @@
 phase: 14
 phase_name: "Wave 14 -- Bundle API completeness (resolve_agent_path, agent metadata, registry find/validate)"
 epoch: 15
-next_action: "Implement F-050 (resolve_agent_path + get_system_instruction)"
+next_action: "Implement F-051 (BundleState timestamps + BundleRegistry.find + validate_cached_paths)"
 blockers: []
 
 architecture_spec:
@@ -505,17 +505,20 @@ features:
   F-050-resolve-agent-path:
     name: "Port Bundle.resolve_agent_path() + Bundle.get_system_instruction()"
     module: "bundle"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-018-bundle"]
     started_at: "2025-01-22T00:00:00Z"
+    completed_at: "2025-01-22T00:30:00Z"
+    commit: "883084a"
 
   F-051-registry-find-validate:
     name: "Port BundleState timestamps + BundleRegistry.find() + validate_cached_paths()"
     module: "registry"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-020-registry"]
+    started_at: "2025-01-22T00:30:00Z"
 
   F-052-agent-metadata:
     name: "Port Bundle.load_agent_metadata() + _load_agent_file_metadata()"
