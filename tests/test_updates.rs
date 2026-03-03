@@ -3,7 +3,8 @@
 
 use amplifier_foundation::sources::SourceStatus;
 use amplifier_foundation::updates::{
-    check_bundle_status, collect_source_uris, update_bundle, BundleStatus,
+    check_bundle_status, check_bundle_status_for_bundle, collect_source_uris, update_bundle,
+    BundleStatus,
 };
 use amplifier_foundation::Bundle;
 use serde_yaml_ng::Value;
@@ -722,4 +723,182 @@ orchestrator: "simple-orchestrator"
     bundle.session = session_yaml;
     let uris = collect_source_uris(&bundle);
     assert!(uris.is_empty());
+}
+
+// ===========================================================================
+// check_bundle_status_for_bundle
+// ===========================================================================
+
+#[tokio::test]
+async fn test_check_bundle_status_for_bundle_empty() {
+    let bundle = Bundle::new("empty-bundle");
+    let status = check_bundle_status_for_bundle(&bundle, None).await.unwrap();
+
+    assert_eq!(status.bundle_name, "empty-bundle");
+    assert_eq!(status.bundle_source, None);
+    assert!(status.sources.is_empty());
+    assert!(!status.has_updates());
+    assert_eq!(status.summary(), "All 0 source(s) up to date");
+}
+
+#[tokio::test]
+async fn test_check_bundle_status_for_bundle_file_source() {
+    let mut bundle = Bundle::new("local-bundle");
+    bundle.source_uri = Some("file:///path/to/bundle".to_string());
+
+    let status = check_bundle_status_for_bundle(&bundle, None).await.unwrap();
+
+    assert_eq!(status.bundle_name, "local-bundle");
+    assert_eq!(
+        status.bundle_source,
+        Some("file:///path/to/bundle".to_string())
+    );
+    assert_eq!(status.sources.len(), 1);
+    assert_eq!(status.sources[0].has_update, Some(false));
+    assert!(status.sources[0].is_cached);
+}
+
+#[tokio::test]
+async fn test_check_bundle_status_for_bundle_git_source() {
+    let cache_dir = tempfile::tempdir().expect("tempdir");
+    let mut bundle = Bundle::new("git-bundle");
+    bundle.source_uri = Some("git+https://127.0.0.1:1/org/bundle@main".to_string());
+
+    let status = check_bundle_status_for_bundle(&bundle, Some(cache_dir.path()))
+        .await
+        .unwrap();
+
+    assert_eq!(status.bundle_name, "git-bundle");
+    assert_eq!(status.sources.len(), 1);
+    // Remote unreachable → unknown
+    assert_eq!(status.sources[0].has_update, None);
+}
+
+#[tokio::test]
+async fn test_check_bundle_status_for_bundle_mixed_sources() {
+    let cache_dir = tempfile::tempdir().expect("tempdir");
+    let mut bundle = Bundle::new("mixed-bundle");
+    bundle.source_uri = Some("file:///local/bundle".to_string());
+
+    let provider: Value = serde_yaml_ng::from_str(
+        r#"
+module: "provider-x"
+source: "git+https://127.0.0.1:1/org/provider@main"
+"#,
+    )
+    .unwrap();
+    bundle.providers = vec![provider];
+
+    let tool: Value = serde_yaml_ng::from_str(
+        r#"
+module: "tool-y"
+source: "https://example.com/tool.tar.gz"
+"#,
+    )
+    .unwrap();
+    bundle.tools = vec![tool];
+
+    let status = check_bundle_status_for_bundle(&bundle, Some(cache_dir.path()))
+        .await
+        .unwrap();
+
+    assert_eq!(status.bundle_name, "mixed-bundle");
+    assert_eq!(status.sources.len(), 3);
+
+    // File source is up to date
+    let file_source = status
+        .sources
+        .iter()
+        .find(|s| s.uri == "file:///local/bundle")
+        .expect("file source");
+    assert_eq!(file_source.has_update, Some(false));
+
+    // Git source (unreachable) is unknown
+    let git_source = status
+        .sources
+        .iter()
+        .find(|s| s.uri.contains("127.0.0.1"))
+        .expect("git source");
+    assert_eq!(git_source.has_update, None);
+
+    // HTTP source is unknown (not supported)
+    let http_source = status
+        .sources
+        .iter()
+        .find(|s| s.uri.contains("example.com"))
+        .expect("http source");
+    assert_eq!(http_source.has_update, None);
+}
+
+#[tokio::test]
+async fn test_check_bundle_status_for_bundle_pinned_git() {
+    let cache_dir = tempfile::tempdir().expect("tempdir");
+    let mut bundle = Bundle::new("pinned-bundle");
+    bundle.source_uri = Some("git+https://127.0.0.1:1/org/bundle@v1.0.0".to_string());
+
+    let status = check_bundle_status_for_bundle(&bundle, Some(cache_dir.path()))
+        .await
+        .unwrap();
+
+    assert_eq!(status.sources.len(), 1);
+    assert_eq!(status.sources[0].has_update, Some(false));
+    assert!(status.sources[0].summary.contains("Pinned"));
+}
+
+#[tokio::test]
+async fn test_check_bundle_status_for_bundle_no_source_uri() {
+    // Bundle loaded without source_uri but has provider with source
+    let cache_dir = tempfile::tempdir().expect("tempdir");
+    let mut bundle = Bundle::new("local-bundle");
+
+    let provider: Value = serde_yaml_ng::from_str(
+        r#"
+module: "provider-x"
+source: "git+https://127.0.0.1:1/org/provider@v2.0"
+"#,
+    )
+    .unwrap();
+    bundle.providers = vec![provider];
+
+    let status = check_bundle_status_for_bundle(&bundle, Some(cache_dir.path()))
+        .await
+        .unwrap();
+
+    assert_eq!(status.bundle_name, "local-bundle");
+    assert_eq!(status.bundle_source, None);
+    assert_eq!(status.sources.len(), 1);
+    // Pinned version tag
+    assert_eq!(status.sources[0].has_update, Some(false));
+}
+
+#[tokio::test]
+async fn test_check_bundle_status_for_bundle_empty_name() {
+    // Python: `bundle.name or "unnamed"` — empty name gets fallback
+    let bundle = Bundle::new("");
+    let status = check_bundle_status_for_bundle(&bundle, None).await.unwrap();
+    assert_eq!(status.bundle_name, "unnamed");
+}
+
+#[tokio::test]
+async fn test_check_bundle_status_for_bundle_multiple_git_sources() {
+    // Both git sources should be reported even if remote is unreachable
+    let cache_dir = tempfile::tempdir().expect("tempdir");
+    let mut bundle = Bundle::new("multi-git");
+    bundle.source_uri = Some("git+https://127.0.0.1:1/org/bundle-a@main".to_string());
+
+    let provider: Value = serde_yaml_ng::from_str(
+        r#"
+module: "provider-x"
+source: "git+https://127.0.0.1:1/org/bundle-b@main"
+"#,
+    )
+    .unwrap();
+    bundle.providers = vec![provider];
+
+    let status = check_bundle_status_for_bundle(&bundle, Some(cache_dir.path()))
+        .await
+        .unwrap();
+
+    // Both sources should be present (no early abort on first failure)
+    assert_eq!(status.sources.len(), 2);
 }

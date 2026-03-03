@@ -169,14 +169,100 @@ pub fn collect_source_uris(bundle: &Bundle) -> Vec<String> {
     sources.into_iter().collect()
 }
 
-/// Check update status for a bundle source URI.
+/// Check update status of all sources in a bundle.
 ///
 /// This is a MECHANISM that has no side effects — it only checks
 /// whether updates are available without downloading anything.
 ///
-/// **API Note:** Unlike Python's `check_bundle_status(bundle)` which walks
-/// the entire bundle component tree, the Rust version takes a single URI
-/// and returns status for that one source. This is intentionally simpler.
+/// Walks the bundle's component tree using [`collect_source_uris`] to find
+/// all source URIs (bundle source, session orchestrator/context, providers,
+/// tools, hooks), then checks each one.
+///
+/// Matches Python's `check_bundle_status(bundle, cache_dir)` from
+/// `updates/__init__.py`.
+///
+/// For git sources, uses `git ls-remote` to compare cached commits
+/// against remote HEAD.
+///
+/// # Arguments
+///
+/// * `bundle` — Bundle to check.
+/// * `cache_dir` — Optional cache directory. Defaults to `~/.amplifier/cache/bundles`.
+///
+/// # Returns
+///
+/// A [`BundleStatus`] with the status of each source in the bundle.
+pub async fn check_bundle_status_for_bundle(
+    bundle: &Bundle,
+    cache_dir: Option<&Path>,
+) -> crate::error::Result<BundleStatus> {
+    let cache = cache_dir
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(default_cache_dir);
+
+    let source_uris = collect_source_uris(bundle);
+    let git_handler = GitSourceHandler::new();
+    let mut statuses: Vec<SourceStatus> = Vec::new();
+
+    for uri in &source_uris {
+        let parsed = parse_uri(uri);
+
+        let source_status = if parsed.is_file() {
+            SourceStatus {
+                uri: uri.clone(),
+                has_update: Some(false),
+                is_cached: true,
+                summary: "Local file (always current)".to_string(),
+                ..Default::default()
+            }
+        } else if git_handler.can_handle(&parsed) {
+            // Catch per-source errors defensively: if one source fails,
+            // continue checking the rest (matches Python's non-raising behavior).
+            match git_handler.get_status(&parsed, &cache).await {
+                Ok(s) => s,
+                Err(e) => SourceStatus {
+                    uri: uri.clone(),
+                    has_update: None,
+                    error: Some(e.to_string()),
+                    summary: format!("Status check failed: {e}"),
+                    ..Default::default()
+                },
+            }
+        } else {
+            // HTTP and other remote sources: no status handler yet
+            SourceStatus {
+                uri: uri.clone(),
+                has_update: None,
+                is_cached: true, // Assume cached since bundle loaded
+                summary: "Update checking not supported for this source type".to_string(),
+                ..Default::default()
+            }
+        };
+
+        statuses.push(source_status);
+    }
+
+    // Python: `bundle.name or "unnamed"` — empty name gets fallback
+    let bundle_name = if bundle.name.is_empty() {
+        "unnamed".to_string()
+    } else {
+        bundle.name.clone()
+    };
+
+    Ok(BundleStatus {
+        bundle_name,
+        bundle_source: bundle.source_uri.clone(),
+        sources: statuses,
+    })
+}
+
+/// Check update status for a single bundle source URI.
+///
+/// This is a MECHANISM that has no side effects — it only checks
+/// whether updates are available without downloading anything.
+///
+/// Takes a single URI and returns status for that one source.
+/// For checking all sources in a bundle, use [`check_bundle_status_for_bundle`].
 ///
 /// Supported source types:
 /// - `file://` and local paths: always reported as up to date

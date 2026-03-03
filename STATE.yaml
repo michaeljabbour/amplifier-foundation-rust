@@ -475,17 +475,20 @@ features:
   F-047-collect-source-uris:
     name: "Port collect_source_uris (extract all source URIs from a Bundle)"
     module: "updates"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-046-wire-status-updates"]
     started_at: "2025-01-21T00:00:00Z"
+    completed_at: "2025-01-21T00:30:00Z"
+    commit: "0969d59"
 
   F-048-bundle-check-status:
     name: "Port Bundle-level check_bundle_status (accept Bundle, walk components)"
     module: "updates"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-047-collect-source-uris"]
+    started_at: "2025-01-21T00:30:00Z"
 
   F-049-bundle-update:
     name: "Enhance update_bundle with Bundle, selective updates, dep install"

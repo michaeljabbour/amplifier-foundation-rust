@@ -140,7 +140,10 @@ pub use spawn::{
 };
 
 // -- Updates --
-pub use updates::{check_bundle_status, collect_source_uris, update_bundle, BundleStatus};
+pub use updates::{
+    check_bundle_status, check_bundle_status_for_bundle, collect_source_uris, update_bundle,
+    BundleStatus,
+};
 
 // -- Module resolution --
 pub use bundle::module_resolver::{BundleModuleResolver, BundleModuleSource, ModuleActivate};
