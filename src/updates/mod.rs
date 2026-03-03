@@ -7,10 +7,10 @@ pub struct BundleStatus {
     pub source_status: Option<SourceStatus>,
 }
 
-pub async fn check_bundle_status(uri: &str) -> crate::error::Result<BundleStatus> {
+pub async fn check_bundle_status(_uri: &str) -> crate::error::Result<BundleStatus> {
     todo!()
 }
 
-pub async fn update_bundle(uri: &str) -> crate::error::Result<()> {
+pub async fn update_bundle(_uri: &str) -> crate::error::Result<()> {
     todo!()
 }

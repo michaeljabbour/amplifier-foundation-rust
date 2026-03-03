@@ -7,21 +7,21 @@ pub struct DiskCache {
 }
 
 impl DiskCache {
-    pub fn new(cache_dir: &Path) -> Self {
+    pub fn new(_cache_dir: &Path) -> Self {
         todo!()
     }
 
-    pub fn cache_key_to_path(&self, key: &str) -> PathBuf {
+    pub fn cache_key_to_path(&self, _key: &str) -> PathBuf {
         todo!()
     }
 }
 
 impl CacheProvider for DiskCache {
-    fn get(&self, key: &str) -> Option<serde_yaml_ng::Value> {
+    fn get(&self, _key: &str) -> Option<serde_yaml_ng::Value> {
         todo!()
     }
 
-    fn set(&mut self, key: &str, value: serde_yaml_ng::Value) {
+    fn set(&mut self, _key: &str, _value: serde_yaml_ng::Value) {
         todo!()
     }
 
@@ -29,7 +29,7 @@ impl CacheProvider for DiskCache {
         todo!()
     }
 
-    fn contains(&self, key: &str) -> bool {
+    fn contains(&self, _key: &str) -> bool {
         todo!()
     }
 }

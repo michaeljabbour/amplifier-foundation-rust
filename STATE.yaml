@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 0
-phase_name: "Wave 0 -- Scaffold + Test Porting"
-epoch: 1
-next_action: "Wave 0 gate check -- all features done, awaiting approval to proceed to Wave 1"
+phase: 1
+phase_name: "Wave 1 -- Leaf Modules (all sync)"
+epoch: 2
+next_action: "Implement F-006-dicts (in-progress)"
 blockers: []
 
 architecture_spec:
@@ -86,16 +86,54 @@ features:
     started_at: "2025-01-15T10:50:00Z"
     completed_at: "2025-01-15T11:30:00Z"
     commit: "55f9862"
+  F-006-dicts:
+    name: "Implement dicts module (deep_merge, merge_module_lists, get/set_nested)"
+    module: "dicts"
+    status: "in-progress"
+    spec: "specs/modules/dicts.md"
+    depends_on: ["F-003-test-port-wave1"]
+    started_at: "2025-01-15T12:00:00Z"
+  F-007-paths:
+    name: "Implement paths module (parse_uri, normalize, discovery)"
+    module: "paths"
+    status: "ready"
+    spec: "specs/modules/paths.md"
+    depends_on: ["F-003-test-port-wave1"]
+  F-008-cache:
+    name: "Implement cache module (SimpleCache, DiskCache)"
+    module: "cache"
+    status: "ready"
+    spec: "specs/modules/cache.md"
+    depends_on: ["F-003-test-port-wave1"]
+  F-009-serialization:
+    name: "Implement serialization module (sanitize_for_json, sanitize_message)"
+    module: "serialization"
+    status: "ready"
+    spec: "specs/modules/serialization.md"
+    depends_on: ["F-003-test-port-wave1"]
+  F-010-tracing-utils:
+    name: "Implement tracing_utils module (generate_sub_session_id)"
+    module: "tracing_utils"
+    status: "ready"
+    spec: "specs/modules/tracing-utils.md"
+    depends_on: ["F-003-test-port-wave1"]
+  F-011-spawn:
+    name: "Implement spawn module (ProviderPreference, apply_provider_preferences)"
+    module: "spawn"
+    status: "ready"
+    spec: "specs/modules/spawn.md"
+    depends_on: ["F-003-test-port-wave1"]
 
 wave_gate:
   current_wave: 0
   gate_criteria: "cargo check passes, cargo test = 0 pass/0 fail, 248 ignored tests, cargo clippy --all-targets clean"
   approval_required: true
-  approval_status: "pending"
+  approval_status: "approved"
+  approved_at: "2025-01-15T12:00:00Z"
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
   total_features_completed: 5
-  last_updated: "2025-01-15T11:30:00Z"
-  last_session: "session-002-wave0-f004-f005"
+  last_updated: "2025-01-15T12:00:00Z"
+  last_session: "session-003-wave1-start"

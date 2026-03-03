@@ -35,11 +35,11 @@ impl ParsedURI {
     }
 }
 
-pub fn parse_uri(uri: &str) -> ParsedURI {
+pub fn parse_uri(_uri: &str) -> ParsedURI {
     todo!()
 }
 
-pub fn normalize_path(path: &str, relative_to: Option<&Path>) -> PathBuf {
+pub fn normalize_path(_path: &str, _relative_to: Option<&Path>) -> PathBuf {
     todo!()
 }
 

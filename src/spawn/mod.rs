@@ -20,7 +20,7 @@ impl ProviderPreference {
         todo!()
     }
 
-    pub fn from_dict(data: &serde_yaml_ng::Value) -> Result<Self, String> {
+    pub fn from_dict(_data: &serde_yaml_ng::Value) -> Result<Self, String> {
         todo!()
     }
 }
@@ -33,8 +33,8 @@ pub struct ModelResolutionResult {
 }
 
 pub fn apply_provider_preferences(
-    mount_plan: &serde_yaml_ng::Value,
-    preferences: &[ProviderPreference],
+    _mount_plan: &serde_yaml_ng::Value,
+    _preferences: &[ProviderPreference],
 ) -> serde_yaml_ng::Value {
     todo!()
 }

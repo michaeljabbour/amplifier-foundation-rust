@@ -28,15 +28,15 @@ pub struct BundleRegistry {
 }
 
 impl BundleRegistry {
-    pub fn new(home: PathBuf) -> Self {
+    pub fn new(_home: PathBuf) -> Self {
         todo!()
     }
 
-    pub fn register(&mut self, bundles: &HashMap<String, String>) {
+    pub fn register(&mut self, _bundles: &HashMap<String, String>) {
         todo!()
     }
 
-    pub fn unregister(&mut self, name: &str) -> bool {
+    pub fn unregister(&mut self, _name: &str) -> bool {
         todo!()
     }
 
@@ -44,7 +44,7 @@ impl BundleRegistry {
         todo!()
     }
 
-    pub fn get_state(&mut self, name: &str) -> &mut BundleState {
+    pub fn get_state(&mut self, _name: &str) -> &mut BundleState {
         todo!()
     }
 
@@ -52,19 +52,19 @@ impl BundleRegistry {
         todo!()
     }
 
-    pub fn find_nearest_bundle_file(&self, start: &Path, stop: &Path) -> Option<PathBuf> {
+    pub fn find_nearest_bundle_file(&self, _start: &Path, _stop: &Path) -> Option<PathBuf> {
         todo!()
     }
 
-    pub async fn load_single(&self, uri: &str) -> crate::error::Result<Bundle> {
+    pub async fn load_single(&self, _uri: &str) -> crate::error::Result<Bundle> {
         todo!()
     }
 
-    pub async fn load(&self, uri: &str) -> crate::error::Result<Bundle> {
+    pub async fn load(&self, _uri: &str) -> crate::error::Result<Bundle> {
         todo!()
     }
 }
 
-pub async fn load_bundle(uri: &str) -> crate::error::Result<Bundle> {
+pub async fn load_bundle(_uri: &str) -> crate::error::Result<Bundle> {
     todo!()
 }

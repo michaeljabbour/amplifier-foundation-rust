@@ -41,15 +41,15 @@ pub struct Bundle {
 }
 
 impl Bundle {
-    pub fn new(name: &str) -> Self {
+    pub fn new(_name: &str) -> Self {
         todo!()
     }
 
-    pub fn from_dict(data: &Value) -> crate::error::Result<Self> {
+    pub fn from_dict(_data: &Value) -> crate::error::Result<Self> {
         todo!()
     }
 
-    pub fn from_dict_with_base_path(data: &Value, base_path: &Path) -> crate::error::Result<Self> {
+    pub fn from_dict_with_base_path(_data: &Value, _base_path: &Path) -> crate::error::Result<Self> {
         todo!()
     }
 
@@ -61,11 +61,11 @@ impl Bundle {
         todo!()
     }
 
-    pub fn compose(&self, others: &[&Bundle]) -> Bundle {
+    pub fn compose(&self, _others: &[&Bundle]) -> Bundle {
         todo!()
     }
 
-    pub fn resolve_context_path(&self, name: &str) -> Option<PathBuf> {
+    pub fn resolve_context_path(&self, _name: &str) -> Option<PathBuf> {
         todo!()
     }
 

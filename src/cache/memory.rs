@@ -19,11 +19,11 @@ impl Default for SimpleCache {
 }
 
 impl CacheProvider for SimpleCache {
-    fn get(&self, key: &str) -> Option<serde_yaml_ng::Value> {
+    fn get(&self, _key: &str) -> Option<serde_yaml_ng::Value> {
         todo!()
     }
 
-    fn set(&mut self, key: &str, value: serde_yaml_ng::Value) {
+    fn set(&mut self, _key: &str, _value: serde_yaml_ng::Value) {
         todo!()
     }
 
@@ -31,7 +31,7 @@ impl CacheProvider for SimpleCache {
         todo!()
     }
 
-    fn contains(&self, key: &str) -> bool {
+    fn contains(&self, _key: &str) -> bool {
         todo!()
     }
 }

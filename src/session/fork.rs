@@ -15,35 +15,35 @@ pub struct ForkResult {
 
 /// Fork a session on disk at a given turn.
 pub fn fork_session(
-    session_dir: &Path,
-    turn: Option<usize>,
-    new_session_id: Option<&str>,
-    target_dir: Option<&Path>,
-    include_events: bool,
+    _session_dir: &Path,
+    _turn: Option<usize>,
+    _new_session_id: Option<&str>,
+    _target_dir: Option<&Path>,
+    _include_events: bool,
 ) -> crate::error::Result<ForkResult> {
     todo!()
 }
 
 /// Fork a session in memory (no disk I/O).
 pub fn fork_session_in_memory(
-    messages: &[Value],
-    turn: Option<usize>,
-    parent_id: Option<&str>,
+    _messages: &[Value],
+    _turn: Option<usize>,
+    _parent_id: Option<&str>,
 ) -> crate::error::Result<ForkResult> {
     todo!()
 }
 
 /// Get a preview of what a fork would produce.
-pub fn get_fork_preview(session_dir: &Path, turn: usize) -> crate::error::Result<Value> {
+pub fn get_fork_preview(_session_dir: &Path, _turn: usize) -> crate::error::Result<Value> {
     todo!()
 }
 
 /// List all forks of a session.
-pub fn list_session_forks(session_dir: &Path) -> crate::error::Result<Vec<Value>> {
+pub fn list_session_forks(_session_dir: &Path) -> crate::error::Result<Vec<Value>> {
     todo!()
 }
 
 /// Get the lineage (ancestry chain) of a session.
-pub fn get_session_lineage(session_dir: &Path) -> crate::error::Result<Value> {
+pub fn get_session_lineage(_session_dir: &Path) -> crate::error::Result<Value> {
     todo!()
 }

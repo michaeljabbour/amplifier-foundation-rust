@@ -11,6 +11,12 @@ pub struct ValidationResult {
     pub warnings: Vec<String>,
 }
 
+impl Default for ValidationResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ValidationResult {
     pub fn new() -> Self {
         ValidationResult {
@@ -32,44 +38,50 @@ impl ValidationResult {
 
 pub struct BundleValidator;
 
+impl Default for BundleValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BundleValidator {
     pub fn new() -> Self {
         todo!()
     }
 
-    pub fn validate(&self, bundle: &Bundle) -> ValidationResult {
+    pub fn validate(&self, _bundle: &Bundle) -> ValidationResult {
         todo!()
     }
 
-    pub fn validate_or_raise(&self, bundle: &Bundle) -> crate::error::Result<()> {
+    pub fn validate_or_raise(&self, _bundle: &Bundle) -> crate::error::Result<()> {
         todo!()
     }
 
-    pub fn validate_completeness(&self, bundle: &Bundle) -> ValidationResult {
+    pub fn validate_completeness(&self, _bundle: &Bundle) -> ValidationResult {
         todo!()
     }
 
-    pub fn validate_completeness_or_raise(&self, bundle: &Bundle) -> crate::error::Result<()> {
+    pub fn validate_completeness_or_raise(&self, _bundle: &Bundle) -> crate::error::Result<()> {
         todo!()
     }
 }
 
 /// Convenience function: validate a bundle.
-pub fn validate_bundle(bundle: &Bundle) -> ValidationResult {
+pub fn validate_bundle(_bundle: &Bundle) -> ValidationResult {
     todo!()
 }
 
 /// Convenience function: validate or raise.
-pub fn validate_bundle_or_raise(bundle: &Bundle) -> crate::error::Result<()> {
+pub fn validate_bundle_or_raise(_bundle: &Bundle) -> crate::error::Result<()> {
     todo!()
 }
 
 /// Convenience function: validate completeness.
-pub fn validate_bundle_completeness(bundle: &Bundle) -> ValidationResult {
+pub fn validate_bundle_completeness(_bundle: &Bundle) -> ValidationResult {
     todo!()
 }
 
 /// Convenience function: validate completeness or raise.
-pub fn validate_bundle_completeness_or_raise(bundle: &Bundle) -> crate::error::Result<()> {
+pub fn validate_bundle_completeness_or_raise(_bundle: &Bundle) -> crate::error::Result<()> {
     todo!()
 }

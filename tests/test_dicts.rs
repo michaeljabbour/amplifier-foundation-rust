@@ -34,7 +34,7 @@ fn seq(items: &[Value]) -> Value {
 // ═════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 1"]
+
 fn test_deep_merge_empty_dicts() {
     let parent = mapping(&[]);
     let child = mapping(&[]);
@@ -43,7 +43,7 @@ fn test_deep_merge_empty_dicts() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
+
 fn test_deep_merge_child_overrides_parent_scalars() {
     let parent = mapping(&[("a", int(1)), ("b", int(2))]);
     let child = mapping(&[("b", int(3)), ("c", int(4))]);
@@ -53,7 +53,7 @@ fn test_deep_merge_child_overrides_parent_scalars() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
+
 fn test_deep_merge_nested_dict_merge() {
     let parent = mapping(&[("config", mapping(&[("a", int(1)), ("b", int(2))]))]);
     let child = mapping(&[("config", mapping(&[("b", int(3)), ("c", int(4))]))]);
@@ -66,7 +66,7 @@ fn test_deep_merge_nested_dict_merge() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
+
 fn test_deep_merge_child_list_replaces_parent_list() {
     let parent = mapping(&[("items", seq(&[int(1), int(2), int(3)]))]);
     let child = mapping(&[("items", seq(&[int(4), int(5)]))]);
@@ -76,7 +76,7 @@ fn test_deep_merge_child_list_replaces_parent_list() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
+
 fn test_deep_merge_parent_unchanged() {
     let parent = mapping(&[("a", mapping(&[("b", int(1))]))]);
     let child = mapping(&[("a", mapping(&[("c", int(2))]))]);
@@ -90,14 +90,14 @@ fn test_deep_merge_parent_unchanged() {
 // ═════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 1"]
+
 fn test_merge_module_lists_empty_lists() {
     let result = merge_module_lists(&[], &[]);
     assert_eq!(result, Vec::<Value>::new());
 }
 
 #[test]
-#[ignore = "Wave 1"]
+
 fn test_merge_module_lists_child_adds_new_modules() {
     let parent = [mapping(&[("module", str_val("a"))])];
     let child = [mapping(&[("module", str_val("b"))])];
@@ -108,7 +108,7 @@ fn test_merge_module_lists_child_adds_new_modules() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
+
 fn test_merge_module_lists_child_config_overrides_parent() {
     let parent = [mapping(&[(
         "module",
@@ -130,17 +130,17 @@ fn test_merge_module_lists_child_config_overrides_parent() {
     let item = &result[0];
     let item_map = item.as_mapping().expect("expected mapping");
     assert_eq!(
-        item_map.get(&str_val("module")),
+        item_map.get(str_val("module")),
         Some(&str_val("a"))
     );
     assert_eq!(
-        item_map.get(&str_val("config")),
+        item_map.get(str_val("config")),
         Some(&mapping(&[("x", int(1)), ("y", int(3)), ("z", int(4))]))
     );
 }
 
 #[test]
-#[ignore = "Wave 1"]
+
 fn test_merge_module_lists_preserves_order() {
     let parent = [
         mapping(&[("module", str_val("a"))]),
@@ -154,7 +154,7 @@ fn test_merge_module_lists_preserves_order() {
         .map(|m| {
             m.as_mapping()
                 .unwrap()
-                .get(&str_val("module"))
+                .get(str_val("module"))
                 .unwrap()
                 .as_str()
                 .unwrap()
@@ -164,7 +164,7 @@ fn test_merge_module_lists_preserves_order() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
+
 #[should_panic]
 fn test_merge_module_lists_raises_on_string_in_parent() {
     // Expected: panic/error with "Malformed module config at index 0"
@@ -176,7 +176,7 @@ fn test_merge_module_lists_raises_on_string_in_parent() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
+
 #[should_panic]
 fn test_merge_module_lists_raises_on_string_in_child() {
     // Expected: panic/error with "Malformed module config at index 1"
@@ -189,7 +189,7 @@ fn test_merge_module_lists_raises_on_string_in_child() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
+
 fn test_merge_module_lists_raises_on_non_dict_types() {
     // Expected: panic/error for non-dict types (integer, list) in module list
     // Sub-case 1: integer in parent list
@@ -210,7 +210,7 @@ fn test_merge_module_lists_raises_on_non_dict_types() {
 // ═════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 1"]
+
 fn test_get_nested_simple_path() {
     let data = mapping(&[(
         "a",
@@ -221,7 +221,7 @@ fn test_get_nested_simple_path() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
+
 fn test_get_nested_missing_path_returns_default() {
     let data = mapping(&[("a", int(1))]);
 
@@ -236,7 +236,7 @@ fn test_get_nested_missing_path_returns_default() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
+
 fn test_get_nested_empty_path_returns_data() {
     let data = mapping(&[("a", int(1))]);
     let result = get_nested(&data, &[]);
@@ -248,7 +248,7 @@ fn test_get_nested_empty_path_returns_data() {
 // ═════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 1"]
+
 fn test_set_nested_simple_path() {
     let mut data = mapping(&[]);
     set_nested(&mut data, &["a", "b", "c"], int(1));
@@ -260,7 +260,7 @@ fn test_set_nested_simple_path() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
+
 fn test_set_nested_overwrites_existing() {
     let mut data = mapping(&[("a", mapping(&[("b", int(1))]))]);
     set_nested(&mut data, &["a", "b"], int(2));
@@ -269,15 +269,15 @@ fn test_set_nested_overwrites_existing() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
+
 fn test_set_nested_creates_intermediate_dicts() {
     let mut data = mapping(&[]);
     set_nested(&mut data, &["a", "b", "c", "d"], str_val("value"));
 
     // Traverse to verify the deeply nested value
-    let a = data.as_mapping().unwrap().get(&str_val("a")).unwrap();
-    let b = a.as_mapping().unwrap().get(&str_val("b")).unwrap();
-    let c = b.as_mapping().unwrap().get(&str_val("c")).unwrap();
-    let d = c.as_mapping().unwrap().get(&str_val("d")).unwrap();
+    let a = data.as_mapping().unwrap().get(str_val("a")).unwrap();
+    let b = a.as_mapping().unwrap().get(str_val("b")).unwrap();
+    let c = b.as_mapping().unwrap().get(str_val("c")).unwrap();
+    let d = c.as_mapping().unwrap().get(str_val("d")).unwrap();
     assert_eq!(d, &str_val("value"));
 }
