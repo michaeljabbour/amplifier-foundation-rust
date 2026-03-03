@@ -40,7 +40,6 @@ fn make_mount_plan(providers: Vec<Value>) -> Value {
 // =====================================================================
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_create_provider_preference() {
     let pref = ProviderPreference::new("anthropic", "claude-haiku-3");
     assert_eq!(pref.provider, "anthropic");
@@ -48,7 +47,6 @@ fn test_create_provider_preference() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_to_dict() {
     let pref = ProviderPreference::new("openai", "gpt-4o-mini");
     let result = pref.to_dict();
@@ -60,7 +58,6 @@ fn test_to_dict() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_from_dict() {
     let data = mapping(&[
         ("provider", str_val("anthropic")),
@@ -72,7 +69,6 @@ fn test_from_dict() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_from_dict_missing_provider() {
     let data = mapping(&[("model", str_val("gpt-4o-mini"))]);
     let result = ProviderPreference::from_dict(&data);
@@ -80,7 +76,6 @@ fn test_from_dict_missing_provider() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_from_dict_missing_model() {
     let data = mapping(&[("provider", str_val("openai"))]);
     let result = ProviderPreference::from_dict(&data);
@@ -92,7 +87,6 @@ fn test_from_dict_missing_model() {
 // =====================================================================
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_not_a_pattern() {
     assert!(!is_glob_pattern("claude-3-haiku-20240307"));
     assert!(!is_glob_pattern("gpt-4o-mini"));
@@ -100,7 +94,6 @@ fn test_not_a_pattern() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_asterisk_pattern() {
     assert!(is_glob_pattern("claude-haiku-*"));
     assert!(is_glob_pattern("*-haiku-*"));
@@ -108,14 +101,12 @@ fn test_asterisk_pattern() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_question_mark_pattern() {
     assert!(is_glob_pattern("gpt-4?"));
     assert!(is_glob_pattern("claude-?-haiku"));
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_bracket_pattern() {
     assert!(is_glob_pattern("gpt-[45]"));
     assert!(is_glob_pattern("claude-[a-z]-haiku"));
@@ -126,7 +117,6 @@ fn test_bracket_pattern() {
 // =====================================================================
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_empty_preferences() {
     let mount_plan = make_mount_plan(vec![
         provider_entry("provider-anthropic", &[]),
@@ -136,7 +126,6 @@ fn test_empty_preferences() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_no_providers_in_mount_plan() {
     let mount_plan = mapping(&[("orchestrator", mapping(&[("module", str_val("loop-basic"))]))]);
     let prefs = [ProviderPreference::new("anthropic", "claude-haiku-3")];
@@ -145,7 +134,6 @@ fn test_no_providers_in_mount_plan() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_first_preference_matches() {
     let mount_plan = make_mount_plan(vec![
         provider_entry("provider-anthropic", &[("priority", int(10))]),
@@ -183,7 +171,6 @@ fn test_first_preference_matches() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_second_preference_matches_when_first_unavailable() {
     // Only openai is in the mount plan; anthropic pref listed first but unavailable.
     let mount_plan = make_mount_plan(vec![
@@ -213,7 +200,6 @@ fn test_second_preference_matches_when_first_unavailable() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_no_preferences_match() {
     let mount_plan = make_mount_plan(vec![
         provider_entry("provider-azure", &[("priority", int(10))]),
@@ -238,7 +224,6 @@ fn test_no_preferences_match() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_flexible_provider_matching_short_name() {
     // Short name "anthropic" should match module "provider-anthropic".
     let mount_plan = make_mount_plan(vec![
@@ -263,7 +248,6 @@ fn test_flexible_provider_matching_short_name() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_flexible_provider_matching_full_name() {
     // Full module name "provider-anthropic" should match directly.
     let mount_plan = make_mount_plan(vec![
@@ -284,7 +268,6 @@ fn test_flexible_provider_matching_full_name() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_mount_plan_not_mutated() {
     let mount_plan = make_mount_plan(vec![
         provider_entry("provider-anthropic", &[("priority", int(10))]),
