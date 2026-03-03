@@ -7,9 +7,11 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+use serde_yaml_ng::Value;
 use tempfile::tempdir;
 
 use amplifier_foundation::registry::{BundleRegistry, BundleState};
+use amplifier_foundation::{extract_bundle_name, find_resource_path, parse_include};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -815,4 +817,479 @@ fn test_validate_cached_paths_empty_registry() {
     // Should not panic or call save() on empty registry
     registry.validate_cached_paths();
     assert!(registry.get_all_states().is_empty());
+}
+
+// ===========================================================================
+// parse_include tests (F-053)
+// ===========================================================================
+
+#[test]
+fn test_parse_include_string() {
+    let val = serde_yaml_ng::Value::String("my-bundle".to_string());
+    assert_eq!(parse_include(&val), Some("my-bundle".to_string()));
+}
+
+#[test]
+fn test_parse_include_dict_with_bundle() {
+    let mut map = serde_yaml_ng::Mapping::new();
+    map.insert(
+        serde_yaml_ng::Value::String("bundle".to_string()),
+        serde_yaml_ng::Value::String("foo".to_string()),
+    );
+    let val = serde_yaml_ng::Value::Mapping(map);
+    assert_eq!(parse_include(&val), Some("foo".to_string()));
+}
+
+#[test]
+fn test_parse_include_dict_without_bundle() {
+    let mut map = serde_yaml_ng::Mapping::new();
+    map.insert(
+        serde_yaml_ng::Value::String("other".to_string()),
+        serde_yaml_ng::Value::String("foo".to_string()),
+    );
+    let val = serde_yaml_ng::Value::Mapping(map);
+    assert_eq!(parse_include(&val), None);
+}
+
+#[test]
+fn test_parse_include_null() {
+    let val = serde_yaml_ng::Value::Null;
+    assert_eq!(parse_include(&val), None);
+}
+
+#[test]
+fn test_parse_include_number() {
+    let val = serde_yaml_ng::Value::Number(serde_yaml_ng::Number::from(42));
+    assert_eq!(parse_include(&val), None);
+}
+
+// ===========================================================================
+// find_resource_path tests (F-053)
+// ===========================================================================
+
+#[test]
+fn test_find_resource_path_exact() {
+    let dir = tempdir().unwrap();
+    let file_path = dir.path().join("myresource");
+    fs::write(&file_path, "content").unwrap();
+
+    let result = find_resource_path(&file_path);
+    assert!(result.is_some());
+    let resolved = result.unwrap();
+    assert!(resolved.is_absolute());
+    // Canonical path should end with "myresource"
+    assert!(resolved.ends_with("myresource"));
+}
+
+#[test]
+fn test_find_resource_path_yaml_ext() {
+    let dir = tempdir().unwrap();
+    let base = dir.path().join("myresource");
+    // Don't create base, but create base.yaml
+    fs::write(dir.path().join("myresource.yaml"), "content").unwrap();
+
+    let result = find_resource_path(&base);
+    assert!(result.is_some());
+    let resolved = result.unwrap();
+    assert!(resolved.to_string_lossy().ends_with("myresource.yaml"));
+}
+
+#[test]
+fn test_find_resource_path_md_ext() {
+    let dir = tempdir().unwrap();
+    let base = dir.path().join("myresource");
+    // Only create base.md
+    fs::write(dir.path().join("myresource.md"), "content").unwrap();
+
+    let result = find_resource_path(&base);
+    assert!(result.is_some());
+    let resolved = result.unwrap();
+    assert!(resolved.to_string_lossy().ends_with("myresource.md"));
+}
+
+#[test]
+fn test_find_resource_path_bundle_yaml() {
+    let dir = tempdir().unwrap();
+    let base = dir.path().join("myresource");
+    fs::create_dir_all(&base).unwrap();
+    fs::write(base.join("bundle.yaml"), "name: test").unwrap();
+
+    let result = find_resource_path(&base);
+    // base itself exists (it's a directory), so it should match as the first candidate
+    assert!(result.is_some());
+
+    // To specifically test bundle.yaml candidate, use a non-existent base dir name
+    let base2 = dir.path().join("nonexistent");
+    // Create nonexistent/bundle.yaml without creating nonexistent as an explicit file
+    fs::create_dir_all(&base2).unwrap();
+    fs::write(base2.join("bundle.yaml"), "name: test").unwrap();
+    // base2 is a dir that exists, so first candidate matches.
+    // Let's test with a path that doesn't exist as file or dir:
+    let base3 = dir.path().join("only_bundle");
+    fs::create_dir_all(&base3).unwrap();
+    fs::write(base3.join("bundle.yaml"), "name: test").unwrap();
+
+    let result3 = find_resource_path(&base3);
+    assert!(result3.is_some());
+}
+
+#[test]
+fn test_find_resource_path_none() {
+    let dir = tempdir().unwrap();
+    let base = dir.path().join("totally_missing");
+
+    let result = find_resource_path(&base);
+    assert!(result.is_none());
+}
+
+#[test]
+fn test_find_resource_path_priority() {
+    // Both base.yaml and base.md exist — base.yaml should win (earlier in list)
+    let dir = tempdir().unwrap();
+    let base = dir.path().join("myresource");
+    fs::write(dir.path().join("myresource.yaml"), "yaml content").unwrap();
+    fs::write(dir.path().join("myresource.md"), "md content").unwrap();
+
+    let result = find_resource_path(&base);
+    assert!(result.is_some());
+    let resolved = result.unwrap();
+    assert!(
+        resolved.to_string_lossy().ends_with("myresource.yaml"),
+        "Expected .yaml to win over .md, got: {}",
+        resolved.display()
+    );
+}
+
+// ===========================================================================
+// resolve_include_source tests (F-053)
+// ===========================================================================
+
+#[test]
+fn test_resolve_include_source_uri_passthrough() {
+    let dir = tempdir().unwrap();
+    let registry = BundleRegistry::new(dir.path().to_path_buf());
+
+    let result = registry.resolve_include_source("git+https://github.com/org/repo@main");
+    assert_eq!(
+        result,
+        Some("git+https://github.com/org/repo@main".to_string())
+    );
+}
+
+#[test]
+fn test_resolve_include_source_http_passthrough() {
+    let dir = tempdir().unwrap();
+    let registry = BundleRegistry::new(dir.path().to_path_buf());
+
+    let result = registry.resolve_include_source("https://example.com/bundle.yaml");
+    assert_eq!(result, Some("https://example.com/bundle.yaml".to_string()));
+}
+
+#[test]
+fn test_resolve_include_source_file_passthrough() {
+    let dir = tempdir().unwrap();
+    let registry = BundleRegistry::new(dir.path().to_path_buf());
+
+    let result = registry.resolve_include_source("file:///path/to/bundle");
+    assert_eq!(result, Some("file:///path/to/bundle".to_string()));
+}
+
+#[test]
+fn test_resolve_include_source_plain_name() {
+    let dir = tempdir().unwrap();
+    let registry = BundleRegistry::new(dir.path().to_path_buf());
+
+    let result = registry.resolve_include_source("my-bundle");
+    assert_eq!(result, Some("my-bundle".to_string()));
+}
+
+#[test]
+fn test_resolve_include_source_namespace_not_registered() {
+    let dir = tempdir().unwrap();
+    let registry = BundleRegistry::new(dir.path().to_path_buf());
+
+    let result = registry.resolve_include_source("unknown:path/to/thing");
+    assert_eq!(result, None);
+}
+
+#[test]
+fn test_resolve_include_source_namespace_file_with_local_path() {
+    let dir = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+
+    // Create a local directory structure with a resource file
+    let local_dir = dir.path().join("local_bundles");
+    let resource_dir = local_dir.join("skills");
+    fs::create_dir_all(&resource_dir).unwrap();
+    fs::write(resource_dir.join("coding.yaml"), "name: coding").unwrap();
+
+    // Register namespace with local_path
+    register_one(&mut registry, "mybundle", "file:///original/path");
+    registry.get_state("mybundle").local_path = Some(local_dir.to_string_lossy().to_string());
+
+    let result = registry.resolve_include_source("mybundle:skills/coding");
+    assert!(
+        result.is_some(),
+        "Should resolve namespace:path with local_path"
+    );
+    let resolved = result.unwrap();
+    assert!(
+        resolved.starts_with("file://"),
+        "Should be a file:// URI, got: {}",
+        resolved
+    );
+    assert!(
+        resolved.contains("coding.yaml"),
+        "Should find coding.yaml via find_resource_path, got: {}",
+        resolved
+    );
+}
+
+#[test]
+fn test_resolve_include_source_namespace_no_local_path_git() {
+    let dir = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+
+    // Register namespace with git URI but no local_path
+    register_one(
+        &mut registry,
+        "mybundle",
+        "git+https://github.com/org/repo@main",
+    );
+    // Deliberately no local_path set
+
+    let result = registry.resolve_include_source("mybundle:skills/coding");
+    assert_eq!(
+        result,
+        Some("git+https://github.com/org/repo@main#subdirectory=skills/coding".to_string())
+    );
+}
+
+// ===========================================================================
+// extract_bundle_name tests (F-053)
+// ===========================================================================
+
+#[test]
+fn test_resolve_include_source_git_namespace_local_path_resource_found() {
+    // P0 test: Git namespace with local_path where resource exists should return
+    // git+...#subdirectory=relative/path, NOT file://local/path
+    let dir = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+
+    let local_dir = dir.path().join("cache_tools");
+    let resource_dir = local_dir.join("skills");
+    fs::create_dir_all(&resource_dir).unwrap();
+    fs::write(resource_dir.join("coding.yaml"), "name: coding").unwrap();
+
+    register_one(
+        &mut registry,
+        "tools",
+        "git+https://github.com/org/tools@main",
+    );
+    registry.get_state("tools").local_path = Some(local_dir.to_string_lossy().to_string());
+
+    let result = registry.resolve_include_source("tools:skills/coding");
+    assert!(result.is_some(), "Should resolve");
+    let resolved = result.unwrap();
+    // MUST be git URI, not file://
+    assert!(
+        resolved.starts_with("git+https://"),
+        "Git namespace should return git URI, got: {}",
+        resolved
+    );
+    assert!(
+        resolved.contains("#subdirectory="),
+        "Should have subdirectory fragment, got: {}",
+        resolved
+    );
+    assert!(
+        resolved.contains("skills/coding.yaml"),
+        "Subdirectory should include resolved extension, got: {}",
+        resolved
+    );
+}
+
+#[test]
+fn test_resolve_include_source_git_namespace_local_path_resource_not_found() {
+    // P0 test: Git namespace with local_path but resource NOT found should return None
+    let dir = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+
+    let local_dir = dir.path().join("cache_tools");
+    fs::create_dir_all(&local_dir).unwrap();
+    // No resource file created — only the directory exists
+
+    register_one(
+        &mut registry,
+        "tools",
+        "git+https://github.com/org/tools@main",
+    );
+    registry.get_state("tools").local_path = Some(local_dir.to_string_lossy().to_string());
+
+    let result = registry.resolve_include_source("tools:nonexistent/path");
+    assert_eq!(
+        result, None,
+        "Missing resource in git namespace should return None"
+    );
+}
+
+#[test]
+fn test_resolve_include_source_namespace_local_path_is_file() {
+    // P1 test: local_path pointing to a file should use parent directory
+    let dir = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+
+    // local_path points to a specific bundle file
+    let bundle_file = dir.path().join("bundle.yaml");
+    fs::write(&bundle_file, "name: test").unwrap();
+    // Create a resource relative to the bundle file's directory
+    let skills_dir = dir.path().join("skills");
+    fs::create_dir_all(&skills_dir).unwrap();
+    fs::write(skills_dir.join("coding.yaml"), "name: coding").unwrap();
+
+    register_one(&mut registry, "mybundle", "file:///original/path");
+    registry.get_state("mybundle").local_path = Some(bundle_file.to_string_lossy().to_string());
+
+    let result = registry.resolve_include_source("mybundle:skills/coding");
+    assert!(
+        result.is_some(),
+        "Should resolve namespace:path when local_path is a file"
+    );
+    let resolved = result.unwrap();
+    assert!(
+        resolved.starts_with("file://"),
+        "Should be file:// URI, got: {}",
+        resolved
+    );
+    assert!(
+        resolved.contains("coding.yaml"),
+        "Should find coding.yaml, got: {}",
+        resolved
+    );
+}
+
+#[test]
+fn test_resolve_include_source_namespace_no_local_path_non_git() {
+    // Non-git namespace with no local_path should return None
+    let dir = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+
+    register_one(&mut registry, "mybundle", "https://example.com/bundle.yaml");
+    // Deliberately no local_path
+
+    let result = registry.resolve_include_source("mybundle:skills/coding");
+    assert_eq!(
+        result, None,
+        "Non-git namespace with no local_path should return None"
+    );
+}
+
+#[test]
+fn test_resolve_include_source_namespace_non_git_local_path_not_found() {
+    // Non-git namespace with local_path but resource not found should return None
+    let dir = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+
+    let local_dir = dir.path().join("local");
+    fs::create_dir_all(&local_dir).unwrap();
+
+    register_one(&mut registry, "mybundle", "file:///original/path");
+    registry.get_state("mybundle").local_path = Some(local_dir.to_string_lossy().to_string());
+
+    let result = registry.resolve_include_source("mybundle:nonexistent/path");
+    assert_eq!(
+        result, None,
+        "Non-git namespace with missing resource should return None"
+    );
+}
+
+#[test]
+fn test_resolve_include_source_empty_namespace() {
+    // Edge case: ":path" (empty namespace)
+    let dir = tempdir().unwrap();
+    let registry = BundleRegistry::new(dir.path().to_path_buf());
+
+    // split_once(':') returns ("", "path") — empty namespace won't be in bundles
+    let result = registry.resolve_include_source(":path");
+    assert_eq!(result, None, "Empty namespace should return None");
+}
+
+#[test]
+fn test_resolve_include_source_git_namespace_existing_fragment() {
+    // Git URI with existing #fragment should strip it before adding subdirectory
+    let dir = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+
+    register_one(
+        &mut registry,
+        "tools",
+        "git+https://github.com/org/tools@main#subdirectory=existing",
+    );
+    // No local_path
+
+    let result = registry.resolve_include_source("tools:new/path");
+    assert_eq!(
+        result,
+        Some("git+https://github.com/org/tools@main#subdirectory=new/path".to_string()),
+        "Should strip existing fragment and use new subdirectory"
+    );
+}
+
+#[test]
+fn test_parse_include_non_string_bundle_value() {
+    // Python uses str(bundle_ref) which coerces non-string values
+    let mut map = serde_yaml_ng::Mapping::new();
+    map.insert(
+        Value::String("bundle".to_string()),
+        Value::Number(serde_yaml_ng::Number::from(42)),
+    );
+    let result = parse_include(&Value::Mapping(map));
+    assert_eq!(
+        result,
+        Some("42".to_string()),
+        "Should coerce number to string"
+    );
+}
+
+#[test]
+fn test_parse_include_false_bundle_value() {
+    // Python: if bundle_ref: — False is falsy, returns None
+    let mut map = serde_yaml_ng::Mapping::new();
+    map.insert(Value::String("bundle".to_string()), Value::Bool(false));
+    let result = parse_include(&Value::Mapping(map));
+    assert_eq!(result, None, "False is falsy, should return None");
+}
+
+// ===========================================================================
+// extract_bundle_name tests (F-053)
+// ===========================================================================
+
+#[test]
+fn test_extract_bundle_name_github() {
+    let name = extract_bundle_name("git+https://github.com/org/repo@main");
+    assert_eq!(name, "repo");
+}
+
+#[test]
+fn test_extract_bundle_name_github_with_fragment() {
+    let name = extract_bundle_name("git+https://github.com/org/repo@main#subdirectory=sub");
+    assert_eq!(name, "repo");
+}
+
+#[test]
+fn test_extract_bundle_name_file() {
+    let name = extract_bundle_name("file:///path/to/bundle.yaml");
+    assert_eq!(name, "bundle.yaml");
+}
+
+#[test]
+fn test_extract_bundle_name_file_with_fragment() {
+    let name = extract_bundle_name("file:///path/to/bundle.yaml#sub");
+    assert_eq!(name, "bundle.yaml");
+}
+
+#[test]
+fn test_extract_bundle_name_plain() {
+    let name = extract_bundle_name("some/path@v1.0#sub");
+    assert_eq!(name, "path");
 }

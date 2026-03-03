@@ -78,6 +78,7 @@ pub use bundle::validator::{
 
 // -- Registry --
 pub use registry::load_bundle;
+pub use registry::{extract_bundle_name, find_resource_path, parse_include};
 
 // -- Protocols / Traits --
 pub use cache::CacheProvider;
