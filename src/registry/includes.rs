@@ -10,24 +10,32 @@ use std::path::{Path, PathBuf};
 impl BundleRegistry {
     /// Walk up from `start` toward `stop`, looking for bundle.md or bundle.yaml.
     /// bundle.md is preferred over bundle.yaml. Returns None if not found.
-    pub fn find_nearest_bundle_file(&self, start: &Path, stop: &Path) -> Option<PathBuf> {
+    ///
+    /// Uses `tokio::fs` for non-blocking I/O (canonicalize and metadata checks).
+    pub async fn find_nearest_bundle_file(&self, start: &Path, stop: &Path) -> Option<PathBuf> {
         let mut current = start.to_path_buf();
         // Canonicalize stop for comparison (if possible)
-        let stop_canonical = std::fs::canonicalize(stop).unwrap_or_else(|_| stop.to_path_buf());
+        let stop_canonical = tokio::fs::canonicalize(stop)
+            .await
+            .unwrap_or_else(|_| stop.to_path_buf());
 
         loop {
-            let current_canonical =
-                std::fs::canonicalize(&current).unwrap_or_else(|_| current.clone());
+            let current_canonical = tokio::fs::canonicalize(&current)
+                .await
+                .unwrap_or_else(|_| current.clone());
 
-            // Check for bundle.md first (preferred)
+            // Check for bundle.md and bundle.yaml concurrently.
+            // bundle.md is preferred when both exist.
             let bundle_md = current.join("bundle.md");
-            if bundle_md.exists() {
+            let bundle_yaml = current.join("bundle.yaml");
+            let (md_exists, yaml_exists) = tokio::join!(
+                tokio::fs::metadata(&bundle_md),
+                tokio::fs::metadata(&bundle_yaml),
+            );
+            if md_exists.is_ok() {
                 return Some(bundle_md);
             }
-
-            // Then bundle.yaml
-            let bundle_yaml = current.join("bundle.yaml");
-            if bundle_yaml.exists() {
+            if yaml_exists.is_ok() {
                 return Some(bundle_yaml);
             }
 

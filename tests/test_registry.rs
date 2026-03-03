@@ -60,38 +60,38 @@ fn write_bundle_yaml_with_includes(path: &std::path::Path, name: &str, includes:
 }
 
 // ===========================================================================
-// TestFindNearestBundleFile (6 tests, sync)
+// TestFindNearestBundleFile (6 tests, async)
 // ===========================================================================
 
-#[test]
+#[tokio::test]
 
-fn test_finds_bundle_md_in_start_directory() {
+async fn test_finds_bundle_md_in_start_directory() {
     let tmp = tempdir().unwrap();
     let base = tmp.path();
     write_bundle_md(base);
 
     let registry = BundleRegistry::new(base.to_path_buf());
-    let result = registry.find_nearest_bundle_file(base, base);
+    let result = registry.find_nearest_bundle_file(base, base).await;
 
     assert_eq!(result, Some(base.join("bundle.md")));
 }
 
-#[test]
+#[tokio::test]
 
-fn test_finds_bundle_yaml_in_start_directory() {
+async fn test_finds_bundle_yaml_in_start_directory() {
     let tmp = tempdir().unwrap();
     let base = tmp.path();
     write_simple_bundle_yaml(base, "test");
 
     let registry = BundleRegistry::new(base.to_path_buf());
-    let result = registry.find_nearest_bundle_file(base, base);
+    let result = registry.find_nearest_bundle_file(base, base).await;
 
     assert_eq!(result, Some(base.join("bundle.yaml")));
 }
 
-#[test]
+#[tokio::test]
 
-fn test_prefers_bundle_md_over_bundle_yaml() {
+async fn test_prefers_bundle_md_over_bundle_yaml() {
     let tmp = tempdir().unwrap();
     let base = tmp.path();
     // Create both files — bundle.md should win.
@@ -99,14 +99,14 @@ fn test_prefers_bundle_md_over_bundle_yaml() {
     write_simple_bundle_yaml(base, "test");
 
     let registry = BundleRegistry::new(base.to_path_buf());
-    let result = registry.find_nearest_bundle_file(base, base);
+    let result = registry.find_nearest_bundle_file(base, base).await;
 
     assert_eq!(result, Some(base.join("bundle.md")));
 }
 
-#[test]
+#[tokio::test]
 
-fn test_walks_up_to_find_bundle() {
+async fn test_walks_up_to_find_bundle() {
     let tmp = tempdir().unwrap();
     let root = tmp.path();
     write_bundle_md(root);
@@ -115,27 +115,27 @@ fn test_walks_up_to_find_bundle() {
     let nested = create_nested_dirs(root, &["a", "b", "c"]);
 
     let registry = BundleRegistry::new(root.to_path_buf());
-    let result = registry.find_nearest_bundle_file(&nested, root);
+    let result = registry.find_nearest_bundle_file(&nested, root).await;
 
     assert_eq!(result, Some(root.join("bundle.md")));
 }
 
-#[test]
+#[tokio::test]
 
-fn test_returns_none_when_not_found() {
+async fn test_returns_none_when_not_found() {
     let tmp = tempdir().unwrap();
     let base = tmp.path();
     // No bundle files at all.
 
     let registry = BundleRegistry::new(base.to_path_buf());
-    let result = registry.find_nearest_bundle_file(base, base);
+    let result = registry.find_nearest_bundle_file(base, base).await;
 
     assert_eq!(result, None);
 }
 
-#[test]
+#[tokio::test]
 
-fn test_stops_at_stop_directory() {
+async fn test_stops_at_stop_directory() {
     let tmp = tempdir().unwrap();
     let root = tmp.path();
 
@@ -148,7 +148,9 @@ fn test_stops_at_stop_directory() {
     let registry = BundleRegistry::new(root.to_path_buf());
     // Searching from deep inside, but stopping at `project/` — should NOT
     // find the bundle.md that lives at root.
-    let result = registry.find_nearest_bundle_file(&search_dir, &stop_dir);
+    let result = registry
+        .find_nearest_bundle_file(&search_dir, &stop_dir)
+        .await;
 
     assert_eq!(result, None);
 }

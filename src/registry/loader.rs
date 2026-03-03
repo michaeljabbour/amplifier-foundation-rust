@@ -67,7 +67,7 @@ impl BundleRegistry {
             // Look for a root bundle ABOVE this one
             if let Some(parent_dir) = bundle_dir.parent() {
                 if let Some(root_bundle_path) =
-                    self.find_nearest_bundle_file(parent_dir, &self.home)
+                    self.find_nearest_bundle_file(parent_dir, &self.home).await
                 {
                     let root_dir = root_bundle_path
                         .parent()

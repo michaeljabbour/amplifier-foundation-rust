@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 19
-phase_name: "Wave 19 -- Full async I/O migration (mentions, registry, io)"
-epoch: 20
-next_action: "Wave 19 COMPLETE. 601 tests passing, 0 clippy warnings, cargo fmt clean. Consider: create_session/spawn (requires AmplifierSession), find_nearest_bundle_file async migration, persistence.rs async migration, PyO3 bindings, benchmarks"
+phase: 20
+phase_name: "Wave 20 -- Async registry secondary paths (find_nearest, find_resource, resolve_include)"
+epoch: 21
+next_action: "Implement F-068 (async find_nearest_bundle_file), F-069 (async find_resource_path), F-070 (async resolve_include_source)"
 blockers: []
 
 architecture_spec:
@@ -680,12 +680,32 @@ features:
     completed_at: "2025-01-27T01:30:00Z"
     commit: "bc113a4"
 
+  F-068-async-find-nearest:
+    name: "Convert find_nearest_bundle_file to async (tokio::fs for exists/canonicalize)"
+    module: "registry"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-059-registry-decompose"]
+    started_at: "2025-01-28T00:00:00Z"
+  F-069-async-find-resource:
+    name: "Convert find_resource_path to async (tokio::fs for exists/canonicalize)"
+    module: "registry"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-059-registry-decompose"]
+  F-070-async-resolve-include:
+    name: "Convert resolve_include_source to async (uses async find_resource_path + is_file)"
+    module: "registry"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-069-async-find-resource"]
+
 wave_gate:
-  current_wave: 19
+  current_wave: 20
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
-  approval_status: "approved"
-  notes: "Wave 19 COMPLETE: 601 tests (595+6 new), 0 clippy warnings, cargo fmt clean. Full async I/O migration of mentions, registry loader, and io/files."
+  approval_status: "in-progress"
+  notes: "Wave 20: Async migration of registry secondary I/O paths (find_nearest_bundle_file, find_resource_path, resolve_include_source)"
 
 meta:
   project: "amplifier-foundation-rs"
