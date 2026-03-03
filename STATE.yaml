@@ -13,7 +13,7 @@
 phase: 18
 phase_name: "Wave 18 -- Bundle decomposition, mention resolver enhancement, async I/O cleanup"
 epoch: 19
-next_action: "Implement F-062 (bundle/mod.rs decomposition), F-063 (BaseMentionResolver context-dict), F-064 (tokio::fs in prompt factory)"
+next_action: "Wave 18 COMPLETE. 595 tests passing, 0 clippy warnings, cargo fmt clean. Consider: create_session/spawn (requires AmplifierSession), full async migration of mentions/loader.rs, PyO3 bindings, benchmarks"
 blockers: []
 
 architecture_spec:
@@ -643,21 +643,23 @@ features:
   F-064-async-prompt-io:
     name: "Replace blocking std::fs with tokio::fs in BundleSystemPromptFactory"
     module: "bundle"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-061-prepared-bundle"]
     started_at: "2025-01-26T01:05:00Z"
+    completed_at: "2025-01-26T01:25:00Z"
+    commit: "197c691"
 
 wave_gate:
   current_wave: 18
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
-  approval_status: "pending"
-  notes: "Wave 18: bundle decomposition, mention resolver enhancement, async I/O cleanup"
+  approval_status: "approved"
+  notes: "Wave 18 COMPLETE: 595 tests (590+5 new), 0 clippy warnings, cargo fmt clean. Bundle decomposed into 7 submodules, BaseMentionResolver enhanced with context-dict, prompt factory uses tokio::fs."
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 61
-  last_updated: "2025-01-26T00:00:00Z"
+  total_features_completed: 64
+  last_updated: "2025-01-26T01:25:00Z"
   last_session: "session-023-wave18-decompose-enhance"

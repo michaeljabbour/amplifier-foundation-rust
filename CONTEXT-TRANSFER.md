@@ -6,6 +6,61 @@
 
 ---
 
+## Session 023 -- Wave 18 COMPLETE (F-062, F-063, F-064)
+
+### Work Completed
+- **F-062-bundle-decompose** (c2d86ff): Decomposed `bundle/mod.rs` (918 lines) into 7 focused submodules: `helpers.rs` (23 lines, `value_type_name` + `is_null_or_empty_mapping`), `serde.rs` (352 lines, `from_dict`/`to_dict` + parse helpers), `agent_meta.rs` (265 lines, `resolve_agent_path`/`load_agent_metadata` + free functions), `compose.rs` (120 lines, `Bundle::compose()` 5-strategy system), `context.rs` (69 lines, `resolve_context_path`/`resolve_pending_context`), `mount.rs` (56 lines, `Bundle::to_mount_plan()`). `mod.rs` slimmed to 69 lines (struct definition + `new()` constructor only). Deduplicated `value_type_name()` between `mod.rs` and `validator.rs` — validator now imports from `helpers`. No file over 352 lines. Purely structural — zero behavioral changes.
+- **F-063-mention-resolver-context** (6544002): Enhanced `BaseMentionResolver` with context-dict namespace lookup. Added `context: IndexMap<String, PathBuf>` field. When resolving `@namespace:name`, the resolver now checks `self.context.get(name)` first (exact match from composed bundle's context dict) before falling back to `bundles[namespace].join(name)`. Updated `BundleSystemPromptFactory` to pass `bundle.context` to resolver. Removed "Known limitation" comment from `prepared.rs`. 5 new tests covering priority, fallback, backward compat, and unknown namespace.
+- **F-064-async-prompt-io** (197c691): Replaced blocking `std::fs::read_to_string` with `tokio::fs::read_to_string` in `BundleSystemPromptFactory::create()` for context file loading. Removed redundant `.exists()`/`metadata()` check before read — the read itself handles missing files, eliminating a TOCTOU race and unnecessary syscall. Note: `load_mentions()` called later in the method still uses blocking I/O internally (pre-existing pattern from Session 012).
+
+### Wave 18 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 595 passing (590 + 5 new), 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **Bundle decomposition uses private modules by default**: `compose`, `serde`, `agent_meta`, `context`, `helpers` are all `mod` (private), not `pub mod`. Only `module_resolver`, `mount`, `prepared`, and `validator` are `pub mod` (have types/traits used externally).
+- **`helpers.rs` visibility is `mod` (private to bundle module tree)**: Antagonistic review suggested `pub(crate)` was broader than needed — only bundle submodules use these helpers. Changed to plain `mod`.
+- **`serde.rs` naming not problematic**: The `serde` module is private (`mod serde`) and doesn't conflict with the `serde` crate at module resolution level.
+- **Context dict lookup is namespace-agnostic**: `@foundation:overview` and `@otherns:overview` both resolve from the same shared context dict (matching Python's `dataclasses.replace` pattern). Documented in struct-level doc comment.
+- **`.md` extension fallback preserved for namespace resolution**: Rust's resolver adds `.md` extension fallback that Python's `resolve_context_path` doesn't have. Documented as intentional Rust enhancement (pre-existing from F-016).
+- **Redundant metadata check removed from context loading**: Antagonistic review correctly identified that `tokio::fs::metadata().await` before `read_to_string().await` creates a TOCTOU race and is redundant — the read itself handles missing files.
+- **Partial async migration documented honestly**: Only context file reads are async via `tokio::fs`. `load_mentions()` and the entire mentions subsystem still use blocking I/O (pre-existing from Session 012). Comment in code reflects this honestly.
+
+### Antagonistic Review Issues Found & Fixed
+- F-062: Changed `pub(crate) mod helpers` to `mod helpers` (P3: narrower visibility)
+- F-063: Fixed misleading comment "matches Python's construct_context_path" → honest description of pre-existing divergence (P1)
+- F-063: Added namespace-agnostic behavior documentation to `context` field doc comment (P2)
+- F-064: Removed redundant `metadata()` check — just try the read (P2: eliminates TOCTOU race)
+- F-064: Fixed misleading comment claiming "no blocking the runtime" → honest description of partial async migration (P3)
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-062: No new issues — purely structural refactoring
+- F-063: `PathBuf::join` vs `construct_context_path` for leading `/` in rel_path — pre-existing divergence from F-016, not introduced by F-063
+- F-063: `.md` extension fallback in namespace resolution diverges from Python — pre-existing, documented as intentional Rust enhancement
+- F-063: No builder method for `BaseMentionResolver` with context — struct fields are pub, callers use struct-literal construction
+- F-064: `load_mentions()` still uses blocking I/O throughout — pre-existing pattern from Session 012. Full async migration of mentions subsystem deferred as larger effort requiring changes to `loader.rs`, `resolver.rs`, `utils.rs`
+
+### File Size Status
+- `src/bundle/mod.rs`: 69 lines (was 918 — decomposed into 7 files)
+- `src/bundle/serde.rs`: 352 lines (largest submodule — from_dict/to_dict + helpers)
+- `src/bundle/agent_meta.rs`: 265 lines (agent resolution + metadata loading)
+- No file in bundle/ over 352 lines
+
+### What's Next
+- All 18 waves complete. 595 tests, 0 clippy warnings, 64 features delivered.
+- Bundle decomposition complete: 7 submodules, no file over 352 lines, mod.rs is 69 lines
+- BaseMentionResolver context-dict limitation resolved (F-016 limitation from Session 007)
+- Remaining unported PreparedBundle functionality:
+  - `create_session` (bundle.py:981-1109) — depends on AmplifierSession from amplifier_core
+  - `spawn` (bundle.py:1111-1289) — depends on AmplifierSession from amplifier_core
+- Consider: Full async migration of mentions/loader.rs (loader, resolver, utils all use blocking std::fs)
+- Consider: PyO3 bindings (feature flag exists, no `#[pyclass]` code)
+- Consider: Benchmarks (bundle compose, cache operations, system prompt factory)
+
+---
+
 ## Session 022 -- Wave 17 COMPLETE (F-059, F-060, F-061)
 
 ### Work Completed
