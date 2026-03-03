@@ -6,6 +6,60 @@
 
 ---
 
+## Session 026 -- Wave 21 COMPLETE (F-071, F-072, F-073)
+
+### Work Completed
+- **F-071-async-persistence-save** (7730a83): Converted `save()` from sync `std::fs` to async `tokio::fs` (create_dir_all + write). RwLock read guard explicitly scoped and dropped before any `.await` point. `record_include_relationships()` converted to async (calls `save().await`). `validate_cached_paths()` converted to async with `&self` (was `&mut self`) — split into read-lock scan + write-lock mutation + async save, enabling `Arc<BundleRegistry>` compatibility. `save()` now logs `tracing::warn!` on I/O and serialization errors instead of silently swallowing. `load_persisted_state()` remains sync (called from sync constructor). 14 registry tests + 1 integration test converted from `#[test]` to `#[tokio::test]`.
+- **F-072-async-validate-cached-paths** (d7ff35d): Converted `path.exists()` inside `validate_cached_paths` to `tokio::fs::metadata().await.is_ok()`. Three-phase approach: read lock (collect name+path candidates) → async metadata checks (no lock held) → write lock (clear stale entries). Read lock dropped before any `.await` points.
+- **F-073-async-load-agent-metadata** (f50ead7): Converted `resolve_agent_path()` from sync `path.exists()` to async `tokio::fs::metadata().await`. Converted `load_agent_file_metadata()` from sync `std::fs::read_to_string` to async `tokio::fs::read_to_string`. Converted `load_agent_metadata()` to async. Removed redundant TOCTOU exists() guard (resolve_agent_path already checks existence via metadata). 20 tests converted from `#[test]` to `#[tokio::test]`.
+
+### Wave 21 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 601 passing, 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **`save()` uses tokio::fs with lock-before-await discipline**: The bundles RwLock read guard is acquired, state serialized to String, lock dropped — THEN async write happens. No lock held across any `.await` point.
+- **`save()` logs warnings instead of silently swallowing errors**: `tracing::warn!` on `create_dir_all` failure, serialization failure, and file write failure. Returns early on first error. Matches the "warn and continue" pattern used throughout the codebase while giving operational visibility. Pre-existing `let _ =` pattern was a data loss footgun.
+- **`validate_cached_paths()` changed from `&mut self` to `&self`**: Enables calling on `Arc<BundleRegistry>` in async contexts. Uses read lock for scan + write lock for mutation instead of `get_mut()` bypass. This aligns with the rest of the async API (`save`, `record_include_relationships`, `load_single`) which all take `&self`.
+- **Three-phase validate_cached_paths**: Phase 1 collects (name, local_path) pairs under read lock. Phase 2 checks existence via async `tokio::fs::metadata` with no lock held. Phase 3 mutates under write lock. This avoids holding any lock across `.await` points.
+- **`resolve_agent_path()` made async**: All existence checks converted to `tokio::fs::metadata().await.is_ok()`. Previously used sync `path.exists()`.
+- **Removed redundant TOCTOU guard in `load_agent_metadata`**: The old code had `Some(p) if p.exists() => p` after `resolve_agent_path` — but `resolve_agent_path` already checks existence at every return site. The redundant check was a TOCTOU safety belt, but now `load_agent_file_metadata` handles the read failure case via Err propagation. Simpler code, same safety.
+- **`load_persisted_state()` stays sync**: Called from `BundleRegistry::new()` which is a synchronous constructor. Making it async would require an async constructor pattern (`BundleRegistry::new_async()`) which would be a significant API change. The file is small (registry.json) so the blocking I/O cost is minimal during startup.
+
+### Antagonistic Review Issues Found & Fixed
+- F-071: Changed `validate_cached_paths` from `&mut self` to `&self` with proper read/write lock phases (P1: was breaking `Arc` compatibility)
+- F-071: Added `tracing::warn!` for all save error paths (P1: was silently swallowing all I/O and serialization errors)
+- F-071: Fixed clippy warning — `mut` removed from empty registry test (P3)
+- F-073: Removed redundant TOCTOU `p.exists()` guard after `resolve_agent_path` (P2: async resolve already checks existence)
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-071: `update_single`/`check_update_single` mutate state but don't call `save()` — pre-existing from before async conversion, not introduced here
+- F-071: `register`/`unregister` require manual `save()` with no compiler enforcement — pre-existing API design
+- F-071: Write lock in `load_single_with_chain` not brace-scoped (style inconsistency) — pre-existing
+- F-071: `load_persisted_state` silently drops parse/IO errors — pre-existing
+- F-072: `validate_cached_paths` runs metadata checks sequentially, not concurrently — could use `futures::join_all` but sequential is simpler for typical registry sizes
+
+### Remaining Blocking I/O in Async Contexts
+- `persistence.rs`: `load_persisted_state()` with `std::fs::read_to_string` — called from sync `BundleRegistry::new()`, requires async constructor to fix
+- `MentionResolver::resolve()`: `path.exists()` calls (mentions/resolver.rs) — sync trait, making async requires trait redesign
+- `write_with_backup`/`write_atomic_bytes`: sync by design (tempfile crate)
+
+### What's Next
+- All 21 waves complete. 601 tests, 0 clippy warnings, 73 features delivered.
+- All persistence write paths now fully async: save(), record_include_relationships(), validate_cached_paths(), load_agent_metadata().
+- Remaining blocking I/O: load_persisted_state (sync constructor), MentionResolver (sync trait), write_with_backup (tempfile).
+- Remaining unported PreparedBundle functionality:
+  - `create_session` (bundle.py:981-1109) — depends on AmplifierSession from amplifier_core
+  - `spawn` (bundle.py:1111-1289) — depends on AmplifierSession from amplifier_core
+- Consider: Async MentionResolver::resolve() (requires trait redesign)
+- Consider: PyO3 bindings (feature flag exists, no `#[pyclass]` code)
+- Consider: Benchmarks (bundle compose, cache operations, system prompt factory)
+- Consider: Async load_persisted_state (requires async constructor pattern)
+
+---
+
 ## Session 025 -- Wave 20 COMPLETE (F-068, F-069, F-070)
 
 ### Work Completed
