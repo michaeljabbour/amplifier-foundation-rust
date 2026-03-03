@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 3
-phase_name: "Wave 3 -- Core Modules (bundle, registry, validator)"
-epoch: 4
-next_action: "Wave 3 COMPLETE. All 251 tests passing, 0 ignored. Proceed to Wave 4: lib.rs re-exports, examples"
+phase: 4
+phase_name: "Wave 4 -- Integration Surface (lib.rs re-exports, examples)"
+epoch: 5
+next_action: "Implement F-021-lib-reexports: add pub use re-exports to lib.rs matching Python __init__.py"
 blockers: []
 
 architecture_spec:
@@ -223,16 +223,30 @@ features:
     completed_at: "2025-01-16T09:30:00Z"
     commit: "43e19b9"
 
+  F-021-lib-reexports:
+    name: "lib.rs pub use re-exports matching Python __init__.py surface"
+    module: "root"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-020-registry"]
+    started_at: "2025-01-16T10:00:00Z"
+  F-022-examples:
+    name: "Example binaries (bundle_parse, bundle_compose, path_utils)"
+    module: "examples"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-021-lib-reexports"]
+
 wave_gate:
-  current_wave: 3
-  gate_criteria: "All 65 Wave 3 tests pass + Wave 1-2's 186 still passing = 251 total"
+  current_wave: 4
+  gate_criteria: "All 251 tests still pass + lib.rs re-exports compile + examples compile and run"
   approval_required: false
-  approval_status: "approved"
-  notes: "Wave 3 COMPLETE: 65/65 tests passing. bundle (26), validator (18), registry (21). Total passing: 251 + 0 ignored."
+  approval_status: "pending"
+  notes: "Starting Wave 4"
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
   total_features_completed: 20
-  last_updated: "2025-01-16T09:30:00Z"
-  last_session: "session-008-wave3-complete"
+  last_updated: "2025-01-16T10:00:00Z"
+  last_session: "session-009-wave4-start"
