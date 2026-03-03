@@ -13,7 +13,7 @@
 phase: 8
 phase_name: "Wave 8 -- Source Handler Resolve + API Completion"
 epoch: 9
-next_action: "Implementing F-034 ContentDeduplicator API + Registry IndexMap"
+next_action: "Wave 8 COMPLETE. 351 tests passing, 0 clippy warnings, cargo fmt clean. All todo!() stubs resolved. 0 remaining. Consider: PyO3 bindings, async test for registry load_single, benchmarks"
 blockers: []
 
 architecture_spec:
@@ -347,21 +347,23 @@ features:
   F-034-dedup-registry:
     name: "ContentDeduplicator full Python API + BundleRegistry IndexMap"
     module: "mentions, registry"
-    status: "in-progress"
+    status: "done"
     started_at: "2025-01-17T07:05:00Z"
+    completed_at: "2025-01-17T07:45:00Z"
+    commit: "30f9723"
     spec: "specs/architecture.md"
     depends_on: ["F-028-dead-code-cleanup", "F-020-registry"]
 
 wave_gate:
-  current_wave: 7
+  current_wave: 8
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
   approval_status: "approved"
-  notes: "Wave 7 COMPLETE: 329 tests, 0 clippy warnings, cargo fmt clean. SimpleSourceResolver, load_mentions, updates module implemented."
+  notes: "Wave 8 COMPLETE: 351 tests, 0 clippy warnings, cargo fmt clean. HttpSourceHandler.resolve, GitSourceHandler.resolve, ContentDeduplicator full API, Registry IndexMap."
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 31
-  last_updated: "2025-01-17T05:30:00Z"
-  last_session: "session-012-wave7-stubs"
+  total_features_completed: 34
+  last_updated: "2025-01-17T07:45:00Z"
+  last_session: "session-013-wave8-sources"

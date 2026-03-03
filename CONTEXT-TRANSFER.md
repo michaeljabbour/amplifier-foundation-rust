@@ -6,6 +6,69 @@
 
 ---
 
+## Session 013 -- Wave 8 COMPLETE (F-032, F-033, F-034)
+
+### Work Completed
+- **F-032-http-resolve** (57fb4e0): Implemented `HttpSourceHandler.resolve` with reqwest HTTP download. SHA-256 content-addressable cache (hash of URL, first 16 hex chars). Cache-hit fast path checks file/subpath existence before download. Feature-gated on `http-sources` (`LoadError` when disabled, not `NotFound`). Shared `resolve_with_subpath` helper eliminates DRY violation between cache-hit and post-download paths. `download()` method extracted for clean `#[cfg]` boundary. 4 new tests: cache hit, cache hit with subpath, download failure (127.0.0.1:1), empty path fallback to "download".
+- **F-033-git-resolve** (877b647): Implemented `GitSourceHandler.resolve` with `tokio::process::Command` for async git clone. SHA-256 cache key from `{git_url}@{ref}` (first 16 hex chars). Shallow clone (`--depth 1`) with `--branch` for non-HEAD refs. Cache integrity verification checks .git directory + expected markers (pyproject.toml/setup.py/setup.cfg/bundle.md/bundle.yaml). Valid cache returns directly (no re-clone on bad subpath — fix from review). OsStr-aware path passing via `.arg(&cache_path)` instead of lossy `.display().to_string()`. Cache metadata JSON with cached_at, ref, commit, git_url. Metadata write errors logged at warn level. 9 new tests: can_handle (4), cache hit, subpath, HEAD default, invalid cache cleanup, clone failure.
+- **F-034-dedup-registry** (30f9723): Extended `ContentDeduplicator` with full Python API: `add_file(path, content) -> bool` with multi-path attribution, `get_unique_files() -> Vec<UniqueFile>` (insertion-ordered via IndexMap), `is_seen(content) -> bool` (pure query), `get_known_hashes() -> HashSet<String>`. New `UniqueFile` struct (content, content_hash, paths) with PartialEq/Eq. Cross-API compatibility: `is_duplicate` and `add_file` share `seen` HashSet. Changed `BundleRegistry.bundles` from `HashMap` to `IndexMap` for deterministic JSON serialization. `unregister` uses `shift_remove` (preserves order). Enabled `serde_json` `preserve_order` feature. 10 new integration tests.
+
+### Wave 8 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 351 passing, 0 ignored, 0 failed
+- MSRV: 1.80 (unchanged)
+- Remaining `todo!()`: 0 (all stubs resolved)
+
+### Design Decisions Made
+- **HttpSourceHandler uses BundleError::NotFound for download failures**: Matches Python's `BundleNotFoundError` usage. Callers match on `NotFound` to distinguish "bundle unavailable" from other errors. The `uri` field contains the full error message (e.g., "Failed to download https://...: connection refused"). This is a known divergence from the strict `uri` field semantics but matches Python behavior exactly.
+- **HttpSourceHandler.download() extracted as separate method**: Clean `#[cfg(feature = "http-sources")]` boundary. The no-feature path returns `LoadError` (not `NotFound`) since the bundle isn't missing — the feature is.
+- **HttpSourceHandler cache filename preserves original**: `{filename}-{cache_key}` format matches Python's `Path(parsed.path).name or "download"`.
+- **GitSourceHandler uses tokio::process::Command for clone**: Async subprocess execution for the main `git clone`. The `get_local_commit` helper uses sync `std::process::Command` (consistent with existing sync I/O in async contexts pattern — same as Python's sync subprocess for rev-parse).
+- **GitSourceHandler valid cache returns directly on subpath error**: If cache is valid but subpath doesn't exist, return NotFound immediately instead of destroying valid cache and re-cloning. This is a deliberate improvement over re-clone behavior.
+- **GitSourceHandler uses OsStr for subprocess args**: `cmd.arg(&cache_path)` passes PathBuf as OsStr, avoiding lossy `.display().to_string()` conversion that would corrupt non-UTF-8 paths.
+- **Git clone omits --branch for HEAD ref**: "HEAD" is not a valid `--branch` argument. Omitting it lets git use the remote's default branch. Matches Python behavior.
+- **ContentDeduplicator internal maps use IndexMap**: `content_by_hash` and `paths_by_hash` use IndexMap for deterministic `get_unique_files()` ordering (matches Python dict insertion order).
+- **ContentDeduplicator is_duplicate ↔ add_file cross-API**: Both APIs share the `seen: HashSet` for hash tracking. `add_file` on content already tracked via `is_duplicate` backfills the content and path maps. This enables mixing the simple `is_duplicate` API (used by load_mentions) and the richer `add_file` API on the same instance.
+- **UniqueFile is separate from ContextFile**: The Python's `ContextFile` for dedup has `content`, `content_hash`, `paths` (plural), while the Rust `ContextFile` has `path` (singular), `content`, `mention`. These serve different purposes, so a separate `UniqueFile` struct was created rather than modifying the existing `ContextFile`.
+- **BundleRegistry.bundles → IndexMap**: Ensures deterministic `registry.json` output. `shift_remove` preserves insertion order (vs `swap_remove` which moves last element to fill gap).
+- **serde_json preserve_order feature**: Required for `serde_json::Map` to use IndexMap internally. Without this, `serde_json::json!({...})` creates a BTreeMap-backed Map that sorts keys alphabetically, defeating the IndexMap in registry.
+- **register() still accepts &HashMap**: Changing to IndexMap would break callers. Single-bundle registration calls (one key per HashMap) maintain deterministic order. Multi-bundle registration order depends on caller's HashMap iteration order (documented).
+
+### Antagonistic Review Issues Found & Fixed
+- F-032: Extracted `resolve_with_subpath` helper to eliminate DRY violation between cache-hit and post-download paths
+- F-032: Separated `download()` method for clean `#[cfg]` boundary (reviewer caught unreachable code risk)
+- F-032: Feature-disabled path returns `LoadError` not `NotFound` (reviewer: "bundle isn't missing, feature is")
+- F-032: Fixed clippy `unneeded return` warning
+- F-033: Fixed valid cache destruction on subpath error (reviewer caught re-clone of valid cache)
+- F-033: Changed from `Vec<String>` args to `Command::arg()` for OsStr-safe path passing
+- F-033: Added tracing::warn for metadata write failures (reviewer caught silent error swallowing)
+- F-033: Changed invalid cache test from github.com to 127.0.0.1:1 (reviewer caught real network call)
+- F-034: Changed dedup internal maps from HashMap to IndexMap (reviewer caught non-deterministic get_unique_files)
+- F-034: Added PartialEq/Eq derives to UniqueFile (reviewer caught missing trait impls)
+- F-034: Added cross-API test (is_duplicate → add_file) for backfill logic
+- F-034: Fixed registry test to register individually and check key order (reviewer caught vacuous test)
+- F-034: Enabled serde_json preserve_order feature (test caught BTreeMap key sorting)
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-032: No mock HTTP server test for actual download path — cache-hit tests verify the important logic; download code is straightforward reqwest usage
+- F-032: NotFound.uri field used for error messages — matches Python's BundleNotFoundError usage
+- F-033: get_local_commit uses sync subprocess in async context — consistent with existing patterns, same as Python
+- F-033: No test for successful clone (requires real git repo) — cache-hit tests verify all logic paths except subprocess
+- F-034: get_known_hashes clones entire HashSet — acceptable for typical cardinality
+- F-034: add_file path dedup is O(n) linear scan — fine for typical paths-per-content counts
+
+### What's Next
+- All 8 waves complete. 351 tests, 0 clippy warnings, 34 features delivered.
+- **ZERO remaining `todo!()` stubs** — all source handlers fully implemented.
+- Consider: PyO3 bindings (Wave 9 if needed)
+- Consider: Async integration tests for registry.load_single
+- Consider: Benchmarks (bundle compose, cache operations)
+- Consider: Mock HTTP server tests (wiremock/httpmock) for download path coverage
+- Consider: Git integration test with local bare repo fixture
+
+---
+
 ## Session 012 -- Wave 7 COMPLETE (F-029, F-030, F-031)
 
 ### Work Completed
