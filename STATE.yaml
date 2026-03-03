@@ -13,7 +13,7 @@
 phase: 9
 phase_name: "Wave 9 -- Module Infrastructure + API Gaps"
 epoch: 10
-next_action: "Implementing F-036 (apply_provider_preferences_with_resolution)"
+next_action: "Implementing F-037 (dead stub cleanup)"
 blockers: []
 
 architecture_spec:
@@ -366,16 +366,19 @@ features:
   F-036-provider-prefs-resolution:
     name: "Port apply_provider_preferences_with_resolution (async glob pattern resolution)"
     module: "spawn"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-011-spawn"]
     started_at: "2025-01-18T00:35:00Z"
+    completed_at: "2025-01-18T01:00:00Z"
+    commit: "4d5ca3e"
   F-037-dead-stub-cleanup:
     name: "Clean up empty TODO stub files (registry/persistence, registry/includes, bundle/prompt)"
-    module: "bundle, registry"
-    status: "ready"
+    module: "bundle, registry, modules"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-034-dedup-registry"]
+    started_at: "2025-01-18T01:05:00Z"
 
 wave_gate:
   current_wave: 9
@@ -387,6 +390,6 @@ wave_gate:
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 35
-  last_updated: "2025-01-18T00:30:00Z"
+  total_features_completed: 36
+  last_updated: "2025-01-18T01:00:00Z"
   last_session: "session-014-wave9-modules"

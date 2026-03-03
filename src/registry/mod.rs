@@ -1,5 +1,7 @@
-pub mod includes;
-pub mod persistence;
+// Note: The architecture spec lists registry/includes.rs and registry/persistence.rs
+// as separate files. In practice, include resolution (compose_includes, cycle detection)
+// and persistence (save/load, BundleState to_dict/from_dict) are implemented directly
+// in this file because they are tightly coupled to BundleRegistry internals.
 
 use crate::bundle::Bundle;
 use indexmap::IndexMap;
