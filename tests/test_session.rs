@@ -177,14 +177,14 @@ fn read_jsonl(path: &Path) -> Vec<Value> {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_get_turn_boundaries_empty_messages() {
     let boundaries = get_turn_boundaries(&[]);
     assert!(boundaries.is_empty());
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_get_turn_boundaries_single_turn() {
     let msgs = vec![
         json!({"role": "user", "content": "Hello"}),
@@ -195,7 +195,7 @@ fn test_get_turn_boundaries_single_turn() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_get_turn_boundaries_multiple_turns() {
     let msgs = simple_messages();
     let boundaries = get_turn_boundaries(&msgs);
@@ -203,7 +203,7 @@ fn test_get_turn_boundaries_multiple_turns() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_get_turn_boundaries_only_user_messages() {
     let msgs = vec![
         json!({"role": "user", "content": "First"}),
@@ -219,20 +219,20 @@ fn test_get_turn_boundaries_only_user_messages() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_count_turns_empty() {
     assert_eq!(count_turns(&[]), 0);
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_count_turns_simple() {
     let msgs = simple_messages();
     assert_eq!(count_turns(&msgs), 3);
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_count_turns_with_tools() {
     let msgs = messages_with_tools();
     assert_eq!(count_turns(&msgs), 2);
@@ -243,7 +243,7 @@ fn test_count_turns_with_tools() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_slice_to_turn_1() {
     let msgs = simple_messages();
     let sliced = slice_to_turn(&msgs, 1, None).expect("slice_to_turn failed");
@@ -253,7 +253,7 @@ fn test_slice_to_turn_1() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_slice_to_turn_2() {
     let msgs = simple_messages();
     let sliced = slice_to_turn(&msgs, 2, None).expect("slice_to_turn failed");
@@ -261,7 +261,7 @@ fn test_slice_to_turn_2() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_slice_to_last_turn() {
     let msgs = simple_messages();
     let sliced = slice_to_turn(&msgs, 3, None).expect("slice_to_turn failed");
@@ -270,7 +270,7 @@ fn test_slice_to_last_turn() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_slice_to_turn_invalid_turn_zero() {
     let msgs = simple_messages();
     let result = slice_to_turn(&msgs, 0, None);
@@ -283,7 +283,7 @@ fn test_slice_to_turn_invalid_turn_zero() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_slice_to_turn_invalid_turn_exceeds_max() {
     let msgs = simple_messages();
     let result = slice_to_turn(&msgs, 10, None);
@@ -296,7 +296,7 @@ fn test_slice_to_turn_invalid_turn_exceeds_max() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_slice_to_turn_with_tool_messages() {
     let msgs = messages_with_tools();
     let sliced = slice_to_turn(&msgs, 1, None).expect("slice_to_turn failed");
@@ -306,7 +306,7 @@ fn test_slice_to_turn_with_tool_messages() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_slice_to_turn_empty_messages() {
     let result = slice_to_turn(&[], 1, None);
     assert!(result.is_err());
@@ -322,7 +322,7 @@ fn test_slice_to_turn_empty_messages() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_find_orphaned_tool_calls_no_tool_calls() {
     let msgs = simple_messages();
     let orphaned = find_orphaned_tool_calls(&msgs);
@@ -330,7 +330,7 @@ fn test_find_orphaned_tool_calls_no_tool_calls() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_find_orphaned_tool_calls_paired_tool_calls() {
     let msgs = messages_with_tools();
     let orphaned = find_orphaned_tool_calls(&msgs);
@@ -338,7 +338,7 @@ fn test_find_orphaned_tool_calls_paired_tool_calls() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_find_orphaned_tool_calls_orphaned_tool_call() {
     let msgs = messages_with_orphaned_tool();
     let orphaned = find_orphaned_tool_calls(&msgs);
@@ -346,7 +346,7 @@ fn test_find_orphaned_tool_calls_orphaned_tool_call() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_find_orphaned_tool_calls_multiple_orphaned() {
     let msgs = vec![
         json!({"role": "user", "content": "Do stuff"}),
@@ -371,7 +371,7 @@ fn test_find_orphaned_tool_calls_multiple_orphaned() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_add_synthetic_tool_results_no_orphans() {
     let msgs = simple_messages();
     let result = add_synthetic_tool_results(&msgs, &[]);
@@ -379,7 +379,7 @@ fn test_add_synthetic_tool_results_no_orphans() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_add_synthetic_tool_results_adds_synthetic_result() {
     let msgs = vec![json!({
         "role": "assistant",
@@ -403,7 +403,7 @@ fn test_add_synthetic_tool_results_adds_synthetic_result() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_add_synthetic_tool_results_multiple_orphans() {
     let msgs = vec![json!({
         "role": "assistant",
@@ -425,7 +425,7 @@ fn test_add_synthetic_tool_results_multiple_orphans() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_slice_to_turn_complete_orphaned_tools() {
     let msgs = messages_with_orphaned_tool();
     let result = slice_to_turn(&msgs, 2, Some("complete")).expect("slice_to_turn failed");
@@ -453,7 +453,7 @@ fn test_slice_to_turn_complete_orphaned_tools() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_slice_to_turn_error_on_orphaned_tools() {
     let msgs = messages_with_orphaned_tool();
     let result = slice_to_turn(&msgs, 2, Some("error"));
@@ -470,7 +470,7 @@ fn test_slice_to_turn_error_on_orphaned_tools() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_get_turn_summary_basic() {
     let msgs = simple_messages();
     let summary = get_turn_summary(&msgs, 1).expect("get_turn_summary failed");
@@ -483,7 +483,7 @@ fn test_get_turn_summary_basic() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_get_turn_summary_with_tools() {
     let msgs = messages_with_tools();
     let summary = get_turn_summary(&msgs, 1).expect("get_turn_summary failed");
@@ -492,7 +492,7 @@ fn test_get_turn_summary_with_tools() {
 }
 
 #[test]
-#[ignore = "Wave 2"]
+
 fn test_get_turn_summary_invalid_turn() {
     let msgs = simple_messages();
     let result = get_turn_summary(&msgs, 10);
