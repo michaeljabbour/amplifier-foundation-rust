@@ -1323,6 +1323,70 @@ fn test_update_info_serialization_null_version() {
     assert_eq!(info, deserialized);
 }
 
+// =============================================================================
+// SourceResolver + SourceHandlerWithStatus traits
+// =============================================================================
+
+#[test]
+fn test_source_resolver_trait_object() {
+    use amplifier_foundation::sources::resolver::SimpleSourceResolver;
+    use amplifier_foundation::SourceResolver;
+
+    // SimpleSourceResolver implements SourceResolver
+    let resolver = SimpleSourceResolver::new();
+    let _dyn_resolver: &dyn SourceResolver = &resolver;
+}
+
+#[tokio::test]
+async fn test_source_resolver_via_trait() {
+    use amplifier_foundation::sources::resolver::SimpleSourceResolver;
+    use amplifier_foundation::SourceResolver;
+
+    let resolver = SimpleSourceResolver::new();
+    let dyn_resolver: &dyn SourceResolver = &resolver;
+
+    // Non-existent file should return NotFound
+    let result = dyn_resolver.resolve("file:///nonexistent/path/to/bundle").await;
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_source_handler_with_status_object_safe() {
+    use amplifier_foundation::SourceHandlerWithStatus;
+
+    // Compile-time check: trait is object-safe (can be used as dyn)
+    fn _accepts(_h: &dyn SourceHandlerWithStatus) {}
+}
+
+#[test]
+fn test_source_resolver_object_safe() {
+    use amplifier_foundation::SourceResolver;
+
+    // Compile-time check: trait is object-safe
+    fn _accepts(_r: &dyn SourceResolver) {}
+}
+
+#[tokio::test]
+async fn test_simple_source_resolver_as_dyn_resolver() {
+    use amplifier_foundation::sources::resolver::SimpleSourceResolver;
+    use amplifier_foundation::SourceResolver;
+    use tempfile::tempdir;
+
+    let tmp = tempdir().unwrap();
+    let bundle_path = tmp.path().join("test-bundle");
+    std::fs::create_dir_all(&bundle_path).unwrap();
+    std::fs::write(bundle_path.join("bundle.yaml"), "name: test\n").unwrap();
+
+    let resolver = SimpleSourceResolver::with_base_path(tmp.path().to_path_buf());
+
+    // Use via trait object
+    let dyn_resolver: &dyn SourceResolver = &resolver;
+    let result = dyn_resolver
+        .resolve(&format!("file://{}", bundle_path.display()))
+        .await;
+    assert!(result.is_ok());
+}
+
 #[test]
 fn test_update_info_hashable() {
     use amplifier_foundation::UpdateInfo;

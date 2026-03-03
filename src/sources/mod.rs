@@ -104,6 +104,12 @@ impl SourceStatus {
 }
 
 /// Trait for source handlers that resolve URIs to local paths.
+///
+/// Matches Python's `SourceHandlerProtocol` in `sources/protocol.py`.
+/// Implementations: [`FileSourceHandler`](file::FileSourceHandler),
+/// [`GitSourceHandler`](git::GitSourceHandler),
+/// [`HttpSourceHandler`](http::HttpSourceHandler),
+/// [`ZipSourceHandler`](zip::ZipSourceHandler).
 #[async_trait]
 pub trait SourceHandler: Send + Sync {
     /// Check if this handler can handle the given parsed URI.
@@ -116,3 +122,66 @@ pub trait SourceHandler: Send + Sync {
         cache_dir: &Path,
     ) -> crate::error::Result<ResolvedSource>;
 }
+
+/// Extended trait for source handlers that support update status checking.
+///
+/// Ports Python's `SourceHandlerWithStatusProtocol` from `sources/protocol.py`.
+/// Adds non-destructive status checking ([`get_status`](Self::get_status)) and
+/// forced re-download ([`update`](Self::update)) on top of the base
+/// [`SourceHandler`] trait.
+///
+/// **Forward-declared protocol:** This trait defines the interface for handlers
+/// that can check for updates (e.g., git via `ls-remote`, HTTP via `HEAD`+`ETag`).
+/// No concrete implementations exist yet — the existing `check_bundle_status()`
+/// and `update_bundle()` in the `updates` module use a simpler hardcoded dispatch.
+/// Handlers will implement this trait as update support is added.
+///
+/// **Return type divergence:** Python's `update()` returns `Path`; Rust returns
+/// `Result<ResolvedSource>`. This matches the Rust `SourceHandler::resolve()`
+/// return type for internal consistency — callers get both `active_path` and
+/// `source_root` from a single call.
+#[async_trait]
+pub trait SourceHandlerWithStatus: SourceHandler {
+    /// Check update status without side effects.
+    ///
+    /// For git sources: uses `ls-remote` to compare cached vs remote HEAD.
+    /// For HTTP sources: uses `HEAD` + `ETag`/`Last-Modified` headers.
+    /// For file sources: checks mtime.
+    async fn get_status(
+        &self,
+        parsed: &ParsedURI,
+        cache_dir: &Path,
+    ) -> crate::error::Result<SourceStatus>;
+
+    /// Force re-download, ignoring cache.
+    ///
+    /// Returns [`ResolvedSource`] after fresh download (not `PathBuf` as in
+    /// Python's protocol — Rust returns the richer type for consistency with
+    /// [`SourceHandler::resolve`]).
+    async fn update(
+        &self,
+        parsed: &ParsedURI,
+        cache_dir: &Path,
+    ) -> crate::error::Result<ResolvedSource>;
+}
+
+/// Trait for resolving source URIs to local paths.
+///
+/// Ports Python's `SourceResolverProtocol` from `sources/protocol.py`.
+/// Higher-level than [`SourceHandler`]: takes a raw URI string instead of
+/// a pre-parsed [`ParsedURI`], and dispatches to the appropriate handler
+/// internally.
+///
+/// **Forward-declared protocol:** This trait formalizes the resolver contract.
+/// The reference implementation is [`SimpleSourceResolver`](resolver::SimpleSourceResolver).
+#[async_trait]
+pub trait SourceResolver: Send + Sync {
+    /// Resolve a URI to local paths.
+    ///
+    /// Returns [`ResolvedSource`] with `active_path` and `source_root`.
+    /// Returns [`BundleError::NotFound`](crate::error::BundleError::NotFound)
+    /// if the URI cannot be resolved by any handler.
+    async fn resolve(&self, uri: &str) -> crate::error::Result<ResolvedSource>;
+}
+
+

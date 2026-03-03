@@ -82,7 +82,7 @@ pub use registry::load_bundle;
 // -- Protocols / Traits --
 pub use cache::CacheProvider;
 pub use mentions::MentionResolver;
-pub use sources::SourceHandler;
+pub use sources::{SourceHandler, SourceHandlerWithStatus, SourceResolver};
 
 // -- Reference implementations --
 pub use cache::{disk::DiskCache, memory::SimpleCache};

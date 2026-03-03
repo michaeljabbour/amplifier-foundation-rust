@@ -13,7 +13,7 @@
 phase: 10
 phase_name: "Wave 10 -- API Completeness (Python __all__ parity)"
 epoch: 11
-next_action: "Implement F-039 (SourceStatus enrichment)"
+next_action: "Implement F-040 (SourceHandlerWithStatus + SourceResolver traits)"
 blockers: []
 
 architecture_spec:
@@ -395,17 +395,20 @@ features:
   F-039-source-status-enrichment:
     name: "Enrich SourceStatus with full Python field parity (is_cached, cached_ref, remote_commit, summary, is_pinned)"
     module: "sources"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-031-updates-module"]
     started_at: "2025-01-19T00:25:00Z"
+    completed_at: "2025-01-19T00:50:00Z"
+    commit: "aa73c62"
 
   F-040-source-protocol-traits:
     name: "Port SourceHandlerWithStatus + SourceResolver traits from Python protocols"
     module: "sources"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-039-source-status-enrichment"]
+    started_at: "2025-01-19T00:55:00Z"
 
 wave_gate:
   current_wave: 10
@@ -417,6 +420,6 @@ wave_gate:
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 38
-  last_updated: "2025-01-19T00:20:00Z"
+  total_features_completed: 39
+  last_updated: "2025-01-19T00:50:00Z"
   last_session: "session-015-wave10-api-parity"

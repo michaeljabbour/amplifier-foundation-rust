@@ -2,11 +2,13 @@ use std::path::PathBuf;
 
 use crate::paths::uri::{parse_uri, ResolvedSource};
 
+use async_trait::async_trait;
+
 use super::file::FileSourceHandler;
 use super::git::GitSourceHandler;
 use super::http::HttpSourceHandler;
 use super::zip::ZipSourceHandler;
-use super::SourceHandler;
+use super::{SourceHandler, SourceResolver};
 
 /// Simple implementation of source resolution.
 ///
@@ -119,5 +121,18 @@ impl SimpleSourceResolver {
         Err(crate::error::BundleError::NotFound {
             uri: uri.to_string(),
         })
+    }
+}
+
+/// `SimpleSourceResolver` implements the `SourceResolver` protocol trait.
+///
+/// This bridges the concrete implementation with the abstract protocol,
+/// allowing `SimpleSourceResolver` to be used wherever a `dyn SourceResolver`
+/// is accepted.
+#[async_trait]
+impl SourceResolver for SimpleSourceResolver {
+    async fn resolve(&self, uri: &str) -> crate::error::Result<ResolvedSource> {
+        // Delegate to the inherent method
+        SimpleSourceResolver::resolve(self, uri).await
     }
 }

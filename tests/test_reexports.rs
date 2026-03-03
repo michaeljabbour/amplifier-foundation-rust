@@ -188,6 +188,18 @@ fn test_reexport_source_types() {
 // =============================================================================
 
 #[test]
+fn test_reexport_source_handler_with_status_trait() {
+    // Compile-time check: trait is importable and object-safe at crate root
+    fn _accepts_handler_with_status(_h: &dyn SourceHandlerWithStatus) {}
+}
+
+#[test]
+fn test_reexport_source_resolver_trait() {
+    // Compile-time check: trait is importable and object-safe at crate root
+    fn _accepts_resolver(_r: &dyn SourceResolver) {}
+}
+
+#[test]
 fn test_reexport_update_info() {
     let info = UpdateInfo {
         name: "my-bundle".into(),
