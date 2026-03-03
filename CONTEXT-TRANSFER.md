@@ -6,6 +6,71 @@
 
 ---
 
+## Session 018 -- Wave 13 COMPLETE (F-047, F-048, F-049)
+
+### Work Completed
+- **F-047-collect-source-uris** (0969d59): Ported `_collect_source_uris(bundle)` from Python `updates/__init__.py`. Sync function that extracts all source URIs from a Bundle: `source_uri`, `session.orchestrator.source`, `session.context.source`, and `source` fields from `providers`, `tools`, `hooks` module lists. Uses `HashSet` for deduplication, filters empty strings consistently across all sources. Pre-allocates `Value::String("source")` key to avoid per-iteration allocations. 17 new tests covering all extraction paths and edge cases.
+- **F-048-bundle-check-status** (3eabdec): Ported `check_bundle_status(bundle, cache_dir)` as `check_bundle_status_for_bundle(&Bundle, Option<&Path>)`. Walks entire bundle component tree using `collect_source_uris`, checks each URI's status via appropriate handler dispatch (file → up-to-date, git → `GitSourceHandler::get_status`, HTTP → unknown). Defensive per-source error handling: if one source's status check fails, returns `SourceStatus { error, has_update: None }` instead of aborting entire function. Empty `bundle.name` falls back to `"unnamed"` matching Python's `bundle.name or "unnamed"`. 8 new tests.
+- **F-049-bundle-update** (8272ae4): Ported `update_bundle(bundle, cache_dir, selective, install_deps)` as `update_bundle_for_bundle(&Bundle, Option<&Path>, Option<&[String]>, bool)`. When `selective` is `None`, calls `check_bundle_status_for_bundle` to identify stale sources then updates only those with `has_update=true`. When `selective` is `Some`, updates only those URIs. Per-source error handling on `GitSourceHandler::update` (log + continue). Optionally reinstalls dependencies via `ModuleActivator::install_dependencies` for paths with `pyproject.toml`. Returns `Vec<PathBuf>` of actually-updated paths (Python returns same bundle object). 7 new tests.
+
+### Wave 13 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 483 passing, 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **`collect_source_uris` is sync**: Pure data extraction with no I/O. Matches Python's `_collect_source_uris` which is also sync.
+- **Empty-string source filtering consistent across all arms**: Bundle `source_uri`, session orchestrator/context sources, and module list sources all filter empty strings. Python's `if source:` treats `""` as falsy.
+- **`collect_source_uris` excludes includes**: Matches Python comment: "Included bundles are now registered as first-class bundles and will be checked independently." No `includes` field walking.
+- **Pre-allocated `Value::String("source")` key**: Follows pattern from `dicts/merge.rs` to avoid per-iteration String allocation inside loops.
+- **`check_bundle_status_for_bundle` uses defensive per-source error handling**: Instead of `?` on `get_status()` which would abort all sources on first error, catches errors per-source and returns `SourceStatus { error, has_update: None }`. Python's `get_status` never raises (catches internally), but this defensive approach protects against future changes.
+- **Empty `bundle.name` → "unnamed"**: Python uses `bundle.name or "unnamed"`. Rust uses `if bundle.name.is_empty() { "unnamed" }`. Ensures status reports always have a readable name.
+- **File URIs treated as always-current**: Rust improvement over Python where file URIs fall through to "unknown". Local files don't need update checking.
+- **`update_bundle_for_bundle` returns `Vec<PathBuf>` not `&Bundle`**: Python returns the same bundle object (cache updated, object unchanged). Rust returns the list of actually-updated paths, which is more useful for callers who want to trigger further actions. Documented as intentional divergence.
+- **Single ModuleActivator for all modules**: Created once before the loop, `finalize()` called after. Avoids N redundant disk reads of `install-state.json` and ensures fingerprint state is persisted.
+- **ModuleActivator cache dir: `~/.amplifier/cache` (not `cache/bundles`)**: The bundles cache dir is `~/.amplifier/cache/bundles` (for source handler caching). ModuleActivator's `install-state.json` needs to be at `~/.amplifier/cache/install-state.json` to match normal activation paths. Reviewer caught this mismatch.
+- **`ModuleActivator::install_dependencies` made `pub`**: Was private, but `update_bundle_for_bundle` needs to call it across module boundaries. Added lifecycle doc note requiring `finalize()` after all installations.
+- **`pyproject.toml` guard in `update_bundle_for_bundle`**: Matches Python behavior — only modules with `pyproject.toml` get dependency reinstallation. Modules with only `requirements.txt` are not reinstalled (same limitation as Python).
+- **Selective mode accepts unvalidated URIs**: Matches Python behavior. Callers can pass URIs not in the bundle. Documented as a spec-compatible footgun.
+- **Per-source error handling in update**: `GitSourceHandler::update` failures are logged at warn level and continue. Other sources silently skipped (no update handler yet).
+
+### Antagonistic Review Issues Found & Fixed
+- F-047: Added `!s.is_empty()` guard to session and module source extraction (reviewer caught asymmetry with bundle source_uri guard)
+- F-047: Pre-allocated `source_key = Value::String("source".to_string())` (reviewer caught repeated allocation in loop)
+- F-047: Simplified `if let Some(ref uri)` to `if let Some(uri) = bundle.source_uri.as_deref()` (reviewer caught unnecessary ref)
+- F-047: Added 5 edge case tests: empty string source_uri, empty source in module, session null, session non-mapping, non-string source value
+- F-048: Added `"unnamed"` fallback for empty `bundle.name` (reviewer confirmed Python uses `bundle.name or "unnamed"`)
+- F-048: Changed `?` on `get_status()` to defensive per-source `match` (reviewer caught early-abort risk)
+- F-048: Added tests for empty name fallback and multiple git sources
+- F-049: Fixed ModuleActivator created inside loop → hoisted to before loop (reviewer caught N redundant disk reads)
+- F-049: Fixed missing `finalize()` call (reviewer caught install state never persisted — HIGH severity bug)
+- F-049: Fixed cache dir mismatch: ModuleActivator now uses `~/.amplifier/cache` not `cache/bundles` (reviewer caught state file location divergence — HIGH severity bug)
+- F-049: Added lifecycle doc note to `install_dependencies` about `finalize()` requirement
+- F-049: Removed double doc comment block on `install_dependencies`
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-047: HashSet-based dedup means non-deterministic output order — acceptable since consumers don't depend on order
+- F-048: Cache dir `cache/bundles` vs Python's `cache/` divergence — intentional, documented for migration
+- F-048: File URIs return `has_update=false` vs Python's `None` — improvement, acceptable divergence
+- F-049: `pyproject.toml` guard skips modules with only `requirements.txt` — matches Python, documented as known limitation
+- F-049: Selective mode accepts unvalidated URIs — matches Python, documented as footgun
+- F-049: No test for `install_deps=true` path — requires `uv` installed in test environment, same limitation as ModuleActivator tests
+- F-049: No integration test for successful update (requires real git clone) — negative-path tests verify error handling
+
+### What's Next
+- All 13 waves complete. 483 tests, 0 clippy warnings, 49 features delivered.
+- Bundle-level update system now matches Python's `check_bundle_status` and `update_bundle` API surface.
+- Remaining unported Python functionality:
+  - `PreparedBundle` (bundle.py:845-1289) — session lifecycle controller. Depends on AmplifierRuntime traits being concrete (amplifier_core::AmplifierSession). Major: create_session, spawn, _build_bundles_for_resolver, _create_system_prompt_factory.
+- Consider: PyO3 bindings (feature flag exists, no `#[pyclass]`/`#[pymodule]` code)
+- Consider: Refactor check_bundle_status/update_bundle to use handler registry pattern (dyn dispatch)
+- Consider: Benchmarks (bundle compose, cache operations, fingerprint computation)
+- Consider: Return ResolvedSource from update_bundle (richer API)
+- Consider: Integration test for update_bundle_for_bundle with real git clone
+
+---
+
 ## Session 017 -- Wave 12 COMPLETE (F-044, F-045, F-046)
 
 ### Work Completed
