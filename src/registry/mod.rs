@@ -869,6 +869,126 @@ impl BundleRegistry {
     pub async fn load(&self, _uri: &str) -> crate::error::Result<Bundle> {
         self.load_single(_uri).await
     }
+
+    // -----------------------------------------------------------------------
+    // check_update / update lifecycle (F-055)
+    // -----------------------------------------------------------------------
+
+    /// Check a single bundle for updates.
+    ///
+    /// Updates the `checked_at` timestamp. Currently a stub that always
+    /// returns `None` — no actual version comparison is performed.
+    ///
+    /// Returns `None` if the name is not registered (matches Python's
+    /// `_check_update_single` which returns `None` for missing names).
+    ///
+    /// Port of Python `_check_update_single`.
+    pub async fn check_update_single(&mut self, name: &str) -> Option<UpdateInfo> {
+        let state = self.bundles.get_mut(name)?;
+        let now = chrono::Utc::now().to_rfc3339();
+        state.checked_at = Some(now.clone());
+        tracing::debug!("Checked for updates: {} (checked_at={})", name, now);
+        None // stub — no actual version comparison
+    }
+
+    /// Check all registered bundles for updates.
+    ///
+    /// Returns a list of available updates. Currently a stub that only
+    /// updates `checked_at` timestamps — no actual version comparison is
+    /// performed, so the returned `Vec` is always empty.
+    ///
+    /// Failures are logged as warnings and skipped (matches Python's
+    /// `asyncio.gather(return_exceptions=True)` pattern).
+    ///
+    /// Port of Python `check_update` with `name=None`.
+    pub async fn check_update_all(&mut self) -> Vec<UpdateInfo> {
+        let names = self.list_registered();
+        if names.is_empty() {
+            return Vec::new();
+        }
+
+        let mut updates = Vec::new();
+        for n in names {
+            if let Some(info) = self.check_update_single(&n).await {
+                updates.push(info);
+            }
+        }
+        updates
+    }
+
+    /// Update a single registered bundle by reloading it.
+    ///
+    /// Bypasses the in-memory cache to force a fresh load from disk.
+    /// Returns the reloaded `Bundle`. Updates `version`, `loaded_at`, and
+    /// `checked_at` on the bundle's tracked state.
+    ///
+    /// **Divergence from Python:** Timestamps use UTC RFC 3339 format
+    /// (`chrono::Utc::now().to_rfc3339()`), while Python uses timezone-naive
+    /// local time (`datetime.now()`). This is an intentional improvement
+    /// matching the existing codebase pattern for timestamps.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BundleError::NotFound`] if `name` is not registered.
+    /// Propagates any errors from the underlying `load_single` call.
+    ///
+    /// Port of Python `_update_single`.
+    pub async fn update_single(&mut self, name: &str) -> crate::error::Result<Bundle> {
+        // Clone the URI to release the immutable borrow before calling load_single.
+        let uri = self
+            .bundles
+            .get(name)
+            .ok_or_else(|| crate::error::BundleError::NotFound {
+                uri: format!("Bundle '{}' not registered", name),
+            })?
+            .uri
+            .clone();
+
+        // Clear cache entry to force a fresh load (Python uses refresh=True)
+        if let Ok(mut cache) = self.cache.lock() {
+            cache.remove(&uri);
+        }
+
+        // Load the bundle. Reborrows &mut self as &self for the duration
+        // of the future; after .await the shared borrow ends and &mut self
+        // is available again for state mutation below.
+        let bundle = self.load_single(&uri).await?;
+
+        // Update state timestamps
+        let now = chrono::Utc::now().to_rfc3339();
+        if let Some(state) = self.bundles.get_mut(name) {
+            state.version = Some(bundle.version.clone());
+            state.loaded_at = Some(now.clone());
+            state.checked_at = Some(now);
+        }
+
+        Ok(bundle)
+    }
+
+    /// Update all registered bundles by reloading them.
+    ///
+    /// Returns a map of name → `Bundle` for successfully updated bundles.
+    /// Failures are logged as warnings and skipped (matches Python's
+    /// `asyncio.gather(return_exceptions=True)` pattern).
+    ///
+    /// Port of Python `update` with `name=None`.
+    pub async fn update_all(&mut self) -> HashMap<String, Bundle> {
+        let names = self.list_registered();
+        let mut bundles = HashMap::new();
+
+        for name in names {
+            match self.update_single(&name).await {
+                Ok(bundle) => {
+                    bundles.insert(name, bundle);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to update bundle '{}': {}", name, e);
+                }
+            }
+        }
+
+        bundles
+    }
 }
 
 /// Resolve a file:// URI to a local filesystem path.

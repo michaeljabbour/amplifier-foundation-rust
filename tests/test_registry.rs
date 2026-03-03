@@ -1582,3 +1582,255 @@ async fn test_compose_includes_registered_namespace_missing_path_is_error() {
         }
     }
 }
+
+// ===========================================================================
+// check_update / update lifecycle tests (F-055)
+// ===========================================================================
+
+#[tokio::test]
+async fn test_check_update_single_updates_timestamp() {
+    let tmp = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
+    register_one(&mut registry, "my-bundle", "file:///some/path");
+
+    // checked_at should be None initially
+    assert!(registry
+        .find_state("my-bundle")
+        .unwrap()
+        .checked_at
+        .is_none());
+
+    let result = registry.check_update_single("my-bundle").await;
+
+    // Stub always returns None (no actual version comparison)
+    assert!(result.is_none());
+
+    // But checked_at should now be set
+    let state = registry.find_state("my-bundle").unwrap();
+    assert!(
+        state.checked_at.is_some(),
+        "checked_at should be set after check_update_single"
+    );
+}
+
+#[tokio::test]
+async fn test_check_update_single_unregistered_returns_none() {
+    let tmp = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
+
+    // Check update for a name that doesn't exist
+    let result = registry.check_update_single("nonexistent").await;
+
+    assert!(
+        result.is_none(),
+        "check_update_single for unregistered bundle should return None"
+    );
+}
+
+#[tokio::test]
+async fn test_check_update_all_empty_registry() {
+    let tmp = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
+
+    let result = registry.check_update_all().await;
+
+    assert!(
+        result.is_empty(),
+        "check_update_all on empty registry should return empty Vec"
+    );
+}
+
+#[tokio::test]
+async fn test_check_update_all_updates_all_timestamps() {
+    let tmp = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
+
+    let bundles = HashMap::from([
+        ("alpha".to_string(), "file:///a".to_string()),
+        ("beta".to_string(), "file:///b".to_string()),
+        ("gamma".to_string(), "file:///c".to_string()),
+    ]);
+    registry.register(&bundles);
+
+    // All checked_at should be None initially
+    for name in ["alpha", "beta", "gamma"] {
+        assert!(registry.find_state(name).unwrap().checked_at.is_none());
+    }
+
+    let result = registry.check_update_all().await;
+
+    // Stub returns empty
+    assert!(result.is_empty());
+
+    // All checked_at should now be set
+    for name in ["alpha", "beta", "gamma"] {
+        let state = registry.find_state(name).unwrap();
+        assert!(
+            state.checked_at.is_some(),
+            "checked_at for '{}' should be set after check_update(None)",
+            name
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_update_single_basic() {
+    let tmp = tempdir().unwrap();
+    let root = tmp.path();
+
+    // Create a bundle on disk
+    let bundle_dir = root.join("my-bundle");
+    fs::create_dir_all(&bundle_dir).unwrap();
+    write_simple_bundle_yaml(&bundle_dir, "my-bundle");
+
+    let uri = format!("file://{}", bundle_dir.display());
+    let mut registry = BundleRegistry::new(root.to_path_buf());
+    register_one(&mut registry, "my-bundle", &uri);
+
+    // Timestamps should be None initially
+    assert!(registry
+        .find_state("my-bundle")
+        .unwrap()
+        .loaded_at
+        .is_none());
+    assert!(registry
+        .find_state("my-bundle")
+        .unwrap()
+        .checked_at
+        .is_none());
+
+    let bundle = registry
+        .update_single("my-bundle")
+        .await
+        .expect("update_single should succeed");
+
+    assert_eq!(bundle.name, "my-bundle");
+
+    // State should have updated timestamps
+    let state = registry.find_state("my-bundle").unwrap();
+    assert!(
+        state.loaded_at.is_some(),
+        "loaded_at should be set after update_single"
+    );
+    assert!(
+        state.checked_at.is_some(),
+        "checked_at should be set after update_single"
+    );
+    assert_eq!(
+        state.version.as_deref(),
+        Some("1.0.0"),
+        "version should be updated from bundle"
+    );
+}
+
+#[tokio::test]
+async fn test_update_single_unregistered_is_error() {
+    let tmp = tempdir().unwrap();
+    let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
+
+    let result = registry.update_single("nonexistent").await;
+
+    assert!(
+        result.is_err(),
+        "update_single on unregistered bundle should return error"
+    );
+    match result.unwrap_err() {
+        amplifier_foundation::BundleError::NotFound { uri } => {
+            assert!(
+                uri.contains("nonexistent"),
+                "Error should mention the bundle name: {}",
+                uri
+            );
+        }
+        other => {
+            panic!("Expected NotFound error, got: {:?}", other);
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_update_all_basic() {
+    let tmp = tempdir().unwrap();
+    let root = tmp.path();
+
+    // Create two bundles on disk
+    let dir_a = root.join("alpha");
+    fs::create_dir_all(&dir_a).unwrap();
+    write_simple_bundle_yaml(&dir_a, "alpha");
+
+    let dir_b = root.join("beta");
+    fs::create_dir_all(&dir_b).unwrap();
+    write_simple_bundle_yaml(&dir_b, "beta");
+
+    let uri_a = format!("file://{}", dir_a.display());
+    let uri_b = format!("file://{}", dir_b.display());
+
+    let mut registry = BundleRegistry::new(root.to_path_buf());
+    let bundles_map = HashMap::from([("alpha".to_string(), uri_a), ("beta".to_string(), uri_b)]);
+    registry.register(&bundles_map);
+
+    let result = registry.update_all().await;
+
+    assert_eq!(result.len(), 2, "Should have updated both bundles");
+    assert!(result.contains_key("alpha"));
+    assert!(result.contains_key("beta"));
+
+    // Both should have updated timestamps
+    for name in ["alpha", "beta"] {
+        let state = registry.find_state(name).unwrap();
+        assert!(
+            state.loaded_at.is_some(),
+            "loaded_at for '{}' should be set after update_all",
+            name
+        );
+        assert!(
+            state.checked_at.is_some(),
+            "checked_at for '{}' should be set after update_all",
+            name
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_update_single_bypasses_cache() {
+    // Verifies that update_single forces a fresh load from disk
+    // (not returning cached data from a prior load_single call)
+    let tmp = tempdir().unwrap();
+    let root = tmp.path();
+
+    let bundle_dir = root.join("my-bundle");
+    fs::create_dir_all(&bundle_dir).unwrap();
+    fs::write(
+        bundle_dir.join("bundle.yaml"),
+        "name: my-bundle\nversion: \"1.0.0\"\n",
+    )
+    .unwrap();
+
+    let uri = format!("file://{}", bundle_dir.display());
+    let mut registry = BundleRegistry::new(root.to_path_buf());
+    register_one(&mut registry, "my-bundle", &uri);
+
+    // First load — populates cache
+    let bundle1 = registry.load_single(&uri).await.unwrap();
+    assert_eq!(bundle1.version, "1.0.0");
+
+    // Modify the file on disk
+    fs::write(
+        bundle_dir.join("bundle.yaml"),
+        "name: my-bundle\nversion: \"2.0.0\"\n",
+    )
+    .unwrap();
+
+    // update_single should bypass cache and read the new version
+    let bundle2 = registry.update_single("my-bundle").await.unwrap();
+    assert_eq!(
+        bundle2.version, "2.0.0",
+        "update_single should bypass cache and read updated file"
+    );
+
+    // State should be updated
+    let state = registry.find_state("my-bundle").unwrap();
+    assert_eq!(state.version.as_deref(), Some("2.0.0"));
+    assert!(state.loaded_at.is_some());
+    assert!(state.checked_at.is_some());
+}
