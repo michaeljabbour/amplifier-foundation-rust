@@ -711,16 +711,19 @@ features:
   F-071-async-persistence-save:
     name: "Convert persistence save() to async using tokio::fs"
     module: "registry"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-059-registry-decompose"]
     started_at: "2025-01-29T00:00:00Z"
+    completed_at: "2025-01-29T00:30:00Z"
+    commit: "7730a83"
   F-072-async-validate-cached-paths:
-    name: "Convert validate_cached_paths to async using tokio::fs::metadata"
+    name: "Convert validate_cached_paths path.exists() to async tokio::fs::metadata"
     module: "registry"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-071-async-persistence-save"]
+    started_at: "2025-01-29T00:30:00Z"
   F-073-async-load-agent-metadata:
     name: "Convert load_agent_metadata to async using tokio::fs::read_to_string"
     module: "bundle"

@@ -18,33 +18,42 @@ impl BundleRegistry {
     /// Persists the cleanup if any stale entries were found.
     ///
     /// Takes `&self` (not `&mut self`) so it can be called on `Arc<BundleRegistry>`.
-    /// Uses read lock for the scan phase and write lock for the mutation phase.
-    ///
-    /// Note: The `path.exists()` checks are still sync (blocking). Making
-    /// those async is tracked as a separate improvement.
+    /// Three-phase approach: read lock → async metadata checks → write lock.
+    /// The read lock is dropped before any `.await` points.
     pub async fn validate_cached_paths(&self) {
-        // Phase 1: Scan for stale paths under read lock.
-        let stale_names: Vec<String> = {
+        // Phase 1: Collect (name, local_path) pairs under read lock, then drop.
+        let candidates: Vec<(String, String)> = {
             let bundles = self.bundles.read().unwrap_or_else(|e| e.into_inner());
             bundles
                 .iter()
                 .filter_map(|(name, state)| {
-                    if let Some(ref lp) = state.local_path {
-                        if !std::path::Path::new(lp).exists() {
-                            tracing::info!("Clearing stale cache reference for '{}'", name);
-                            return Some(name.clone());
-                        }
-                    }
-                    None
+                    state
+                        .local_path
+                        .as_ref()
+                        .map(|lp| (name.clone(), lp.clone()))
                 })
                 .collect()
         };
+
+        if candidates.is_empty() {
+            return;
+        }
+
+        // Phase 2: Async metadata checks (no lock held).
+        let mut stale_names = Vec::new();
+        for (name, local_path) in &candidates {
+            let exists = tokio::fs::metadata(local_path).await.is_ok();
+            if !exists {
+                tracing::info!("Clearing stale cache reference for '{}'", name);
+                stale_names.push(name.clone());
+            }
+        }
 
         if stale_names.is_empty() {
             return;
         }
 
-        // Phase 2: Mutate under write lock.
+        // Phase 3: Mutate under write lock.
         {
             let mut bundles = self.bundles.write().unwrap_or_else(|e| e.into_inner());
             for name in &stale_names {
