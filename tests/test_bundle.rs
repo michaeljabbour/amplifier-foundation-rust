@@ -1509,3 +1509,227 @@ fn test_load_agent_metadata_no_frontmatter() {
         Some("Just a plain instruction.")
     );
 }
+
+// ---------------------------------------------------------------------------
+// PreparedBundle tests (F-061)
+// ---------------------------------------------------------------------------
+
+use amplifier_foundation::PreparedBundle;
+
+#[test]
+fn test_prepared_bundle_new() {
+    let bundle = amplifier_foundation::Bundle::new("test-bundle");
+    let resolver = BundleModuleResolver::new(HashMap::new(), None);
+    let mount_plan = Value::Null;
+
+    let prepared = PreparedBundle::new(mount_plan.clone(), resolver, bundle);
+    assert_eq!(prepared.bundle.name, "test-bundle");
+    assert!(prepared.bundle_package_paths.is_empty());
+}
+
+#[test]
+fn test_build_bundles_for_resolver_from_source_base_paths() {
+    let tmp = tempdir().unwrap();
+    let ns_path = tmp.path().join("foundation");
+    fs::create_dir_all(&ns_path).unwrap();
+
+    let mut bundle = amplifier_foundation::Bundle::new("my-app");
+    bundle
+        .source_base_paths
+        .insert("foundation".to_string(), ns_path.clone());
+    bundle.base_path = Some(tmp.path().to_path_buf());
+
+    let resolver = BundleModuleResolver::new(HashMap::new(), None);
+    let prepared = PreparedBundle::new(Value::Null, resolver, bundle.clone());
+
+    let bundles_map = prepared.build_bundles_for_resolver(&bundle);
+
+    // Should contain "foundation" mapped to ns_path
+    assert_eq!(bundles_map.get("foundation"), Some(&ns_path));
+    // Should also contain "my-app" mapped to bundle.base_path
+    assert_eq!(bundles_map.get("my-app"), Some(&tmp.path().to_path_buf()));
+}
+
+#[test]
+fn test_build_bundles_for_resolver_bundle_name_included() {
+    let tmp = tempdir().unwrap();
+
+    let mut bundle = amplifier_foundation::Bundle::new("standalone");
+    bundle.base_path = Some(tmp.path().to_path_buf());
+
+    let resolver = BundleModuleResolver::new(HashMap::new(), None);
+    let prepared = PreparedBundle::new(Value::Null, resolver, bundle.clone());
+
+    let bundles_map = prepared.build_bundles_for_resolver(&bundle);
+
+    // Bundle name should be included even without source_base_paths
+    assert_eq!(
+        bundles_map.get("standalone"),
+        Some(&tmp.path().to_path_buf())
+    );
+}
+
+#[test]
+fn test_build_bundles_for_resolver_empty_name_skipped() {
+    let mut bundle = amplifier_foundation::Bundle::new("");
+    bundle.base_path = Some(PathBuf::from("/tmp/base"));
+
+    let resolver = BundleModuleResolver::new(HashMap::new(), None);
+    let prepared = PreparedBundle::new(Value::Null, resolver, bundle.clone());
+
+    let bundles_map = prepared.build_bundles_for_resolver(&bundle);
+
+    // Empty name should be skipped
+    assert!(bundles_map.is_empty());
+}
+
+#[test]
+fn test_build_bundles_for_resolver_namespace_already_present() {
+    let tmp = tempdir().unwrap();
+    let ns_path = tmp.path().join("ns");
+    fs::create_dir_all(&ns_path).unwrap();
+
+    let mut bundle = amplifier_foundation::Bundle::new("ns");
+    bundle
+        .source_base_paths
+        .insert("ns".to_string(), ns_path.clone());
+    bundle.base_path = Some(tmp.path().to_path_buf());
+
+    let resolver = BundleModuleResolver::new(HashMap::new(), None);
+    let prepared = PreparedBundle::new(Value::Null, resolver, bundle.clone());
+
+    let bundles_map = prepared.build_bundles_for_resolver(&bundle);
+
+    // "ns" in source_base_paths should win (not duplicated)
+    assert_eq!(bundles_map.len(), 1);
+    assert_eq!(bundles_map.get("ns"), Some(&ns_path));
+}
+
+#[tokio::test]
+async fn test_create_system_prompt_factory_basic() {
+    let tmp = tempdir().unwrap();
+
+    // Create a context file
+    let ctx_path = tmp.path().join("context.md");
+    fs::write(&ctx_path, "Some context content").unwrap();
+
+    let mut bundle = amplifier_foundation::Bundle::new("test");
+    bundle.instruction = Some("Test instruction".to_string());
+    bundle.context.insert("context".to_string(), ctx_path);
+    bundle.base_path = Some(tmp.path().to_path_buf());
+
+    let resolver = BundleModuleResolver::new(HashMap::new(), None);
+    let prepared = PreparedBundle::new(Value::Null, resolver, bundle.clone());
+
+    let factory = prepared.create_system_prompt_factory(&bundle, None);
+    let prompt = factory.create().await;
+
+    assert!(prompt.contains("Test instruction"));
+    assert!(prompt.contains("Some context content"));
+}
+
+#[tokio::test]
+async fn test_create_system_prompt_factory_no_context() {
+    let tmp = tempdir().unwrap();
+
+    let mut bundle = amplifier_foundation::Bundle::new("test");
+    bundle.instruction = Some("Just an instruction".to_string());
+    bundle.base_path = Some(tmp.path().to_path_buf());
+
+    let resolver = BundleModuleResolver::new(HashMap::new(), None);
+    let prepared = PreparedBundle::new(Value::Null, resolver, bundle.clone());
+
+    let factory = prepared.create_system_prompt_factory(&bundle, None);
+    let prompt = factory.create().await;
+
+    assert_eq!(prompt, "Just an instruction");
+}
+
+#[tokio::test]
+async fn test_create_system_prompt_factory_with_mentions() {
+    let tmp = tempdir().unwrap();
+
+    // Create a file that will be @mentioned
+    let agents_path = tmp.path().join("AGENTS.md");
+    fs::write(&agents_path, "Agent list here").unwrap();
+
+    let mut bundle = amplifier_foundation::Bundle::new("test");
+    bundle.instruction = Some("Hello @AGENTS.md world".to_string());
+    bundle.base_path = Some(tmp.path().to_path_buf());
+
+    let resolver = BundleModuleResolver::new(HashMap::new(), None);
+    let prepared = PreparedBundle::new(Value::Null, resolver, bundle.clone());
+
+    let factory = prepared.create_system_prompt_factory(&bundle, None);
+    let prompt = factory.create().await;
+
+    // Should contain the instruction and the resolved @mention content
+    assert!(prompt.contains("Hello @AGENTS.md world"));
+    assert!(prompt.contains("Agent list here"));
+}
+
+#[tokio::test]
+async fn test_create_system_prompt_factory_rereads_files() {
+    let tmp = tempdir().unwrap();
+
+    let ctx_path = tmp.path().join("dynamic.md");
+    fs::write(&ctx_path, "Version 1").unwrap();
+
+    let mut bundle = amplifier_foundation::Bundle::new("test");
+    bundle
+        .context
+        .insert("dynamic".to_string(), ctx_path.clone());
+    bundle.base_path = Some(tmp.path().to_path_buf());
+
+    let resolver = BundleModuleResolver::new(HashMap::new(), None);
+    let prepared = PreparedBundle::new(Value::Null, resolver, bundle.clone());
+
+    let factory = prepared.create_system_prompt_factory(&bundle, None);
+
+    // First call
+    let prompt1 = factory.create().await;
+    assert!(prompt1.contains("Version 1"));
+
+    // Update the file
+    fs::write(&ctx_path, "Version 2").unwrap();
+
+    // Second call should pick up the change
+    let prompt2 = factory.create().await;
+    assert!(prompt2.contains("Version 2"));
+    assert!(!prompt2.contains("Version 1"));
+}
+
+// Test for enhanced namespace resolution in BaseMentionResolver
+#[test]
+fn test_mention_resolver_namespace_resolution() {
+    let tmp = tempdir().unwrap();
+    let ns_path = tmp.path().join("foundation");
+    fs::create_dir_all(&ns_path).unwrap();
+    fs::write(ns_path.join("context.md"), "Foundation context").unwrap();
+
+    let mut bundles = HashMap::new();
+    bundles.insert("foundation".to_string(), ns_path);
+
+    let resolver = amplifier_foundation::BaseMentionResolver {
+        base_path: tmp.path().to_path_buf(),
+        bundles,
+    };
+
+    // @foundation:context should resolve to foundation/context.md
+    let resolved = resolver.resolve("@foundation:context");
+    assert!(resolved.is_some());
+    let path = resolved.unwrap();
+    assert!(path.to_str().unwrap().contains("context.md"));
+}
+
+#[test]
+fn test_mention_resolver_namespace_not_found() {
+    let resolver = amplifier_foundation::BaseMentionResolver {
+        base_path: PathBuf::from("/tmp"),
+        bundles: HashMap::new(),
+    };
+
+    // Unknown namespace should return None
+    let resolved = resolver.resolve("@unknown:path");
+    assert!(resolved.is_none());
+}

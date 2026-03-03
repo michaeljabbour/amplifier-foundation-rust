@@ -149,6 +149,9 @@ pub use updates::{
 // -- Module resolution --
 pub use bundle::module_resolver::{BundleModuleResolver, BundleModuleSource, ModuleActivate};
 
+// -- PreparedBundle --
+pub use bundle::prepared::PreparedBundle;
+
 // -- Modules --
 pub use modules::activator::ModuleActivator;
 pub use modules::state::InstallStateManager;

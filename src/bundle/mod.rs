@@ -1,14 +1,14 @@
 mod compose;
 pub mod module_resolver;
 pub mod mount;
+pub mod prepared;
 pub mod validator;
 
 // Future modules: These are reserved for functionality that depends on
 // AmplifierRuntime/AmplifierSession (declared in src/runtime.rs).
-// Implement when the runtime layer is concrete enough to support them.
 //
-// - prepared: PreparedBundle (session lifecycle controller -- create_session, spawn)
-// - prompt: System prompt factory (async closure for live @mention re-resolution)
+// - prepared: PreparedBundle struct + build_bundles_for_resolver + system prompt factory (DONE)
+// - Remaining: create_session and spawn depend on AmplifierSession runtime
 
 use indexmap::IndexMap;
 use serde_yaml_ng::{Mapping, Value};

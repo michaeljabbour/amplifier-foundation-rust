@@ -53,11 +53,23 @@ impl BaseMentionResolver {
 
         let mention_body = &mention[1..]; // Remove @ prefix
 
-        // Pattern 1: @bundle-name:context-name
-        // Full bundle resolution (resolve_context_path) is Wave 3.
-        // For now, namespace patterns always return None since we can't
-        // resolve context paths without Bundle struct's resolve_context_path method.
+        // Pattern 1: @namespace:path — resolve relative to namespace base path
         if mention_body.contains(':') {
+            let (namespace, rel_path) = match mention_body.split_once(':') {
+                Some((ns, path)) => (ns, path),
+                None => return None,
+            };
+            if let Some(ns_base) = self.bundles.get(namespace) {
+                let path = ns_base.join(rel_path);
+                if path.exists() {
+                    return Some(path);
+                }
+                // Try with .md extension
+                let path_md = ns_base.join(format!("{rel_path}.md"));
+                if path_md.exists() {
+                    return Some(path_md);
+                }
+            }
             return None;
         }
 
