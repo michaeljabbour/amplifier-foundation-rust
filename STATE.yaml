@@ -13,7 +13,7 @@
 phase: 1
 phase_name: "Wave 1 -- Leaf Modules (all sync)"
 epoch: 2
-next_action: "Implement F-006-dicts (in-progress)"
+next_action: "Implement F-007-paths (in-progress)"
 blockers: []
 
 architecture_spec:
@@ -89,16 +89,19 @@ features:
   F-006-dicts:
     name: "Implement dicts module (deep_merge, merge_module_lists, get/set_nested)"
     module: "dicts"
-    status: "in-progress"
+    status: "done"
     spec: "specs/modules/dicts.md"
     depends_on: ["F-003-test-port-wave1"]
     started_at: "2025-01-15T12:00:00Z"
+    completed_at: "2025-01-15T12:20:00Z"
+    commit: "23d1a7a"
   F-007-paths:
     name: "Implement paths module (parse_uri, normalize, discovery)"
     module: "paths"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/modules/paths.md"
     depends_on: ["F-003-test-port-wave1"]
+    started_at: "2025-01-15T12:20:00Z"
   F-008-cache:
     name: "Implement cache module (SimpleCache, DiskCache)"
     module: "cache"

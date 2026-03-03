@@ -8,7 +8,6 @@ use amplifier_foundation::paths::uri::{normalize_path, parse_uri};
 // ---------------------------------------------------------------------------
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_git_https_uri() {
     let uri = parse_uri("git+https://github.com/user/repo@main");
     assert_eq!(uri.scheme, "git+https");
@@ -18,7 +17,6 @@ fn test_git_https_uri() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_git_uri_with_subdirectory_fragment() {
     let uri = parse_uri(
         "git+https://github.com/org/repo@main#subdirectory=bundles/foundation",
@@ -31,7 +29,6 @@ fn test_git_uri_with_subdirectory_fragment() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_zip_https_uri() {
     let uri = parse_uri(
         "zip+https://releases.example.com/bundle.zip#subdirectory=foundation",
@@ -44,7 +41,6 @@ fn test_zip_https_uri() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_zip_file_uri() {
     let uri =
         parse_uri("zip+file:///local/archive.zip#subdirectory=my-bundle");
@@ -55,7 +51,6 @@ fn test_zip_file_uri() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_file_uri() {
     let uri = parse_uri("file:///home/user/bundle");
     assert_eq!(uri.scheme, "file");
@@ -63,7 +58,6 @@ fn test_file_uri() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_https_uri() {
     let uri = parse_uri("https://example.com/bundle.yaml");
     assert_eq!(uri.scheme, "https");
@@ -72,7 +66,6 @@ fn test_https_uri() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_local_path() {
     let uri = parse_uri("/home/user/bundle");
     assert_eq!(uri.scheme, "file");
@@ -80,7 +73,6 @@ fn test_local_path() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_relative_path() {
     let uri = parse_uri("./bundles/my-bundle");
     assert_eq!(uri.scheme, "file");
@@ -92,14 +84,12 @@ fn test_relative_path() {
 // ---------------------------------------------------------------------------
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_absolute_path() {
     let result = normalize_path("/home/user/file.txt", None);
     assert_eq!(result, Path::new("/home/user/file.txt"));
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_relative_path_with_base() {
     let result =
         normalize_path("file.txt", Some(Path::new("/home/user")));
@@ -107,14 +97,12 @@ fn test_relative_path_with_base() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_relative_path_without_base() {
     let result = normalize_path("file.txt", None);
     assert!(result.is_absolute());
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_path_object_input() {
     let result = normalize_path("/home/user/file.txt", None);
     assert_eq!(result, Path::new("/home/user/file.txt"));
@@ -125,14 +113,12 @@ fn test_path_object_input() {
 // ---------------------------------------------------------------------------
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_construct_agent_path() {
     let result = construct_agent_path(Path::new("/bundle"), "code-reviewer");
     assert_eq!(result, Path::new("/bundle/agents/code-reviewer.md"));
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_construct_context_path() {
     let base = Path::new("/bundle");
 
@@ -157,7 +143,6 @@ fn test_construct_context_path() {
 }
 
 #[test]
-#[ignore = "Wave 1"]
 fn test_paths_are_standardized() {
     let base = Path::new("/test");
 
