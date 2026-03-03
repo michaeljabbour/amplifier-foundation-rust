@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 20
-phase_name: "Wave 20 -- Async registry secondary paths (find_nearest, find_resource, resolve_include)"
-epoch: 21
-next_action: "Wave 20 COMPLETE. 601 tests passing, 0 clippy warnings, cargo fmt clean. All registry secondary I/O paths now async. Consider: async persistence.rs save/load, async MentionResolver::resolve(), PyO3 bindings, benchmarks"
+phase: 21
+phase_name: "Wave 21 -- Async persistence, validate_cached_paths, load_agent_metadata"
+epoch: 22
+next_action: "Implement F-071 (async persistence save), F-072 (async validate_cached_paths), F-073 (async load_agent_metadata)"
 blockers: []
 
 architecture_spec:
@@ -708,16 +708,36 @@ features:
     completed_at: "2025-01-28T01:00:00Z"
     commit: "cb065c2"
 
+  F-071-async-persistence-save:
+    name: "Convert persistence save() to async using tokio::fs"
+    module: "registry"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-059-registry-decompose"]
+    started_at: "2025-01-29T00:00:00Z"
+  F-072-async-validate-cached-paths:
+    name: "Convert validate_cached_paths to async using tokio::fs::metadata"
+    module: "registry"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-071-async-persistence-save"]
+  F-073-async-load-agent-metadata:
+    name: "Convert load_agent_metadata to async using tokio::fs::read_to_string"
+    module: "bundle"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-062-bundle-decompose"]
+
 wave_gate:
-  current_wave: 20
+  current_wave: 21
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
-  approval_status: "approved"
-  notes: "Wave 20 COMPLETE: 601 tests (all passing), 0 clippy warnings, cargo fmt clean. All registry secondary I/O paths (find_nearest_bundle_file, find_resource_path, resolve_include_source) now fully async."
+  approval_status: "pending"
+  notes: "Wave 21: async persistence save, async validate_cached_paths, async load_agent_metadata"
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
   total_features_completed: 70
-  last_updated: "2025-01-28T01:00:00Z"
-  last_session: "session-025-wave20-async-registry-secondary"
+  last_updated: "2025-01-29T00:00:00Z"
+  last_session: "session-026-wave21-async-persistence"

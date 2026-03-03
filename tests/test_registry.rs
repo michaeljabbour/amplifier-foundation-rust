@@ -202,9 +202,9 @@ fn test_unregister_removes_from_list_registered() {
     assert_eq!(remaining, vec!["alpha".to_string(), "gamma".to_string()]);
 }
 
-#[test]
+#[tokio::test]
 
-fn test_unregister_does_not_auto_persist() {
+async fn test_unregister_does_not_auto_persist() {
     let tmp = tempdir().unwrap();
     let home = tmp.path().to_path_buf();
 
@@ -212,7 +212,7 @@ fn test_unregister_does_not_auto_persist() {
     {
         let mut registry = BundleRegistry::new(home.clone());
         register_one(&mut registry, "persistent", "file:///p");
-        registry.save();
+        registry.save().await;
     }
 
     // Unregister but do NOT save.
@@ -636,8 +636,8 @@ fn test_registry_get_all_states_populated() {
 // BundleRegistry.validate_cached_paths() tests
 // ---------------------------------------------------------------------------
 
-#[test]
-fn test_validate_cached_paths_clears_stale() {
+#[tokio::test]
+async fn test_validate_cached_paths_clears_stale() {
     let dir = tempdir().unwrap();
     let mut registry = BundleRegistry::new(dir.path().to_path_buf());
 
@@ -648,7 +648,7 @@ fn test_validate_cached_paths_clears_stale() {
     registry.get_state("stale-bundle").local_path = Some("/nonexistent/path/to/bundle".to_string());
 
     // validate_cached_paths should clear the stale reference
-    registry.validate_cached_paths();
+    registry.validate_cached_paths().await;
 
     assert!(
         registry.get_state("stale-bundle").local_path.is_none(),
@@ -656,8 +656,8 @@ fn test_validate_cached_paths_clears_stale() {
     );
 }
 
-#[test]
-fn test_validate_cached_paths_keeps_valid() {
+#[tokio::test]
+async fn test_validate_cached_paths_keeps_valid() {
     let dir = tempdir().unwrap();
     let bundle_dir = dir.path().join("my-bundle");
     fs::create_dir_all(&bundle_dir).unwrap();
@@ -668,7 +668,7 @@ fn test_validate_cached_paths_keeps_valid() {
     registry.register(&bundles);
     registry.get_state("valid-bundle").local_path = Some(bundle_dir.to_string_lossy().to_string());
 
-    registry.validate_cached_paths();
+    registry.validate_cached_paths().await;
 
     assert!(
         registry.get_state("valid-bundle").local_path.is_some(),
@@ -676,8 +676,8 @@ fn test_validate_cached_paths_keeps_valid() {
     );
 }
 
-#[test]
-fn test_validate_cached_paths_mixed() {
+#[tokio::test]
+async fn test_validate_cached_paths_mixed() {
     let dir = tempdir().unwrap();
     let valid_path = dir.path().join("exists");
     fs::create_dir_all(&valid_path).unwrap();
@@ -693,7 +693,7 @@ fn test_validate_cached_paths_mixed() {
     registry.register(&b2);
     registry.get_state("stale").local_path = Some("/definitely/not/here".to_string());
 
-    registry.validate_cached_paths();
+    registry.validate_cached_paths().await;
 
     assert!(registry.get_state("valid").local_path.is_some());
     assert!(registry.get_state("stale").local_path.is_none());
@@ -812,12 +812,12 @@ fn test_registry_find_state_missing() {
     assert!(registry.find_state("nonexistent").is_none());
 }
 
-#[test]
-fn test_validate_cached_paths_empty_registry() {
+#[tokio::test]
+async fn test_validate_cached_paths_empty_registry() {
     let dir = tempdir().unwrap();
-    let mut registry = BundleRegistry::new(dir.path().to_path_buf());
+    let registry = BundleRegistry::new(dir.path().to_path_buf());
     // Should not panic or call save() on empty registry
-    registry.validate_cached_paths();
+    registry.validate_cached_paths().await;
     assert!(registry.get_all_states().is_empty());
 }
 
@@ -1320,8 +1320,8 @@ fn test_extract_bundle_name_plain() {
 // record_include_relationships tests (F-054)
 // ===========================================================================
 
-#[test]
-fn test_record_include_relationships_basic() {
+#[tokio::test]
+async fn test_record_include_relationships_basic() {
     let tmp = tempdir().unwrap();
     let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
 
@@ -1334,7 +1334,9 @@ fn test_record_include_relationships_basic() {
     registry.register(&bundles);
 
     let child_names = vec!["child-a".to_string(), "child-b".to_string()];
-    registry.record_include_relationships("parent", &child_names);
+    registry
+        .record_include_relationships("parent", &child_names)
+        .await;
 
     // Parent should have both children in includes
     let parent = registry.find_state("parent").unwrap();
@@ -1348,8 +1350,8 @@ fn test_record_include_relationships_basic() {
     assert_eq!(child_b.included_by, vec!["parent"]);
 }
 
-#[test]
-fn test_record_include_relationships_dedup() {
+#[tokio::test]
+async fn test_record_include_relationships_dedup() {
     let tmp = tempdir().unwrap();
     let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
 
@@ -1362,8 +1364,12 @@ fn test_record_include_relationships_dedup() {
     let child_names = vec!["child-a".to_string()];
 
     // Call twice with the same names
-    registry.record_include_relationships("parent", &child_names);
-    registry.record_include_relationships("parent", &child_names);
+    registry
+        .record_include_relationships("parent", &child_names)
+        .await;
+    registry
+        .record_include_relationships("parent", &child_names)
+        .await;
 
     // Should NOT have duplicates
     let parent = registry.find_state("parent").unwrap();
@@ -1383,8 +1389,8 @@ fn test_record_include_relationships_dedup() {
     );
 }
 
-#[test]
-fn test_record_include_relationships_persists() {
+#[tokio::test]
+async fn test_record_include_relationships_persists() {
     let tmp = tempdir().unwrap();
     let home = tmp.path().to_path_buf();
 
@@ -1396,10 +1402,12 @@ fn test_record_include_relationships_persists() {
             ("child".to_string(), "file:///child".to_string()),
         ]);
         registry.register(&bundles);
-        registry.save(); // persist the registration first
+        registry.save().await; // persist the registration first
 
         let child_names = vec!["child".to_string()];
-        registry.record_include_relationships("parent", &child_names);
+        registry
+            .record_include_relationships("parent", &child_names)
+            .await;
         // record_include_relationships calls save() internally
     }
 
@@ -1423,8 +1431,8 @@ fn test_record_include_relationships_persists() {
     }
 }
 
-#[test]
-fn test_record_include_relationships_missing_parent() {
+#[tokio::test]
+async fn test_record_include_relationships_missing_parent() {
     // Parent not in registry — children should still be updated
     let tmp = tempdir().unwrap();
     let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
@@ -1434,7 +1442,9 @@ fn test_record_include_relationships_missing_parent() {
     registry.register(&bundles);
 
     let child_names = vec!["child".to_string()];
-    registry.record_include_relationships("nonexistent-parent", &child_names);
+    registry
+        .record_include_relationships("nonexistent-parent", &child_names)
+        .await;
 
     // Child should still get the included_by entry
     let child = registry.find_state("child").unwrap();
@@ -1447,8 +1457,8 @@ fn test_record_include_relationships_missing_parent() {
     );
 }
 
-#[test]
-fn test_record_include_relationships_missing_child() {
+#[tokio::test]
+async fn test_record_include_relationships_missing_child() {
     // Child not in registry — parent should still be updated
     let tmp = tempdir().unwrap();
     let mut registry = BundleRegistry::new(tmp.path().to_path_buf());
@@ -1458,7 +1468,9 @@ fn test_record_include_relationships_missing_child() {
     registry.register(&bundles);
 
     let child_names = vec!["nonexistent-child".to_string()];
-    registry.record_include_relationships("parent", &child_names);
+    registry
+        .record_include_relationships("parent", &child_names)
+        .await;
 
     // Parent should still get the includes entry
     let parent = registry.find_state("parent").unwrap();
@@ -1471,8 +1483,8 @@ fn test_record_include_relationships_missing_child() {
     );
 }
 
-#[test]
-fn test_record_include_relationships_shared_ref() {
+#[tokio::test]
+async fn test_record_include_relationships_shared_ref() {
     // Verify record_include_relationships works with &self (shared reference),
     // which is the key goal of the RwLock refactor (F-056).
     let tmp = tempdir().unwrap();
@@ -1488,7 +1500,8 @@ fn test_record_include_relationships_shared_ref() {
     // Call through a shared reference — the whole point of the RwLock change
     let registry_ref: &BundleRegistry = &registry;
     registry_ref
-        .record_include_relationships("parent", &["child-a".to_string(), "child-b".to_string()]);
+        .record_include_relationships("parent", &["child-a".to_string(), "child-b".to_string()])
+        .await;
 
     // Verify relationships were recorded
     let parent = registry.find_state("parent").unwrap();
@@ -2121,8 +2134,8 @@ async fn test_update_single_bypasses_cache() {
 // Batch-save optimization (F-060)
 // ---------------------------------------------------------------------------
 
-#[test]
-fn test_record_include_relationships_deferred_does_not_save() {
+#[tokio::test]
+async fn test_record_include_relationships_deferred_does_not_save() {
     let tmp = tempdir().unwrap();
     let home = tmp.path().to_path_buf();
 
@@ -2134,7 +2147,7 @@ fn test_record_include_relationships_deferred_does_not_save() {
             ("child".to_string(), "file:///child".to_string()),
         ]);
         registry.register(&bundles);
-        registry.save(); // persist registration
+        registry.save().await; // persist registration
 
         let child_names = vec!["child".to_string()];
         registry.record_include_relationships_deferred("parent", &child_names);
@@ -2152,8 +2165,8 @@ fn test_record_include_relationships_deferred_does_not_save() {
     }
 }
 
-#[test]
-fn test_record_include_relationships_deferred_then_explicit_save() {
+#[tokio::test]
+async fn test_record_include_relationships_deferred_then_explicit_save() {
     let tmp = tempdir().unwrap();
     let home = tmp.path().to_path_buf();
 
@@ -2172,7 +2185,7 @@ fn test_record_include_relationships_deferred_then_explicit_save() {
         registry.record_include_relationships_deferred("parent", &["child2".to_string()]);
 
         // Single batch save
-        registry.save();
+        registry.save().await;
     }
 
     // Fresh registry should see all relationships
@@ -2189,8 +2202,8 @@ fn test_record_include_relationships_deferred_then_explicit_save() {
     }
 }
 
-#[test]
-fn test_record_include_relationships_still_saves_immediately() {
+#[tokio::test]
+async fn test_record_include_relationships_still_saves_immediately() {
     // Backward compat: the non-deferred version still persists immediately
     let tmp = tempdir().unwrap();
     let home = tmp.path().to_path_buf();
@@ -2202,9 +2215,11 @@ fn test_record_include_relationships_still_saves_immediately() {
             ("child".to_string(), "file:///child".to_string()),
         ]);
         registry.register(&bundles);
-        registry.save();
+        registry.save().await;
 
-        registry.record_include_relationships("parent", &["child".to_string()]);
+        registry
+            .record_include_relationships("parent", &["child".to_string()])
+            .await;
         // record_include_relationships still calls save() internally
     }
 

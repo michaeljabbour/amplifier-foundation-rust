@@ -1175,8 +1175,8 @@ fn test_content_deduplicator_is_duplicate_compat_reverse() {
 // Test 21: BundleRegistry deterministic ordering (IndexMap)
 // ============================================================================
 
-#[test]
-fn test_registry_deterministic_ordering() {
+#[tokio::test]
+async fn test_registry_deterministic_ordering() {
     use amplifier_foundation::registry::BundleRegistry;
 
     let tmp = tempfile::tempdir().unwrap();
@@ -1197,7 +1197,7 @@ fn test_registry_deterministic_ordering() {
     registry.register(&b3);
 
     // Save and check key ordering
-    registry.save();
+    registry.save().await;
     let content = std::fs::read_to_string(tmp.path().join("registry.json")).unwrap();
     let data: serde_json::Value = serde_json::from_str(&content).unwrap();
     let bundle_keys: Vec<&str> = data["bundles"]
@@ -1211,7 +1211,7 @@ fn test_registry_deterministic_ordering() {
     assert_eq!(bundle_keys, vec!["zulu", "alpha", "mike"]);
 
     // Consecutive saves should produce identical output
-    registry.save();
+    registry.save().await;
     let content2 = std::fs::read_to_string(tmp.path().join("registry.json")).unwrap();
     assert_eq!(
         content, content2,

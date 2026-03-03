@@ -1,4 +1,9 @@
 //! Registry persistence: save/load to disk, path validation, relationship recording.
+//!
+//! `save()` and `record_include_relationships()` are async, using `tokio::fs`
+//! for non-blocking disk writes. `load_persisted_state()` remains sync since
+//! it's called from `BundleRegistry::new()` (construction, before any async
+//! runtime context is needed).
 
 use super::types::BundleState;
 use super::BundleRegistry;
@@ -11,10 +16,17 @@ impl BundleRegistry {
     /// those stale references so bundles will be re-fetched when needed.
     ///
     /// Persists the cleanup if any stale entries were found.
-    pub fn validate_cached_paths(&mut self) {
-        let has_stale = {
-            let bundles = self.bundles.get_mut().unwrap_or_else(|e| e.into_inner());
-            let stale_names: Vec<String> = bundles
+    ///
+    /// Takes `&self` (not `&mut self`) so it can be called on `Arc<BundleRegistry>`.
+    /// Uses read lock for the scan phase and write lock for the mutation phase.
+    ///
+    /// Note: The `path.exists()` checks are still sync (blocking). Making
+    /// those async is tracked as a separate improvement.
+    pub async fn validate_cached_paths(&self) {
+        // Phase 1: Scan for stale paths under read lock.
+        let stale_names: Vec<String> = {
+            let bundles = self.bundles.read().unwrap_or_else(|e| e.into_inner());
+            bundles
                 .iter()
                 .filter_map(|(name, state)| {
                     if let Some(ref lp) = state.local_path {
@@ -25,19 +37,24 @@ impl BundleRegistry {
                     }
                     None
                 })
-                .collect();
+                .collect()
+        };
 
+        if stale_names.is_empty() {
+            return;
+        }
+
+        // Phase 2: Mutate under write lock.
+        {
+            let mut bundles = self.bundles.write().unwrap_or_else(|e| e.into_inner());
             for name in &stale_names {
                 if let Some(state) = bundles.get_mut(name) {
                     state.local_path = None;
                 }
             }
-            !stale_names.is_empty()
-        };
-
-        if has_stale {
-            self.save();
         }
+
+        self.save().await;
     }
 
     /// Record include relationships without persisting to disk.
@@ -82,38 +99,70 @@ impl BundleRegistry {
     /// Record include relationships between a parent bundle and its children.
     ///
     /// Updates the parent's `includes` list and each child's `included_by` list,
-    /// deduplicating entries. Persists the updated state to disk immediately.
+    /// deduplicating entries. Persists the updated state to disk immediately
+    /// using async I/O.
     ///
     /// Port of Python `_record_include_relationships`.
-    pub fn record_include_relationships(&self, parent_name: &str, child_names: &[String]) {
+    pub async fn record_include_relationships(&self, parent_name: &str, child_names: &[String]) {
         self.record_include_relationships_deferred(parent_name, child_names);
-        self.save();
+        self.save().await;
     }
 
-    /// Persist registry to disk as JSON.
-    pub fn save(&self) {
-        let _ = std::fs::create_dir_all(&self.home);
+    /// Persist registry to disk as JSON using non-blocking I/O.
+    ///
+    /// Uses `tokio::fs::create_dir_all` and `tokio::fs::write` to avoid
+    /// blocking the async runtime. The bundles RwLock is held only briefly
+    /// to serialize the state — it is dropped before any `.await` point.
+    pub async fn save(&self) {
+        if let Err(e) = tokio::fs::create_dir_all(&self.home).await {
+            tracing::warn!(
+                "Failed to create registry directory {}: {}",
+                self.home.display(),
+                e
+            );
+            return;
+        }
         let registry_path = self.home.join("registry.json");
 
-        let mut bundles_map = serde_json::Map::new();
-        {
-            let bundles = self.bundles.read().unwrap_or_else(|e| e.into_inner());
-            for (name, state) in bundles.iter() {
-                bundles_map.insert(name.clone(), state.to_dict());
+        // Serialize state under read lock, then drop lock before async write.
+        let content = {
+            let mut bundles_map = serde_json::Map::new();
+            {
+                let bundles = self.bundles.read().unwrap_or_else(|e| e.into_inner());
+                for (name, state) in bundles.iter() {
+                    bundles_map.insert(name.clone(), state.to_dict());
+                }
             }
-        }
 
-        let data = serde_json::json!({
-            "version": 1,
-            "bundles": serde_json::Value::Object(bundles_map),
-        });
+            let data = serde_json::json!({
+                "version": 1,
+                "bundles": serde_json::Value::Object(bundles_map),
+            });
 
-        if let Ok(content) = serde_json::to_string_pretty(&data) {
-            let _ = std::fs::write(&registry_path, content);
+            match serde_json::to_string_pretty(&data) {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::warn!("Failed to serialize registry state: {}", e);
+                    return;
+                }
+            }
+        };
+
+        if let Err(e) = tokio::fs::write(&registry_path, content).await {
+            tracing::warn!(
+                "Failed to write registry file {}: {}",
+                registry_path.display(),
+                e
+            );
         }
     }
 
     /// Load persisted state from registry.json.
+    ///
+    /// Remains sync because it's called from `BundleRegistry::new()`, which
+    /// is a synchronous constructor (called before the async runtime is
+    /// needed). Converting the constructor to async would require changing
+    /// the public API significantly.
     pub(super) fn load_persisted_state(&mut self) {
         let registry_path = self.home.join("registry.json");
         if !registry_path.exists() {

@@ -21,7 +21,7 @@ impl BundleRegistry {
         // Single batch save after entire recursive tree completes.
         // Persists: deferred include relationships from compose_includes,
         // local_path/loaded_at updates from load_single_with_chain.
-        self.save();
+        self.save().await;
         Ok(bundle)
     }
 
