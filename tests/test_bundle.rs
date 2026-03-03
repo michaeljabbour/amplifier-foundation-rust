@@ -1210,3 +1210,302 @@ fn test_get_system_instruction_some() {
         Some("You are a helpful assistant.")
     );
 }
+
+// ---------------------------------------------------------------------------
+// load_agent_metadata tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_load_agent_metadata_basic() {
+    let dir = tempdir().unwrap();
+    let agents_dir = dir.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+
+    fs::write(
+        agents_dir.join("helper.md"),
+        "---\nmeta:\n  name: helper\n  description: A helpful agent\n---\nYou help with things.\n",
+    )
+    .unwrap();
+
+    let mut bundle = Bundle::new("test-bundle");
+    bundle.base_path = Some(dir.path().to_path_buf());
+    bundle
+        .agents
+        .insert("helper".to_string(), Value::Mapping(Mapping::new()));
+
+    bundle.load_agent_metadata();
+
+    let agent = bundle.agents.get("helper").unwrap();
+    let agent_map = agent.as_mapping().unwrap();
+    assert_eq!(
+        agent_map
+            .get(Value::String("description".to_string()))
+            .and_then(|v| v.as_str()),
+        Some("A helpful agent")
+    );
+    assert_eq!(
+        agent_map
+            .get(Value::String("instruction".to_string()))
+            .and_then(|v| v.as_str()),
+        Some("You help with things.")
+    );
+}
+
+#[test]
+fn test_load_agent_metadata_fills_gaps_only() {
+    let dir = tempdir().unwrap();
+    let agents_dir = dir.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+
+    fs::write(
+        agents_dir.join("agent.md"),
+        "---\nmeta:\n  name: agent\n  description: From file\n---\nFile instruction.\n",
+    )
+    .unwrap();
+
+    // Agent already has a description set inline
+    let mut existing = Mapping::new();
+    existing.insert(
+        Value::String("description".to_string()),
+        Value::String("Inline description".to_string()),
+    );
+
+    let mut bundle = Bundle::new("test-bundle");
+    bundle.base_path = Some(dir.path().to_path_buf());
+    bundle
+        .agents
+        .insert("agent".to_string(), Value::Mapping(existing));
+
+    bundle.load_agent_metadata();
+
+    let agent = bundle.agents.get("agent").unwrap();
+    let agent_map = agent.as_mapping().unwrap();
+    // Inline description should be preserved (not overridden by file)
+    assert_eq!(
+        agent_map
+            .get(Value::String("description".to_string()))
+            .and_then(|v| v.as_str()),
+        Some("Inline description")
+    );
+    // But instruction should be filled from file since it wasn't set inline
+    assert_eq!(
+        agent_map
+            .get(Value::String("instruction".to_string()))
+            .and_then(|v| v.as_str()),
+        Some("File instruction.")
+    );
+}
+
+#[test]
+fn test_load_agent_metadata_no_agents() {
+    let mut bundle = Bundle::new("test-bundle");
+    // Should not panic with no agents
+    bundle.load_agent_metadata();
+    assert!(bundle.agents.is_empty());
+}
+
+#[test]
+fn test_load_agent_metadata_agent_file_not_found() {
+    let dir = tempdir().unwrap();
+    let agents_dir = dir.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+    // No agent .md file exists
+
+    let mut bundle = Bundle::new("test-bundle");
+    bundle.base_path = Some(dir.path().to_path_buf());
+    bundle
+        .agents
+        .insert("missing".to_string(), Value::Mapping(Mapping::new()));
+
+    // Should not panic, just skip the agent
+    bundle.load_agent_metadata();
+
+    let agent = bundle.agents.get("missing").unwrap();
+    // Agent should remain unchanged (empty mapping)
+    assert!(agent.as_mapping().unwrap().is_empty());
+}
+
+#[test]
+fn test_load_agent_metadata_flat_frontmatter() {
+    // Some agents have flat frontmatter (name/description at top level, not under meta:)
+    let dir = tempdir().unwrap();
+    let agents_dir = dir.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+
+    fs::write(
+        agents_dir.join("flat.md"),
+        "---\nname: flat-agent\ndescription: Flat description\n---\nFlat instruction.\n",
+    )
+    .unwrap();
+
+    let mut bundle = Bundle::new("test-bundle");
+    bundle.base_path = Some(dir.path().to_path_buf());
+    bundle
+        .agents
+        .insert("flat".to_string(), Value::Mapping(Mapping::new()));
+
+    bundle.load_agent_metadata();
+
+    let agent = bundle.agents.get("flat").unwrap();
+    let agent_map = agent.as_mapping().unwrap();
+    assert_eq!(
+        agent_map
+            .get(Value::String("description".to_string()))
+            .and_then(|v| v.as_str()),
+        Some("Flat description")
+    );
+}
+
+#[test]
+fn test_load_agent_metadata_with_mount_plan_sections() {
+    // Agents can define their own tools/providers/hooks/session
+    let dir = tempdir().unwrap();
+    let agents_dir = dir.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+
+    fs::write(
+        agents_dir.join("tooled.md"),
+        "---\nmeta:\n  name: tooled\n  description: Agent with tools\ntools:\n  - module: tool-bash\nproviders:\n  - module: provider-openai\n---\nTooled instruction.\n",
+    )
+    .unwrap();
+
+    let mut bundle = Bundle::new("test-bundle");
+    bundle.base_path = Some(dir.path().to_path_buf());
+    bundle
+        .agents
+        .insert("tooled".to_string(), Value::Mapping(Mapping::new()));
+
+    bundle.load_agent_metadata();
+
+    let agent = bundle.agents.get("tooled").unwrap();
+    let agent_map = agent.as_mapping().unwrap();
+    assert!(agent_map.get(Value::String("tools".to_string())).is_some());
+    assert!(agent_map
+        .get(Value::String("providers".to_string()))
+        .is_some());
+}
+
+#[test]
+fn test_load_agent_metadata_non_mapping_config_preserved() {
+    // If agent_config is not a mapping (e.g., null or string), it should be
+    // preserved as-is (matching Python where TypeError is caught)
+    let dir = tempdir().unwrap();
+    let agents_dir = dir.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+    fs::write(
+        agents_dir.join("nullagent.md"),
+        "---\nmeta:\n  name: nullagent\n  description: From file\n---\nInstruction.\n",
+    )
+    .unwrap();
+
+    let mut bundle = Bundle::new("test-bundle");
+    bundle.base_path = Some(dir.path().to_path_buf());
+    bundle.agents.insert("nullagent".to_string(), Value::Null);
+
+    bundle.load_agent_metadata();
+
+    // Non-mapping agent should be preserved (not replaced by file metadata)
+    assert!(bundle.agents.get("nullagent").unwrap().is_null());
+}
+
+#[test]
+fn test_load_agent_metadata_malformed_yaml() {
+    // Malformed YAML frontmatter should be caught and logged, not panic
+    let dir = tempdir().unwrap();
+    let agents_dir = dir.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+    fs::write(
+        agents_dir.join("broken.md"),
+        "---\nmeta:\n  name: [unterminated\n---\nBody.\n",
+    )
+    .unwrap();
+
+    let mut bundle = Bundle::new("test-bundle");
+    bundle.base_path = Some(dir.path().to_path_buf());
+    bundle
+        .agents
+        .insert("broken".to_string(), Value::Mapping(Mapping::new()));
+
+    // Should not panic -- error is caught and logged as warning
+    bundle.load_agent_metadata();
+
+    // Agent should remain unchanged (empty mapping)
+    assert!(bundle
+        .agents
+        .get("broken")
+        .unwrap()
+        .as_mapping()
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
+fn test_load_agent_metadata_empty_string_overwritten() {
+    // Empty string values should be considered falsy and overwritten by file metadata
+    let dir = tempdir().unwrap();
+    let agents_dir = dir.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+    fs::write(
+        agents_dir.join("agent.md"),
+        "---\nmeta:\n  name: agent\n  description: From file\n---\n",
+    )
+    .unwrap();
+
+    let mut existing = Mapping::new();
+    existing.insert(
+        Value::String("description".to_string()),
+        Value::String(String::new()), // empty string = falsy
+    );
+
+    let mut bundle = Bundle::new("test-bundle");
+    bundle.base_path = Some(dir.path().to_path_buf());
+    bundle
+        .agents
+        .insert("agent".to_string(), Value::Mapping(existing));
+
+    bundle.load_agent_metadata();
+
+    let agent = bundle.agents.get("agent").unwrap();
+    let agent_map = agent.as_mapping().unwrap();
+    // Empty string should be overwritten by file metadata
+    assert_eq!(
+        agent_map
+            .get(Value::String("description".to_string()))
+            .and_then(|v| v.as_str()),
+        Some("From file")
+    );
+}
+
+#[test]
+fn test_load_agent_metadata_no_frontmatter() {
+    // Agent .md with no frontmatter -- just body
+    let dir = tempdir().unwrap();
+    let agents_dir = dir.path().join("agents");
+    fs::create_dir_all(&agents_dir).unwrap();
+
+    fs::write(agents_dir.join("plain.md"), "Just a plain instruction.\n").unwrap();
+
+    let mut bundle = Bundle::new("test-bundle");
+    bundle.base_path = Some(dir.path().to_path_buf());
+    bundle
+        .agents
+        .insert("plain".to_string(), Value::Mapping(Mapping::new()));
+
+    bundle.load_agent_metadata();
+
+    let agent = bundle.agents.get("plain").unwrap();
+    let agent_map = agent.as_mapping().unwrap();
+    // Should have name (fallback) and instruction from body
+    assert_eq!(
+        agent_map
+            .get(Value::String("name".to_string()))
+            .and_then(|v| v.as_str()),
+        Some("plain")
+    );
+    assert_eq!(
+        agent_map
+            .get(Value::String("instruction".to_string()))
+            .and_then(|v| v.as_str()),
+        Some("Just a plain instruction.")
+    );
+}
