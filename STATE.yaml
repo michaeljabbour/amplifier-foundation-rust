@@ -13,7 +13,7 @@
 phase: 2
 phase_name: "Wave 2 -- Mid-tier Modules (mixed sync/async)"
 epoch: 3
-next_action: "Implement Wave 2 remaining: io (6 tests), mentions (21 tests), sources (16 tests)"
+next_action: "Wave 2 COMPLETE. Proceed to Wave 3: bundle (26 tests), registry (21 tests), validator (18 tests)"
 blockers: []
 
 architecture_spec:
@@ -188,21 +188,23 @@ features:
   F-017-sources:
     name: "Implement sources module (FileSourceHandler, HttpSourceHandler, ZipSourceHandler)"
     module: "sources"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-004-test-port-wave2", "F-007-paths"]
     started_at: "2025-01-16T07:00:00Z"
+    completed_at: "2025-01-16T07:30:00Z"
+    commit: "61ef735"
 
 wave_gate:
   current_wave: 2
   gate_criteria: "All 96 Wave 2 tests pass + Wave 1's 87 still passing = 183 total"
   approval_required: false
   approval_status: "approved"
-  notes: "Session module COMPLETE: 53/53 tests passing. Wave 2 progress: 53 of 96 tests done. Remaining: io (6), mentions (21), sources (16)."
+  notes: "Wave 2 COMPLETE: 96/96 tests passing. io (6), mentions (21), sources (16), session (53). Total passing: 183 + 2 lib + 1 doc = 186."
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 14
-  last_updated: "2025-01-16T05:15:00Z"
-  last_session: "session-006-wave2-session"
+  total_features_completed: 17
+  last_updated: "2025-01-16T07:30:00Z"
+  last_session: "session-007-wave2-completion"

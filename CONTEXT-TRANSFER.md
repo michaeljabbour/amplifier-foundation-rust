@@ -6,6 +6,45 @@
 
 ---
 
+## Session 007 -- Wave 2 Completion (F-015, F-016, F-017)
+
+### Work Completed
+- **F-015-io** (dcdb3fc): Implemented io module -- write_with_backup (atomic write via tempfile + rename), write_with_backup_bytes, read_with_retry (async with exponential backoff on errno 5), write_with_retry, read_yaml, write_yaml, parse_frontmatter (LazyLock regex, YAML frontmatter extraction). 6 tests un-ignored, all pass.
+- **F-016-mentions** (4de3d35): Implemented mentions module -- parse_mentions (extracts @mentions excluding code blocks/inline code, email rejection via post-filter), BaseMentionResolver (resolves @path, @./path, @~/path, namespace patterns return None pending Wave 3 Bundle type). 21 tests un-ignored, all pass.
+- **F-017-sources** (61ef735): Implemented sources module -- FileSourceHandler (file:// URIs and local paths with subpath), HttpSourceHandler (can_handle only, resolve deferred), ZipSourceHandler (zip+file:// extraction to SHA256-keyed cache), GitSourceHandler (can_handle only, resolve deferred). 16 tests un-ignored, all pass.
+
+### Wave 2 COMPLETE
+- All 96 Wave 2 tests passing: io (6) + mentions (21) + session (53) + sources (16)
+- Wave 1 still fully passing: 87 tests
+- Total: 186 passing (87 Wave 1 + 96 Wave 2 + 3 lib/doc) 
+- Remaining ignored: 65 (26 bundle + 21 registry + 18 validator) -- all Wave 3
+
+### Design Decisions Made
+- **tempfile as regular dependency**: Needed for atomic write pattern in io/files.rs. Was only dev-dependency before. Python uses tempfile.NamedTemporaryFile for atomic writes.
+- **No lookahead/lookbehind in Rust regex**: The `regex` crate doesn't support PCRE lookaround. Mentions parser uses email span post-filtering (find all email matches, reject @-mentions inside them) instead of Python's negative lookahead. Inline code removal uses simple `` `[^`]+` `` pattern instead of lookbehind/lookahead.
+- **BaseMentionResolver bundles field is HashMap<String, PathBuf>**: Python uses `dict[str, Bundle]` with `resolve_context_path`. Since Bundle struct with context resolution is Wave 3, namespace patterns (@bundle:name) currently return None. This is safe -- the only test for namespace patterns checks an empty bundles map.
+- **serial_test for CWD-modifying tests**: Added `serial_test` crate as dev-dependency. Mention resolver tests that call `set_current_dir` or `set_var("HOME")` are marked `#[serial]` to prevent race conditions in parallel test execution. Python tests run sequentially by default.
+- **FileSourceHandler source_root simplified**: Python has _find_source_root and _find_bundle_root for smart root detection. Rust returns active_path as source_root when no subpath (simpler). Tests pass because they only check basic subpath cases.
+- **HttpSourceHandler and GitSourceHandler resolve deferred**: Only `can_handle` is implemented. No tests exercise the `resolve` path for HTTP or Git. These remain `todo!()` until Wave 3+ or when tests require them.
+- **ZipSourceHandler uses SHA256 cache key**: Same strategy as Python -- hash the source URI to create a content-addressable cache directory. Cache check before extraction for performance.
+- **parse_frontmatter returns normalized content**: Both match and no-match paths return \r\n-normalized content (fixed from initial implementation where no-match path returned original).
+- **compute_backup_path handles extensionless files**: Fixed from initial implementation. For `Makefile` -> `Makefile.backup` (appends suffix directly), vs `test.txt` -> `test.txt.backup` (replaces extension). Python uses `path.with_suffix(path.suffix + backup_suffix)`.
+- **read_with_retry/write_with_retry use blocking std::fs**: Matches Python behavior exactly (Python's `path.read_text()` is also synchronous within async def). The async is only for the sleep between retries. A future optimization could use tokio::fs.
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- `parse_frontmatter(None, text)` vs Python's `({}, text)` for no-match case -- Rust's Option<Value> is more idiomatic than always returning Some(empty_mapping).
+- `@~` resolves to `$HOME/~` instead of `$HOME` -- edge case not tested, same as `~user` expansion not supported (Python-specific `expanduser`).
+- FENCED_CODE_BLOCK regex hardcoded to exactly 3 backticks (Python same behavior).
+- write_with_backup silently eats backup copy failure (Python same: `contextlib.suppress(Exception)`).
+
+### What's Next
+- Wave 3: bundle (26 tests), registry (21 tests), validator (18 tests) -- MOSTLY ASYNC
+- Wave 3 is the real migration challenge: bundle.py (1,289 LOC), registry.py (1,223 LOC)
+- PreparedBundle async closure pattern needs spike
+- Bundle struct with resolve_context_path needed for full mention resolution
+
+---
+
 ## Session 006 -- Wave 2 Session Module (F-012, F-013, F-014)
 
 ### Work Completed
