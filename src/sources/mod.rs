@@ -9,12 +9,15 @@ pub mod resolver;
 pub mod zip;
 
 /// Status of a bundle source (for update checking).
-#[derive(Debug, Clone)]
+///
+/// `has_update` is `Some(true)` if an update is available, `Some(false)` if
+/// up to date, or `None` if the status could not be determined.
+#[derive(Debug, Clone, PartialEq)]
 pub struct SourceStatus {
     pub uri: String,
     pub current_version: Option<String>,
     pub latest_version: Option<String>,
-    pub has_update: bool,
+    pub has_update: Option<bool>,
 }
 
 /// Trait for source handlers that resolve URIs to local paths.

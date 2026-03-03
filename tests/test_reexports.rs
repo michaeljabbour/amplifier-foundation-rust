@@ -179,7 +179,7 @@ fn test_reexport_source_types() {
         uri: "file:///test".into(),
         current_version: None,
         latest_version: None,
-        has_update: false,
+        has_update: Some(false),
     };
     let _handler = FileSourceHandler::new();
 }

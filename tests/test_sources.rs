@@ -338,7 +338,10 @@ async fn test_resolver_resolve_file_uri() {
 
     let resolver = SimpleSourceResolver::with_base_path(tmp.path().to_path_buf());
     let uri = format!("file://{}", bundle_dir.display());
-    let resolved = resolver.resolve(&uri).await.expect("resolve should succeed");
+    let resolved = resolver
+        .resolve(&uri)
+        .await
+        .expect("resolve should succeed");
 
     assert_eq!(resolved.active_path, bundle_dir);
 }
@@ -387,7 +390,10 @@ async fn test_resolver_resolve_zip_file() {
 
     let resolver = SimpleSourceResolver::with_cache_dir(cache_dir.path().to_path_buf());
     let uri = format!("zip+file://{}", zip_path.display());
-    let resolved = resolver.resolve(&uri).await.expect("resolve should succeed");
+    let resolved = resolver
+        .resolve(&uri)
+        .await
+        .expect("resolve should succeed");
 
     assert!(resolved.active_path.join("bundle.yaml").exists());
 }
@@ -438,7 +444,10 @@ async fn test_resolver_add_handler_takes_priority() {
 
     // Resolve a file URI -- should hit the custom handler, not the default
     let uri = format!("file://{}", real_path.display());
-    let resolved = resolver.resolve(&uri).await.expect("resolve should succeed");
+    let resolved = resolver
+        .resolve(&uri)
+        .await
+        .expect("resolve should succeed");
 
     // The custom handler should have been used (returns fixed_path, not real_path)
     assert_eq!(resolved.active_path, custom_path);
