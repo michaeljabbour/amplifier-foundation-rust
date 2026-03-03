@@ -9,6 +9,48 @@ use serde_yaml_ng::{Mapping, Value};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
+/// Information about an available update for a registered bundle.
+///
+/// Returned by registry update-checking operations. Matches Python's
+/// `UpdateInfo` dataclass in `registry.py`.
+///
+/// This is the **bundle-level** update notification, produced when the registry
+/// determines that a newer version is available. It is distinct from
+/// [`SourceStatus`](crate::sources::SourceStatus) which is a **source-level**
+/// status check (may be unknown/tri-state). `UpdateInfo` represents a *confirmed*
+/// update — `available_version` is always known (non-optional).
+///
+/// Currently a data-only struct. Will be returned by `BundleRegistry` update-checking
+/// methods when full update workflow is implemented.
+///
+/// # Examples
+///
+/// ```
+/// use amplifier_foundation::UpdateInfo;
+///
+/// let info = UpdateInfo {
+///     name: "my-bundle".to_string(),
+///     current_version: Some("1.0.0".to_string()),
+///     available_version: "2.0.0".to_string(),
+///     uri: "git+https://github.com/org/my-bundle@main".to_string(),
+/// };
+/// assert_eq!(info.name, "my-bundle");
+/// assert_eq!(info.current_version.as_deref(), Some("1.0.0"));
+/// assert_eq!(info.available_version, "2.0.0");
+/// assert!(info.uri.starts_with("git+"));
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct UpdateInfo {
+    /// Name of the bundle with an update available.
+    pub name: String,
+    /// Currently installed version, if known.
+    pub current_version: Option<String>,
+    /// Version available for update (always known for confirmed updates).
+    pub available_version: String,
+    /// Source URI of the bundle.
+    pub uri: String,
+}
+
 /// Tracked state for a registered bundle.
 #[derive(Debug, Clone)]
 pub struct BundleState {

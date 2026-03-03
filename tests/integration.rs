@@ -1218,3 +1218,133 @@ fn test_registry_deterministic_ordering() {
         "consecutive saves should produce identical output"
     );
 }
+
+// =============================================================================
+// UpdateInfo
+// =============================================================================
+
+#[test]
+fn test_update_info_creation() {
+    use amplifier_foundation::UpdateInfo;
+
+    let info = UpdateInfo {
+        name: "foundation".to_string(),
+        current_version: Some("1.0.0".to_string()),
+        available_version: "2.0.0".to_string(),
+        uri: "git+https://github.com/microsoft/amplifier-foundation@main".to_string(),
+    };
+    assert_eq!(info.name, "foundation");
+    assert_eq!(info.current_version.as_deref(), Some("1.0.0"));
+    assert_eq!(info.available_version, "2.0.0");
+    assert!(info.uri.contains("amplifier-foundation"));
+}
+
+#[test]
+fn test_update_info_no_current_version() {
+    use amplifier_foundation::UpdateInfo;
+
+    let info = UpdateInfo {
+        name: "new-bundle".to_string(),
+        current_version: None,
+        available_version: "1.0.0".to_string(),
+        uri: "file:///tmp/new-bundle".to_string(),
+    };
+    assert!(info.current_version.is_none());
+    assert_eq!(info.available_version, "1.0.0");
+}
+
+#[test]
+fn test_update_info_equality() {
+    use amplifier_foundation::UpdateInfo;
+
+    let info1 = UpdateInfo {
+        name: "test".to_string(),
+        current_version: Some("1.0".to_string()),
+        available_version: "2.0".to_string(),
+        uri: "test://uri".to_string(),
+    };
+    let info2 = info1.clone();
+    assert_eq!(info1, info2);
+
+    let info3 = UpdateInfo {
+        name: "test".to_string(),
+        current_version: Some("1.0".to_string()),
+        available_version: "3.0".to_string(), // different
+        uri: "test://uri".to_string(),
+    };
+    assert_ne!(info1, info3);
+}
+
+#[test]
+fn test_update_info_debug() {
+    use amplifier_foundation::UpdateInfo;
+
+    let info = UpdateInfo {
+        name: "debug-test".to_string(),
+        current_version: None,
+        available_version: "1.0.0".to_string(),
+        uri: "file:///test".to_string(),
+    };
+    let debug_str = format!("{:?}", info);
+    assert!(debug_str.contains("debug-test"));
+    assert!(debug_str.contains("1.0.0"));
+}
+
+#[test]
+fn test_update_info_serialization_roundtrip() {
+    use amplifier_foundation::UpdateInfo;
+
+    let info = UpdateInfo {
+        name: "roundtrip".to_string(),
+        current_version: Some("1.0.0".to_string()),
+        available_version: "2.0.0".to_string(),
+        uri: "git+https://github.com/org/repo@main".to_string(),
+    };
+
+    let json = serde_json::to_string(&info).unwrap();
+    let deserialized: UpdateInfo = serde_json::from_str(&json).unwrap();
+    assert_eq!(info, deserialized);
+}
+
+#[test]
+fn test_update_info_serialization_null_version() {
+    use amplifier_foundation::UpdateInfo;
+
+    let info = UpdateInfo {
+        name: "no-version".to_string(),
+        current_version: None,
+        available_version: "1.0.0".to_string(),
+        uri: "file:///test".to_string(),
+    };
+
+    let json = serde_json::to_string(&info).unwrap();
+    assert!(json.contains("\"current_version\":null"));
+    let deserialized: UpdateInfo = serde_json::from_str(&json).unwrap();
+    assert_eq!(info, deserialized);
+}
+
+#[test]
+fn test_update_info_hashable() {
+    use amplifier_foundation::UpdateInfo;
+    use std::collections::HashSet;
+
+    let info1 = UpdateInfo {
+        name: "a".to_string(),
+        current_version: None,
+        available_version: "1.0".to_string(),
+        uri: "file:///a".to_string(),
+    };
+    let info2 = info1.clone();
+    let info3 = UpdateInfo {
+        name: "b".to_string(),
+        current_version: None,
+        available_version: "1.0".to_string(),
+        uri: "file:///b".to_string(),
+    };
+
+    let mut set = HashSet::new();
+    set.insert(info1);
+    set.insert(info2); // duplicate, should not increase size
+    set.insert(info3);
+    assert_eq!(set.len(), 2);
+}

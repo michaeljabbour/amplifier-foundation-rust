@@ -183,3 +183,19 @@ fn test_reexport_source_types() {
     };
     let _handler = FileSourceHandler::new();
 }
+
+// =============================================================================
+// UpdateInfo
+// =============================================================================
+
+#[test]
+fn test_reexport_update_info() {
+    let info = UpdateInfo {
+        name: "my-bundle".into(),
+        current_version: Some("1.0.0".into()),
+        available_version: "2.0.0".into(),
+        uri: "git+https://github.com/org/my-bundle@main".into(),
+    };
+    assert_eq!(info.name, "my-bundle");
+    assert_eq!(info.available_version, "2.0.0");
+}

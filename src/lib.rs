@@ -61,7 +61,7 @@ pub mod updates;
 
 // -- Core classes --
 pub use bundle::Bundle;
-pub use registry::{BundleRegistry, BundleState};
+pub use registry::{BundleRegistry, BundleState, UpdateInfo};
 
 // -- Errors --
 pub use error::{BundleError, Result};
