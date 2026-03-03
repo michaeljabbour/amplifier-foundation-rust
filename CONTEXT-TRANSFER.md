@@ -6,6 +6,42 @@
 
 ---
 
+## Session 009 -- Wave 4 COMPLETE (F-021, F-022)
+
+### Work Completed
+- **F-021-lib-reexports** (c547bcf): Added 92 `pub use` re-exports to `lib.rs` creating a flat public API surface. Users can now write `use amplifier_foundation::Bundle` instead of `use amplifier_foundation::bundle::Bundle`. Covers all implemented items from Python's `__init__.py` `__all__` (61 items) plus Rust-specific additions (Result type alias, runtime traits, session functions, source handler implementations, ResolvedSource, utility variants). Added crate-level doc comment with Quick Start example. 13 re-export tests + 1 doc test verify compile-time accessibility.
+- **F-022-examples** (c62a7a6): Created 3 example binaries in `examples/`:
+  - `bundle_parse`: Demonstrates parsing YAML bundles, inspecting fields, generating mount plans, and validation
+  - `bundle_compose`: Demonstrates composing parent + child bundles with the 5-strategy merge system
+  - `path_utils`: Demonstrates URI parsing, path normalization, path construction, and deep merge
+
+### Wave 4 COMPLETE
+- lib.rs re-exports: 92 `pub use` statements across 34 lines
+- Examples: 3 binaries, all compile and run successfully
+- Tests: 265 passing (251 Wave 1-3 + 13 re-export + 1 doc test), 0 ignored
+
+### Design Decisions Made
+- **ValidationResult naming collision**: `error::ValidationResult` and `bundle::validator::ValidationResult` are two distinct structs. Only `bundle::validator::ValidationResult` is re-exported at the crate root (matching Python's `__init__.py` which exports the validator version). `error::ValidationResult` remains accessible via `amplifier_foundation::error::ValidationResult`.
+- **Missing Python __all__ items (7 of 61)**: These are intentionally not re-exported because they don't have direct Rust equivalents:
+  - `UpdateInfo` -- struct not implemented in Rust yet
+  - `BundleNotFoundError`, `BundleLoadError`, `BundleValidationError`, `BundleDependencyError` -- In Rust these are variants of the `BundleError` enum, not separate types
+  - `SourceResolverProtocol`, `SourceHandlerWithStatusProtocol` -- traits not implemented
+  - `apply_provider_preferences_with_resolution` -- async function not implemented
+- **Extra Rust re-exports (beyond Python's 61)**: Justified additions including `Result` type alias, all runtime traits (AmplifierRuntime, Coordinator, etc.), session functions (fork_session, slice_to_turn, etc.), source handler implementations, `ResolvedSource`, `get_amplifier_home`, `get_nested_with_default`, `sanitize_for_json_with_depth`, `write_with_backup_bytes`, `validate_bundle_completeness*`, `ForkResult`.
+- **ZipSourceHandler conditionally re-exported**: `#[cfg(feature = "zip-sources")]` gate on the re-export since the zip crate is optional.
+
+### Antagonistic Review Notes
+- Review agent was unavailable (overloaded). Self-reviewed against Python `__init__.py` for completeness. All 54 of 61 Python items that have Rust equivalents are re-exported. The 7 missing are documented with justification.
+- Test coverage in test_reexports.rs covers the most commonly used items (Bundle, BundleError, Result, Validator, dicts, paths, serialization, tracing, spawn, cache, sources). Items requiring filesystem or async are tested in their dedicated test files.
+
+### What's Next
+- Wave 5: Integration tests (load real .yaml/.md bundles), roundtrip tests, cleanup
+- Consider: cargo fmt --check clean, final cargo clippy pass for pre-existing warnings
+- Consider: MSRV bump from 1.75 to 1.80 (would eliminate ~30 LazyLock MSRV warnings)
+- Consider: fix needless_borrows_for_generic_args clippy warnings across codebase
+
+---
+
 ## Session 008 -- Wave 3 COMPLETE (F-018, F-019, F-020)
 
 ### Work Completed

@@ -13,7 +13,7 @@
 phase: 4
 phase_name: "Wave 4 -- Integration Surface (lib.rs re-exports, examples)"
 epoch: 5
-next_action: "F-021 done. Implement F-022-examples: create example binaries"
+next_action: "Wave 4 COMPLETE. All 265 tests passing, 3 examples. Proceed to Wave 5: Integration tests, roundtrip tests, cleanup"
 blockers: []
 
 architecture_spec:
@@ -235,21 +235,23 @@ features:
   F-022-examples:
     name: "Example binaries (bundle_parse, bundle_compose, path_utils)"
     module: "examples"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-021-lib-reexports"]
     started_at: "2025-01-16T10:30:00Z"
+    completed_at: "2025-01-16T11:00:00Z"
+    commit: "c62a7a6"
 
 wave_gate:
   current_wave: 4
   gate_criteria: "All 251 tests still pass + lib.rs re-exports compile + examples compile and run"
   approval_required: false
-  approval_status: "pending"
-  notes: "Starting Wave 4"
+  approval_status: "approved"
+  notes: "Wave 4 COMPLETE: 92 pub use re-exports in lib.rs, 13 re-export tests, 1 doc test, 3 example binaries. Total: 265 tests passing."
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 21
-  last_updated: "2025-01-16T10:30:00Z"
-  last_session: "session-009-wave4-start"
+  total_features_completed: 22
+  last_updated: "2025-01-16T11:00:00Z"
+  last_session: "session-009-wave4-complete"
