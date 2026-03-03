@@ -69,15 +69,6 @@ impl ProviderPreference {
     }
 }
 
-/// Result of resolving a model pattern.
-#[derive(Debug, Clone)]
-pub struct ModelResolutionResult {
-    pub resolved_model: String,
-    pub pattern: Option<String>,
-    pub available_models: Option<Vec<String>>,
-    pub matched_models: Option<Vec<String>>,
-}
-
 /// Build a lookup dict mapping provider names to indices.
 ///
 /// For each provider, indexes by:

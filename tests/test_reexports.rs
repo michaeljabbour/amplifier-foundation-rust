@@ -146,12 +146,6 @@ fn test_reexport_spawn() {
     assert!(is_glob_pattern("claude-*"));
     assert!(!is_glob_pattern("gpt-4"));
 
-    let _result: ModelResolutionResult = ModelResolutionResult {
-        resolved_model: "gpt-4".into(),
-        pattern: None,
-        available_models: None,
-        matched_models: None,
-    };
 }
 
 // =============================================================================

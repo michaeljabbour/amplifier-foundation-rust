@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 11
-phase_name: "Wave 11 -- Advanced Module Infrastructure (ModuleActivator, BundleModuleResolver, format_context_block)"
-epoch: 12
-next_action: "Wave 11 COMPLETE. 440 tests passing, 0 clippy warnings, cargo fmt clean. Consider: PreparedBundle port, PyO3 bindings, format_context_block integration into load_mentions, concrete SourceHandlerWithStatus impl"
+phase: 12
+phase_name: "Wave 12 -- Doctest fix, Git status handler, Update system wiring"
+epoch: 13
+next_action: "Implementing F-044 (fix doctest + cleanup dead code)"
 blockers: []
 
 architecture_spec:
@@ -442,12 +442,34 @@ features:
     completed_at: "2025-01-19T04:00:00Z"
     commit: "bc4c657"
 
+  F-044-doctest-cleanup:
+    name: "Fix failing ModuleActivator doctest + remove unused ModelResolutionResult"
+    module: "modules, spawn"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-043-module-activator"]
+    started_at: "2025-01-20T00:00:00Z"
+
+  F-045-git-status-handler:
+    name: "Implement SourceHandlerWithStatus on GitSourceHandler (git ls-remote status checking)"
+    module: "sources"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-033-git-resolve", "F-040-source-protocol-traits"]
+
+  F-046-wire-status-updates:
+    name: "Wire SourceHandlerWithStatus into check_bundle_status/update_bundle for git URIs"
+    module: "updates"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-045-git-status-handler"]
+
 wave_gate:
-  current_wave: 11
+  current_wave: 12
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
-  approval_status: "approved"
-  notes: "Wave 11 COMPLETE: 440 tests, 0 clippy warnings, cargo fmt clean. format_context_block, BundleModuleSource/BundleModuleResolver, ModuleActivator."
+  approval_status: "in-progress"
+  notes: "Wave 12: Fix doctest, Git status handler, wire into update system."
 
 meta:
   project: "amplifier-foundation-rs"

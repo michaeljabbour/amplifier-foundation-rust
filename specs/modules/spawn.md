@@ -30,14 +30,6 @@ impl ProviderPreference {
     pub fn from_list(data: &[Value]) -> Vec<Self>;
 }
 
-/// Result of resolving a model pattern.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ModelResolutionResult {
-    pub provider: String,
-    pub model: String,
-    pub was_glob: bool,
-}
-
 /// Apply provider preferences to session config (sync version).
 /// Modifies session config to inject provider/model selection.
 /// Tries each preference in order until finding an available provider.

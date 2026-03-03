@@ -41,6 +41,7 @@ use crate::sources::resolver::SimpleSourceResolver;
 ///
 /// ```no_run
 /// use amplifier_foundation::modules::activator::ModuleActivator;
+/// use amplifier_foundation::ModuleActivate; // trait provides activate()
 ///
 /// # async fn example() -> amplifier_foundation::Result<()> {
 /// let activator = ModuleActivator::new(None, false, None);
