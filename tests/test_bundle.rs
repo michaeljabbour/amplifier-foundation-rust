@@ -1713,6 +1713,7 @@ fn test_mention_resolver_namespace_resolution() {
     let resolver = amplifier_foundation::BaseMentionResolver {
         base_path: tmp.path().to_path_buf(),
         bundles,
+        context: indexmap::IndexMap::new(),
     };
 
     // @foundation:context should resolve to foundation/context.md
@@ -1727,6 +1728,7 @@ fn test_mention_resolver_namespace_not_found() {
     let resolver = amplifier_foundation::BaseMentionResolver {
         base_path: PathBuf::from("/tmp"),
         bundles: HashMap::new(),
+        context: indexmap::IndexMap::new(),
     };
 
     // Unknown namespace should return None

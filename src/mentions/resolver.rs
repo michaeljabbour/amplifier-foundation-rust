@@ -1,16 +1,36 @@
+use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Base implementation of MentionResolver.
 ///
 /// Supports patterns:
-/// - `@bundle-name:context-name` -- From bundle's context namespace (returns None if not found)
+/// - `@bundle-name:context-name` -- From bundle's context namespace
+///   (checks context dict first, then falls back to base path join)
 /// - `@path` -- Relative to base_path (project/workspace directory)
 /// - `@~/path` -- Relative to user's home directory
 /// - `@./path` -- Explicit relative path from base_path
+///
+/// The `context` field holds the composed bundle's context dict. When resolving
+/// `@namespace:name`, the resolver first checks `context.get(name)` for an
+/// exact match (matching Python's `Bundle.resolve_context_path` behavior),
+/// then falls back to `bundles[namespace].join(name)`.
 pub struct BaseMentionResolver {
     pub base_path: PathBuf,
     pub bundles: HashMap<String, PathBuf>,
+    /// Shared context dict from the composed bundle.
+    /// Uses `IndexMap` to match `Bundle.context` type and preserve insertion order
+    /// (Python dict semantics).
+    ///
+    /// When resolving `@namespace:name`, this dict is checked first for an
+    /// exact match on `name` — the lookup is **namespace-agnostic**. This means
+    /// `@foundation:overview` and `@otherns:overview` both resolve to the same
+    /// context-dict entry. This matches Python behavior where all bundle copies
+    /// in the resolver share the SAME composed context dict.
+    ///
+    /// Populated by `BundleSystemPromptFactory` from the composed bundle's
+    /// context field. Empty by default (preserves backward compatibility).
+    pub context: IndexMap<String, PathBuf>,
 }
 
 impl Default for BaseMentionResolver {
@@ -25,6 +45,7 @@ impl BaseMentionResolver {
         Self {
             base_path: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
             bundles: HashMap::new(),
+            context: IndexMap::new(),
         }
     }
 
@@ -33,6 +54,7 @@ impl BaseMentionResolver {
         Self {
             base_path,
             bundles: HashMap::new(),
+            context: IndexMap::new(),
         }
     }
 
@@ -41,6 +63,7 @@ impl BaseMentionResolver {
         Self {
             base_path: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
             bundles,
+            context: IndexMap::new(),
         }
     }
 
@@ -53,21 +76,37 @@ impl BaseMentionResolver {
 
         let mention_body = &mention[1..]; // Remove @ prefix
 
-        // Pattern 1: @namespace:path — resolve relative to namespace base path
+        // Pattern 1: @namespace:name — resolve via context dict then namespace base path
         if mention_body.contains(':') {
             let (namespace, rel_path) = match mention_body.split_once(':') {
                 Some((ns, path)) => (ns, path),
                 None => return None,
             };
-            if let Some(ns_base) = self.bundles.get(namespace) {
-                let path = ns_base.join(rel_path);
-                if path.exists() {
-                    return Some(path);
+
+            // Check if namespace is registered
+            if self.bundles.contains_key(namespace) {
+                // Step 1: Check context dict for exact match on rel_path
+                // (matches Python's Bundle.resolve_context_path step 1)
+                if let Some(path) = self.context.get(rel_path) {
+                    return Some(path.clone());
                 }
-                // Try with .md extension
-                let path_md = ns_base.join(format!("{rel_path}.md"));
-                if path_md.exists() {
-                    return Some(path_md);
+
+                // Step 2: Try namespace base path join with existence check.
+                // Note: Python calls construct_context_path(base_path, name) which strips
+                // leading '/' from name. Rust uses PathBuf::join which treats leading '/'
+                // as absolute. This is a pre-existing divergence from F-016 (before F-063).
+                // The .md extension fallback below is also a Rust-specific enhancement
+                // that Python's resolve_context_path does not have.
+                if let Some(ns_base) = self.bundles.get(namespace) {
+                    let path = ns_base.join(rel_path);
+                    if path.exists() {
+                        return Some(path);
+                    }
+                    // Try with .md extension
+                    let path_md = ns_base.join(format!("{rel_path}.md"));
+                    if path_md.exists() {
+                        return Some(path_md);
+                    }
                 }
             }
             return None;

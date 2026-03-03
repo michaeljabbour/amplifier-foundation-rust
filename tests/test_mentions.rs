@@ -620,3 +620,122 @@ fn test_format_context_block_with_real_files() {
     let canonical = fs::canonicalize(&file_path).unwrap();
     assert!(result.contains(&canonical.display().to_string()));
 }
+
+// ==========================================================================
+// BaseMentionResolver -- context dict namespace resolution (F-063)
+// ==========================================================================
+
+#[test]
+fn test_resolve_namespace_via_context_dict() {
+    // When context dict has an entry for the name, it should resolve directly
+    // without checking the filesystem (matching Python's resolve_context_path)
+    let mut bundles = HashMap::new();
+    bundles.insert("foundation".to_string(), PathBuf::from("/nonexistent/base"));
+
+    let mut context = indexmap::IndexMap::new();
+    context.insert(
+        "overview".to_string(),
+        PathBuf::from("/custom/path/overview.md"),
+    );
+
+    let resolver = BaseMentionResolver {
+        base_path: PathBuf::from("/some/base"),
+        bundles,
+        context,
+    };
+
+    // @foundation:overview should resolve via context dict, not base_path join
+    let result = resolver.resolve("@foundation:overview");
+    assert_eq!(result, Some(PathBuf::from("/custom/path/overview.md")));
+}
+
+#[test]
+fn test_resolve_namespace_context_dict_takes_priority() {
+    // Context dict should take priority over base_path join even when file exists
+    let tmp = tempfile::tempdir().unwrap();
+    let ns_base = tmp.path().join("ns");
+    std::fs::create_dir_all(ns_base.join("docs")).unwrap();
+    std::fs::write(ns_base.join("docs").join("guide.md"), "base path guide").unwrap();
+
+    let mut bundles = HashMap::new();
+    bundles.insert("myns".to_string(), ns_base.join("docs"));
+
+    let custom_path = tmp.path().join("custom_guide.md");
+    std::fs::write(&custom_path, "custom guide").unwrap();
+
+    let mut context = indexmap::IndexMap::new();
+    context.insert("guide.md".to_string(), custom_path.clone());
+
+    let resolver = BaseMentionResolver {
+        base_path: PathBuf::from("/irrelevant"),
+        bundles,
+        context,
+    };
+
+    // @myns:guide.md should resolve to custom path from context dict, not ns_base/guide.md
+    let result = resolver.resolve("@myns:guide.md");
+    assert_eq!(result, Some(custom_path));
+}
+
+#[test]
+fn test_resolve_namespace_falls_back_to_base_path_when_not_in_context() {
+    // When context dict doesn't have the name, fall back to base_path join
+    let tmp = tempfile::tempdir().unwrap();
+    let ns_base = tmp.path().join("ns");
+    std::fs::create_dir_all(&ns_base).unwrap();
+    std::fs::write(ns_base.join("readme.md"), "readme content").unwrap();
+
+    let mut bundles = HashMap::new();
+    bundles.insert("myns".to_string(), ns_base.clone());
+
+    // Context dict has a different key, not "readme.md"
+    let mut context = indexmap::IndexMap::new();
+    context.insert("other".to_string(), PathBuf::from("/other/path"));
+
+    let resolver = BaseMentionResolver {
+        base_path: PathBuf::from("/irrelevant"),
+        bundles,
+        context,
+    };
+
+    // @myns:readme.md should fall back to ns_base/readme.md
+    let result = resolver.resolve("@myns:readme.md");
+    assert_eq!(result, Some(ns_base.join("readme.md")));
+}
+
+#[test]
+fn test_resolve_namespace_empty_context_preserves_old_behavior() {
+    // With empty context (default), behavior should be exactly as before F-063
+    let tmp = tempfile::tempdir().unwrap();
+    let ns_base = tmp.path().join("ns");
+    std::fs::create_dir_all(&ns_base).unwrap();
+    std::fs::write(ns_base.join("file.txt"), "content").unwrap();
+
+    let mut bundles = HashMap::new();
+    bundles.insert("ns".to_string(), ns_base.clone());
+
+    let resolver = BaseMentionResolver::with_bundles(bundles);
+
+    let result = resolver.resolve("@ns:file.txt");
+    assert_eq!(result, Some(ns_base.join("file.txt")));
+}
+
+#[test]
+fn test_resolve_namespace_unknown_namespace_returns_none() {
+    // Unknown namespace should still return None even if context has the key
+    let mut context = indexmap::IndexMap::new();
+    context.insert(
+        "overview".to_string(),
+        PathBuf::from("/path/to/overview.md"),
+    );
+
+    let resolver = BaseMentionResolver {
+        base_path: PathBuf::from("/base"),
+        bundles: HashMap::new(), // No namespaces registered
+        context,
+    };
+
+    // @unknown:overview should return None because "unknown" is not in bundles
+    let result = resolver.resolve("@unknown:overview");
+    assert!(result.is_none());
+}

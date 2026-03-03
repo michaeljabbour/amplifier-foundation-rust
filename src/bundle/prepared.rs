@@ -4,14 +4,6 @@
 //! Provides system prompt factory creation for dynamic @mention resolution.
 //!
 //! Port of Python `PreparedBundle` from `bundle.py:845-979`.
-//!
-//! **Known limitation:** Namespace mention resolution (`@ns:path`) resolves
-//! against `base_path.join(path)` only. Python's `resolve_context_path` also
-//! checks the bundle's `context` dict for exact-name matches before falling
-//! back to base_path. This means bundles with non-standard context paths
-//! (e.g., `context: { overview: /custom/path/overview.md }`) won't resolve
-//! via `@ns:overview`. Pre-existing limitation from `BaseMentionResolver`
-//! design (F-016). Enhancement tracked for future work.
 
 use crate::bundle::module_resolver::BundleModuleResolver;
 use crate::bundle::Bundle;
@@ -170,9 +162,10 @@ impl SystemPromptFactory for BundleSystemPromptFactory {
 
             let combined_instruction = instruction_parts.join("\n\n---\n\n");
 
-            // Build resolver with namespace bundles and session cwd
+            // Build resolver with namespace bundles, shared context dict, and session cwd
             let resolver = BaseMentionResolver {
                 bundles: self.bundles_for_resolver.clone(),
+                context: self.bundle.context.clone(),
                 base_path: self.base_path.clone(),
             };
 

@@ -623,17 +623,20 @@ features:
   F-062-bundle-decompose:
     name: "Decompose bundle/mod.rs (918 lines) into focused submodules"
     module: "bundle"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-061-prepared-bundle"]
     started_at: "2025-01-26T00:00:00Z"
+    completed_at: "2025-01-26T00:30:00Z"
+    commit: "c2d86ff"
 
   F-063-mention-resolver-context:
     name: "Enhance BaseMentionResolver for context-dict namespace lookup"
     module: "mentions, bundle"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-061-prepared-bundle"]
+    started_at: "2025-01-26T00:35:00Z"
 
   F-064-async-prompt-io:
     name: "Replace blocking std::fs with tokio::fs in BundleSystemPromptFactory"
