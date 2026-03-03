@@ -6,6 +6,67 @@
 
 ---
 
+## Session 024 -- Wave 19 COMPLETE (F-065, F-066, F-067)
+
+### Work Completed
+- **F-065-async-mentions-loader** (a4d1fad): Full async migration of mentions/loader.rs. `resolve_mention` converted to async via `Box::pin` recursive pattern. `std::fs::read_to_string` → `tokio::fs::read_to_string`. `path.is_dir()` → `tokio::fs::metadata().await`. New `format_directory_listing_async` function using `tokio::fs::read_dir` with proper error-skipping loop (`match` instead of `while let Ok` to match sync `.flatten()` behavior). Sync `format_directory_listing` kept for backward compat. `format_context_block` unchanged (sync, no I/O). Updated stale comment in prepared.rs that incorrectly claimed load_mentions still used blocking I/O.
+- **F-066-async-registry-loader** (0535b13): Async migration of registry/loader.rs. `load_from_path`, `load_yaml_bundle`, `load_markdown_bundle` all converted to async. `std::fs::read_to_string` → `tokio::fs::read_to_string`. `path.is_dir()`/`.exists()` → `tokio::fs::metadata().await`. Also fixed blocking `is_file()` in `load_single_with_chain` and `preload_namespace_bundles`. All 3 call sites of `load_from_path` updated to `.await`.
+- **F-067-async-io-files** (bc113a4): Async migration of io/files.rs. `read_with_retry`: `std::fs::read_to_string` → `tokio::fs::read_to_string`. `write_with_retry`: `std::fs::write` → `tokio::fs::write`, `std::fs::create_dir_all` → `tokio::fs::create_dir_all`. Removed TOCTOU check (`parent.exists()` before `create_dir_all`) since `create_dir_all` is idempotent. Added 6 new async tests. Sync backup functions unchanged (tempfile crate requires sync).
+
+### Wave 19 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- Tests: 601 passing (595 + 6 new), 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **`resolve_mention` takes `mention: String` (owned), not `&'a str`**: Required for recursive async. Inside the `async move` block, nested `String` variables from `parse_mentions` are local and cannot satisfy `&'a str` bounds. Since `parse_mentions` already returns `Vec<String>`, this requires zero extra allocations.
+- **`+ Send` bound on resolve_mention future**: Required because `BundleSystemPromptFactory::create` returns `BoxFuture<'_, String>` (which is `Pin<Box<dyn Future + Send + 'a>>`), and it awaits `load_mentions`.
+- **`format_directory_listing_async` uses `loop { match }` not `while let Ok(Some(...))`**: `while let Ok(Some(entry))` terminates the entire loop on the first `Err`, unlike sync `.flatten()` which skips individual errors. The `loop { match }` with `Err(_) => continue` matches the sync behavior.
+- **`load_from_path` uses native `async fn` (not `Pin<Box<dyn Future>>`)**: Non-recursive, so doesn't need the `Box::pin` pattern. The `load_single_with_chain` caller already returns `Pin<Box<dyn Future>>` and can call `.await` on the async method.
+- **`tokio::fs::metadata().await.is_ok()` replaces `.exists()`**: Semantically identical — `Path::exists()` calls `fs::metadata()` internally and returns `false` on any error. Pre-existing TOCTOU between check and read (same as Python).
+- **`create_dir_all` called unconditionally (no `metadata` guard)**: `create_dir_all` is idempotent — succeeds silently if directory already exists. The `parent.exists()` check was a pointless TOCTOU that added latency and complexity. Removed.
+- **Sync backup functions kept sync**: `write_with_backup`, `write_with_backup_bytes`, `write_atomic_bytes` use `tempfile::Builder` for atomic writes. The tempfile crate doesn't have async support, and the atomic rename is inherently sync.
+
+### Antagonistic Review Issues Found & Fixed
+- F-065: `while let Ok(Some(entry))` terminates on error vs sync `.flatten()` skips errors → changed to `loop { match }` pattern (P1)
+- F-065: Stale comment in prepared.rs "still uses blocking I/O" → updated to reflect F-065 migration (P1)
+- F-066: `local_path.is_file()` blocking in `load_single_with_chain` async block → `tokio::fs::metadata` (P1)
+- F-066: `local_path.is_file()` blocking in `preload_namespace_bundles` → `tokio::fs::metadata` (P1)
+- F-067: `let _ =` on `create_dir_all` swallows errors → kept as pre-existing behavior (documented)
+- F-067: TOCTOU metadata check before `create_dir_all` → removed (idempotent) (P2)
+- F-067: Zero test coverage for async functions → added 6 new tests (P1)
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-065: `MentionResolver::resolve()` still uses sync `path.exists()` checks — pre-existing, making MentionResolver async would be a larger trait change
+- F-066: `find_nearest_bundle_file` does blocking I/O (canonicalize, exists) in async context — larger refactor, pre-existing
+- F-066: `resolve_include_source` has blocking I/O, called from async `compose_includes` — pre-existing
+- F-066: `Pin<Box<dyn Future + 'a>>` returns are not `+ Send` — pre-existing, requires `tokio::sync` locks to fix
+- F-066: `persistence.rs` remains fully blocking (save/load registry.json) — pre-existing, small files
+- F-067: `let _ =` on create_dir_all swallows errors — pre-existing pattern matching Python's best-effort semantics
+
+### Remaining Blocking I/O in Async Contexts
+- `find_nearest_bundle_file`: 2x `canonicalize` + 2x `exists` per directory level (registry/includes.rs)
+- `resolve_include_source`: `is_file()`, `find_resource_path()` with `exists()` (registry/includes.rs)
+- `persistence.rs`: `save()` with `std::fs::create_dir_all` + `std::fs::write` (registry/persistence.rs)
+- `MentionResolver::resolve()`: `path.exists()` calls (mentions/resolver.rs)
+- `Bundle::load_agent_metadata()`: `std::fs::read_to_string` (bundle/agent_meta.rs) — sync function, not called from async
+- `write_with_backup`/`write_atomic_bytes`: sync by design (tempfile crate)
+
+### What's Next
+- All 19 waves complete. 601 tests, 0 clippy warnings, 67 features delivered.
+- Primary async hot path (load_mentions, registry loader, io retry functions) is now fully async.
+- Remaining blocking I/O is in secondary paths (directory walking, include resolution, persistence).
+- Remaining unported PreparedBundle functionality:
+  - `create_session` (bundle.py:981-1109) — depends on AmplifierSession from amplifier_core
+  - `spawn` (bundle.py:1111-1289) — depends on AmplifierSession from amplifier_core
+- Consider: Async `find_nearest_bundle_file` (most impactful remaining blocking I/O)
+- Consider: Async persistence.rs (save/load are called from load_single)
+- Consider: PyO3 bindings (feature flag exists, no `#[pyclass]` code)
+- Consider: Benchmarks (bundle compose, cache operations, system prompt factory)
+
+---
+
 ## Session 023 -- Wave 18 COMPLETE (F-062, F-063, F-064)
 
 ### Work Completed
