@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 23
-phase_name: "Wave 23 -- DRY persistence, pyo3 abi3 fix, criterion benchmarks"
-epoch: 24
-next_action: "Wave 23 COMPLETE. 610 tests passing, 0 clippy warnings, cargo fmt clean. DRY persistence load, pyo3 abi3 fix + pymodule scaffold, criterion benchmarks. Consider: expand pyo3 bindings (Bundle, BundleRegistry), native Python dict deep_merge via pythonize, maturin build, HTTP SourceHandlerWithStatus."
+phase: 24
+phase_name: "Wave 24 -- Expand PyO3 bindings: pythonize, PyBundle, PyBundleValidator"
+epoch: 25
+next_action: "Implementing Wave 24: F-080 (pythonize + native dict deep_merge), F-081 (PyBundle class), F-082 (PyValidationResult + PyBundleValidator)"
 blockers: []
 
 architecture_spec:
@@ -796,12 +796,34 @@ features:
     completed_at: "2025-01-31T01:30:00Z"
     commit: "41ec3f3"
 
+  F-080-pythonize-deep-merge:
+    name: "Add pythonize crate + native Python dict deep_merge (replace JSON string interface)"
+    module: "pyo3_bindings"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-078-pyo3-abi3-fix"]
+    started_at: "2025-02-01T00:00:00Z"
+
+  F-081-pybundle:
+    name: "PyBundle class bindings (from_dict, to_dict, compose, to_mount_plan, properties)"
+    module: "pyo3_bindings"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-080-pythonize-deep-merge"]
+
+  F-082-pyvalidator:
+    name: "PyValidationResult + PyBundleValidator bindings (validate, validate_completeness)"
+    module: "pyo3_bindings"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-081-pybundle"]
+
 wave_gate:
-  current_wave: 23
-  gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
+  current_wave: 24
+  gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo clippy --features pyo3-bindings clean + cargo fmt clean"
   approval_required: false
-  approval_status: "approved"
-  notes: "Wave 23 COMPLETE: 610 tests (all passing), 0 clippy warnings, cargo fmt clean. DRY persistence load, pyo3 abi3 fix + pymodule scaffold, criterion benchmarks."
+  approval_status: "in-progress"
+  notes: "Wave 24 IN PROGRESS: Expanding PyO3 bindings with pythonize, PyBundle, PyBundleValidator."
 
 meta:
   project: "amplifier-foundation-rs"

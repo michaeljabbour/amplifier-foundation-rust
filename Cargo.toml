@@ -28,13 +28,14 @@ indexmap = { version = "2", features = ["serde"] }
 futures = "0.3"
 tempfile = "3"
 pyo3 = { version = "0.24", features = ["extension-module", "abi3-py39"], optional = true }
+pythonize = { version = "0.24", optional = true }
 
 [features]
 default = ["git", "http-sources", "zip-sources"]
 git = []
 http-sources = ["reqwest"]
 zip-sources = ["dep:zip"]
-pyo3-bindings = ["dep:pyo3"]
+pyo3-bindings = ["dep:pyo3", "dep:pythonize"]
 
 [dev-dependencies]
 tokio-test = "0.4"
