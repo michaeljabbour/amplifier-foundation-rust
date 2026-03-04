@@ -6,6 +6,86 @@
 
 ---
 
+## Session 031 -- Wave 26 COMPLETE (F-086, F-087, F-088)
+
+### Work Completed
+- **F-086-py-exceptions** (c68c2fc): Created Python exception hierarchy matching the Python library via `pyo3::create_exception!`: `BundleError` (base), `BundleNotFoundError`, `BundleLoadError`, `BundleValidationError`, `BundleDependencyError`. Added `bundle_error_to_pyerr` conversion function mapping all `BundleError` enum variants to proper Python exceptions. Fixed pre-existing bug: `validate_or_raise` and `validate_completeness_or_raise` now use `BundleError::ValidationError` variant (was `LoadError`). `ValidationError` conversion formats actual error messages, not just counts. Updated `from_dict` and validation functions to raise proper exceptions instead of `PyValueError`. Added docstrings to all exception classes. Registered all 5 exceptions in the Python module.
+- **F-087-py-utils** (73669b6): Added 4 new PyO3 utility function bindings: `sanitize_for_json(data, max_depth=None)` with `pyobject_to_json`/`json_to_pyobject` conversion helpers for serde_json::Value, `sanitize_message(message)` for LLM chat message sanitization, `merge_module_lists(parent, child)` with panic-safe FFI boundary (`catch_unwind` → `PyTypeError`), `format_directory_listing(path)`. Updated module docstring with exceptions and new functions.
+- **F-088-http-status-handler** (395a51b): Implemented `SourceHandlerWithStatus` trait on `HttpSourceHandler`. `get_status()` uses conditional HEAD with `If-None-Match`/`If-Modified-Since` headers from `.meta.json` sidecar. `download()` now captures ETag/Last-Modified from GET response headers (no separate HEAD needed — eliminates TOCTOU race). `update()` removes cache and delegates to `resolve()`. Wired HTTP handler into `check_bundle_status`, `update_bundle`, `check_bundle_status_for_bundle`, and `update_bundle_for_bundle`. 30s timeout on HEAD requests. Both conditional headers sent per RFC 7232 §3.3. Updated trait documentation. 4 new tests.
+
+### Wave 26 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- cargo clippy --all-targets --features pyo3-bindings: 0 warnings
+- cargo check --features pyo3-bindings: CLEAN
+- Tests: 614 passing (610 + 4 new), 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **Validator now uses `BundleError::ValidationError` variant**: Pre-existing bug fixed — `validate_or_raise()` and `validate_completeness_or_raise()` were using `LoadError` variant, causing `BundleLoadError` instead of `BundleValidationError` in Python. Now correctly maps to `BundleValidationError` with actual error messages.
+- **`bundle_error_to_pyerr` formats ValidationError with actual errors**: `ValidationResult::Display` only shows counts ("3 errors, 1 warnings"). The conversion function destructures the variant and formats `vr.errors.join("; ")` for useful exception messages.
+- **BundleError name collision documented**: `create_exception!` generates a `BundleError` struct that shadows `crate::error::BundleError`. Inside `bundle_error_to_pyerr`, the Rust enum is aliased as `BE`. Prominent comment warns about the shadowing.
+- **Exception classes have docstrings**: 4th arg to `create_exception!` provides Python `help()` text matching the Python library's docstrings.
+- **Breaking change from ValueError to custom exceptions**: `from_dict`, `validate_*_or_raise` now raise `BundleLoadError`/`BundleValidationError` instead of `PyValueError`. Accepted for 0.x semver.
+- **pyobject_to_yaml still raises PyValueError**: Generic conversion errors (not bundle-specific) correctly use `PyValueError`. `BundleLoadError` is for bundle operations only.
+- **merge_module_lists uses catch_unwind for panic safety**: The underlying Rust `merge_module_lists` panics on non-Mapping elements. The PyO3 binding catches the panic and converts to `PyTypeError`.
+- **format_directory_listing never raises**: Returns error messages as strings (faithful to Rust API). Documented in docstring.
+- **sanitize_for_json(max_depth=0) returns None**: Documented in docstring. Pre-existing Rust behavior.
+- **HTTP metadata saved during download() not update()**: `download()` captures ETag/Last-Modified from the GET response headers and writes `.meta.json`. No separate HEAD needed in `update()`, eliminating TOCTOU race where resource could change between GET and HEAD.
+- **Both conditional headers sent per RFC 7232 §3.3**: ETag (`If-None-Match`) and Last-Modified (`If-Modified-Since`) sent in the same request when both are available.
+- **HTTP status checking: 304=no update, 200=update, error=unknown**: Servers without conditional request support always return 200, which reports `has_update: Some(true)` — potential false positive for servers that don't support ETag/Last-Modified. Documented as acceptable since the alternative (content comparison) is much more expensive.
+
+### Antagonistic Review Issues Found & Fixed
+- F-086 P0: Validator returned `LoadError` instead of `ValidationError` — fixed variant
+- F-086 P0: `ValidationResult::Display` showed counts not errors — custom formatting
+- F-086 P1: Stale docstrings ("raises ValueError") — updated
+- F-086 P1: Exception docstrings missing — added 4th arg to `create_exception!`
+- F-086 P1: Name collision warning comment — added
+- F-086 P2: Collapsed `Io`/`Yaml`/`Http`/`Git` match arms
+- F-086 P3: `format!("{e}")` → `e.to_string()`
+- F-087 P1: `merge_module_lists` could panic on non-dict elements — added `catch_unwind`
+- F-087 P1: Dead `as_sequence()` check — changed to `.expect()`
+- F-087 P2: `max_depth=0` behavior documented
+- F-087 P2: `format_directory_listing` error behavior documented
+- F-088 P0: Bundle-level functions didn't dispatch to HTTP — wired in
+- F-088 P1: First `resolve()` didn't write metadata — `download()` now saves metadata
+- F-088 P1: TOCTOU: separate GET then HEAD in update — eliminated redundant HEAD
+- F-088 P2: `else if` prevented sending both conditional headers — changed to separate `if`
+- F-088 P2: Stale trait documentation — updated
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- pyobject_to_yaml/yaml_to_pyobject raise PyValueError (correct — generic conversion, not bundle-specific)
+- merge_module_lists rejects tuples (consistent with deep_merge accepting only PyDict)
+- format_directory_listing swallows errors as strings (faithful to Rust API)
+- HTTP download() has no timeout (pre-existing — HEAD has 30s, GET doesn't)
+- reqwest::Client::new() per-request (no connection reuse) — acceptable for current usage
+- No tests for 304/200 happy paths (would need HTTP mock server like wiremock)
+- Blocking std::fs in async context for metadata (consistent with git handler)
+- save_cache_metadata silently swallows write errors (consistent with git handler)
+
+### File Size Warning
+- `src/pyo3_bindings.rs`: ~1310 lines (exceeds 1000-line threshold). Should be decomposed in a future wave into submodules (exceptions, types, functions, helpers).
+
+### Module Registration
+- Exceptions: `BundleError`, `BundleNotFoundError`, `BundleLoadError`, `BundleValidationError`, `BundleDependencyError` (5 total)
+- Types: `ParsedURI`, `Bundle`, `ValidationResult`, `SourceStatus`, `ResolvedSource`, `ProviderPreference`, `SimpleCache`, `DiskCache` (8 total, unchanged)
+- Functions: `parse_uri`, `normalize_path`, `deep_merge`, `deep_merge_json`, `parse_mentions`, `generate_sub_session_id`, `validate_bundle`, `validate_bundle_completeness`, `validate_bundle_or_raise`, `validate_bundle_completeness_or_raise`, `apply_provider_preferences`, `is_glob_pattern`, `sanitize_for_json`, `sanitize_message`, `merge_module_lists`, `format_directory_listing` (16 total, was 12)
+
+### What's Next
+- All 26 waves complete. 614 tests, 0 clippy warnings, 88 features delivered.
+- PyO3 bindings: 8 types + 16 functions + 5 exceptions, native dict I/O via pythonize.
+- HTTP SourceHandlerWithStatus fills the last source handler gap.
+- Remaining architecture spec section 13 types NOT yet exposed:
+  - `BundleRegistry` — complex type with async methods, needs careful design
+  - `BundleValidator` — already exposed as functions; class wrapper is optional
+- `pyo3_bindings.rs` at ~1310 lines — flag for decomposition
+- Consider: maturin build + PyPI publishing
+- Consider: Python-side integration tests via maturin develop
+- Consider: PyO3 BundleRegistry bindings
+- Consider: Decompose pyo3_bindings.rs into submodules
+
+---
+
 ## Session 030 -- Wave 25 COMPLETE (F-083, F-084, F-085)
 
 ### Work Completed

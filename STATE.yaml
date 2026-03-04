@@ -13,7 +13,7 @@
 phase: 26
 phase_name: "Wave 26 -- BundleError exception hierarchy, PyO3 utility bindings, HTTP status handler"
 epoch: 27
-next_action: "Implement F-086 (BundleError exception hierarchy), F-087 (PyO3 utility bindings), F-088 (HTTP SourceHandlerWithStatus)"
+next_action: "Wave 26 COMPLETE. 614 tests passing, 0 clippy warnings, cargo fmt clean. 8 types + 16 functions + 5 exceptions exposed via PyO3. HTTP SourceHandlerWithStatus implemented. Consider: maturin build + PyPI, Python-side integration tests, BundleRegistry PyO3 bindings, pyo3_bindings.rs decomposition (1300+ lines)."
 blockers: []
 
 architecture_spec:
@@ -874,22 +874,24 @@ features:
     commit: "73669b6"
   F-088-http-status-handler:
     name: "Implement SourceHandlerWithStatus on HttpSourceHandler (HEAD + ETag/Last-Modified)"
-    module: "sources"
-    status: "in-progress"
+    module: "sources, updates"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-040-source-protocol-traits"]
     started_at: "2025-02-03T01:05:00Z"
+    completed_at: "2025-02-03T01:45:00Z"
+    commit: "395a51b"
 
 wave_gate:
   current_wave: 26
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo clippy --features pyo3-bindings clean + cargo fmt clean"
   approval_required: false
   approval_status: "approved"
-  notes: "Wave 25 COMPLETE: 610 tests (all passing), 0 clippy warnings, cargo fmt clean. 5 new PyO3 types + 2 new functions. 8 types + 12 functions total exposed."
+  notes: "Wave 26 COMPLETE: 614 tests (all passing), 0 clippy warnings, cargo fmt clean. PyO3: 5 exceptions + 4 new functions + 8 types = 16 functions + 8 types + 5 exceptions. HTTP SourceHandlerWithStatus implemented."
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 85
-  last_updated: "2025-02-02T00:30:00Z"
-  last_session: "session-030-wave25-pyo3-data-types"
+  total_features_completed: 88
+  last_updated: "2025-02-03T01:45:00Z"
+  last_session: "session-031-wave26-exceptions-utils-http"
