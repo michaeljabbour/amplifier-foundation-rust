@@ -14,6 +14,7 @@
 //! - `ProviderPreference` -- provider+model preference (frozen)
 //! - `SimpleCache` -- in-memory key-value cache
 //! - `DiskCache` -- filesystem-backed key-value cache
+//! - `ForkResult` -- result of a session fork operation (frozen)
 //!
 //! ## Exposed functions
 //!
@@ -45,6 +46,13 @@
 //! - `find_orphaned_tool_calls(messages)` -- find tool calls without results
 //! - `add_synthetic_tool_results(messages, ids)` -- add synthetic results for orphans
 //! - `get_turn_summary(messages, turn)` -- get summary dict for a turn
+//! - `fork_session(session_dir, ...)` -- fork a stored session at a turn
+//! - `fork_session_in_memory(messages, ...)` -- fork in-memory without disk I/O
+//! - `get_fork_preview(session_dir, turn)` -- preview a fork without creating files
+//! - `list_session_forks(session_dir)` -- list all forks of a session
+//! - `get_session_lineage(session_dir)` -- get full ancestor/child lineage
+//! - `count_events(events_path)` -- count events in events.jsonl
+//! - `get_event_summary(events_path)` -- get summary of events file
 //!
 //! ## Exposed exceptions
 //!
@@ -73,8 +81,9 @@ use functions::{
     validate_bundle_completeness, validate_bundle_completeness_or_raise, validate_bundle_or_raise,
 };
 use session::{
-    add_synthetic_tool_results, count_turns, find_orphaned_tool_calls, get_turn_boundaries,
-    get_turn_summary, slice_to_turn,
+    add_synthetic_tool_results, count_events, count_turns, find_orphaned_tool_calls, fork_session,
+    fork_session_in_memory, get_event_summary, get_fork_preview, get_session_lineage,
+    get_turn_boundaries, get_turn_summary, list_session_forks, slice_to_turn, PyForkResult,
 };
 use types::{
     PyBundle, PyDiskCache, PyParsedURI, PyProviderPreference, PyResolvedSource, PySimpleCache,
@@ -136,6 +145,9 @@ fn amplifier_foundation(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_nested_with_default, m)?)?;
     m.add_function(wrap_pyfunction!(set_nested, m)?)?;
 
+    // Session types
+    m.add_class::<PyForkResult>()?;
+
     // Session slice functions
     m.add_function(wrap_pyfunction!(count_turns, m)?)?;
     m.add_function(wrap_pyfunction!(get_turn_boundaries, m)?)?;
@@ -143,6 +155,17 @@ fn amplifier_foundation(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(find_orphaned_tool_calls, m)?)?;
     m.add_function(wrap_pyfunction!(add_synthetic_tool_results, m)?)?;
     m.add_function(wrap_pyfunction!(get_turn_summary, m)?)?;
+
+    // Session fork functions
+    m.add_function(wrap_pyfunction!(fork_session, m)?)?;
+    m.add_function(wrap_pyfunction!(fork_session_in_memory, m)?)?;
+    m.add_function(wrap_pyfunction!(get_fork_preview, m)?)?;
+    m.add_function(wrap_pyfunction!(list_session_forks, m)?)?;
+    m.add_function(wrap_pyfunction!(get_session_lineage, m)?)?;
+
+    // Session events functions
+    m.add_function(wrap_pyfunction!(count_events, m)?)?;
+    m.add_function(wrap_pyfunction!(get_event_summary, m)?)?;
     Ok(())
 }
 
