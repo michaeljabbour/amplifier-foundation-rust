@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 24
-phase_name: "Wave 24 -- Expand PyO3 bindings: pythonize, PyBundle, PyBundleValidator"
-epoch: 25
-next_action: "Wave 24 COMPLETE. 610 tests passing, 0 clippy warnings, cargo fmt clean. pythonize direct conversion, PyBundle class, PyValidationResult + validate functions. 3 types + 10 functions exposed. Consider: maturin build + PyPI, expand pyo3 (BundleRegistry, SourceStatus), HTTP SourceHandlerWithStatus."
+phase: 25
+phase_name: "Wave 25 -- Expand PyO3 bindings: SourceStatus, ProviderPreference, Cache"
+epoch: 26
+next_action: "Implement F-083 (PySourceStatus + PyResolvedSource), F-084 (PyProviderPreference + apply_provider_preferences), F-085 (PySimpleCache + PyDiskCache)"
 blockers: []
 
 architecture_spec:
@@ -826,16 +826,36 @@ features:
     completed_at: "2025-02-01T01:30:00Z"
     commit: "d7a8faf"
 
+  F-083-py-source-status:
+    name: "PySourceStatus + PyResolvedSource pyo3 bindings (frozen data classes)"
+    module: "pyo3_bindings"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-082-pyvalidator"]
+    started_at: "2025-02-02T00:00:00Z"
+  F-084-py-provider-pref:
+    name: "PyProviderPreference + apply_provider_preferences + is_glob_pattern bindings"
+    module: "pyo3_bindings"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-083-py-source-status"]
+  F-085-py-cache:
+    name: "PySimpleCache + PyDiskCache pyo3 bindings (CacheProvider trait)"
+    module: "pyo3_bindings"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-083-py-source-status"]
+
 wave_gate:
-  current_wave: 24
+  current_wave: 25
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo clippy --features pyo3-bindings clean + cargo fmt clean"
   approval_required: false
-  approval_status: "approved"
-  notes: "Wave 24 COMPLETE: 610 tests (all passing), 0 clippy warnings, cargo fmt clean. pythonize 0.24 direct conversion, PyBundle class, PyValidationResult, 4 validate functions, type-checked deep_merge. 3 types + 10 functions exposed."
+  approval_status: "pending"
+  notes: "Wave 25 in progress: expanding PyO3 bindings with SourceStatus, ResolvedSource, ProviderPreference, Cache types."
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
   total_features_completed: 82
-  last_updated: "2025-02-01T01:30:00Z"
-  last_session: "session-029-wave24-pyo3-expansion"
+  last_updated: "2025-02-02T00:00:00Z"
+  last_session: "session-030-wave25-pyo3-data-types"

@@ -193,7 +193,7 @@ pub fn normalize_path(path: &str, relative_to: Option<&Path>) -> PathBuf {
 }
 
 /// Result of resolving a source URI to local paths.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ResolvedSource {
     pub active_path: PathBuf,
     pub source_root: PathBuf,
