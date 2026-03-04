@@ -14,8 +14,7 @@
 //! # Quick Start
 //!
 //! ```rust
-//! use amplifier_foundation::{Bundle, BundleError};
-//! use serde_yaml_ng::Value;
+//! use amplifier_foundation::{Bundle, BundleError, Value};
 //!
 //! // Create a bundle from YAML data
 //! let yaml = r#"
@@ -65,6 +64,9 @@ mod pyo3_bindings;
 // -- Core classes --
 pub use bundle::Bundle;
 pub use registry::{BundleRegistry, BundleState, UpdateInfo};
+
+// -- YAML Value (re-export for convenience) --
+pub use serde_yaml_ng::Value;
 
 // -- Errors --
 pub use error::{BundleError, Result};
