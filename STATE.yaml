@@ -13,7 +13,7 @@
 phase: 23
 phase_name: "Wave 23 -- DRY persistence, pyo3 abi3 fix, criterion benchmarks"
 epoch: 24
-next_action: "Implementing Wave 23: F-077 DRY persistence load, F-078 pyo3 abi3 fix + pymodule scaffold, F-079 criterion benchmarks"
+next_action: "Wave 23 COMPLETE. 610 tests passing, 0 clippy warnings, cargo fmt clean. DRY persistence load, pyo3 abi3 fix + pymodule scaffold, criterion benchmarks. Consider: expand pyo3 bindings (Bundle, BundleRegistry), native Python dict deep_merge via pythonize, maturin build, HTTP SourceHandlerWithStatus."
 blockers: []
 
 architecture_spec:
@@ -787,23 +787,25 @@ features:
     commit: "2eadf53"
 
   F-079-criterion-benchmarks:
-    name: "Add criterion benchmarks for core operations (deep_merge, from_dict, compose, to_mount_plan)"
+    name: "Add criterion benchmarks for core operations (deep_merge, from_dict, compose, parse_mentions)"
     module: "all"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: []
     started_at: "2025-01-31T01:00:00Z"
+    completed_at: "2025-01-31T01:30:00Z"
+    commit: "41ec3f3"
 
 wave_gate:
   current_wave: 23
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo fmt clean"
   approval_required: false
-  approval_status: "in-progress"
-  notes: "Wave 23 in progress: DRY persistence, pyo3 abi3 fix, criterion benchmarks."
+  approval_status: "approved"
+  notes: "Wave 23 COMPLETE: 610 tests (all passing), 0 clippy warnings, cargo fmt clean. DRY persistence load, pyo3 abi3 fix + pymodule scaffold, criterion benchmarks."
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 78
-  last_updated: "2025-01-31T01:00:00Z"
+  total_features_completed: 79
+  last_updated: "2025-01-31T01:30:00Z"
   last_session: "session-028-wave23-dry-pyo3-benchmarks"

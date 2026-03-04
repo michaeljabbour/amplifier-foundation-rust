@@ -6,6 +6,79 @@
 
 ---
 
+## Session 028 -- Wave 23 COMPLETE (F-077, F-078, F-079)
+
+### Work Completed
+- **F-077-dry-persistence-load** (1902261): Extracted `apply_persisted_content()` helper from `persistence.rs` to DRY the duplicated JSON parse + bundle insertion logic between `load_persisted_state` (sync) and `load_persisted_state_async` (async). Return type uses `Result<(), Option<serde_json::Error>>` to distinguish: Ok = bundles applied, Err(None) = valid JSON but no "bundles" key (not an error), Err(Some(e)) = corrupt JSON (with full serde error detail). Async caller logs warning only on actual parse errors. Sync caller uses `let _ =` to signal deliberate discard. 4 new tests.
+- **F-078-pyo3-abi3-fix** (2eadf53): Added `abi3-py39` to pyo3 features in Cargo.toml, fixing Python 3.14+ build failure. Created `src/pyo3_bindings.rs` with basic `#[pymodule]` scaffold behind `pyo3-bindings` feature flag: PyParsedURI (frozen pyclass with all getters, is_* methods, __repr__, __eq__, __hash__), parse_uri, normalize_path (PyResult for non-UTF-8), deep_merge (JSON string interface, v1 limitation), parse_mentions, generate_sub_session_id (optional kwargs). `__version__` module attribute. Error handling: unreachable!() for impossible number branch, PyResult propagation for serialization errors. `cargo check --features pyo3-bindings`: CLEAN.
+- **F-079-criterion-benchmarks** (41ec3f3): Added `benches/core_ops.rs` with criterion 0.5 benchmarks for deep_merge (~2.1 µs), from_dict full (~2.7 µs) and minimal (~410 ns), compose (~5.3 µs), parse_mentions (~2.8 µs). Realistic YAML fixtures with providers, tools, hooks, session, agents, context. `cargo bench` for full run, `cargo bench -- --quick` for CI.
+
+### Wave 23 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- cargo clippy --all-targets --features pyo3-bindings: 0 warnings
+- cargo check --features pyo3-bindings: CLEAN
+- Tests: 610 passing (606 + 4 new), 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **`apply_persisted_content` returns `Result<(), Option<serde_json::Error>>`**: Three-way return distinguishes parse error (with full error detail) from missing "bundles" key (not an error) from success. Antagonistic review caught P1 issues with initial `bool` return: spurious warning on valid JSON, discarded serde error detail, and conflated two semantically distinct outcomes.
+- **Sync load uses `let _ =`**: Explicitly signals deliberate discard of the result, matching pre-existing silent-swallow behavior. Future `#[must_use]` on the helper would catch accidental ignoring.
+- **pyo3 uses `abi3-py39` (not `abi3-py310` or higher)**: Python 3.9 is the lowest maintained version. No Python 3.10+ APIs are used in the bindings. abi3 produces forward-compatible wheels across Python versions.
+- **deep_merge accepts JSON strings, not Python dicts**: v1 limitation documented in docstrings. Native dict support would require `pythonize` crate for JSON<->Python conversion. JSON string interface is simpler but requires `json.dumps()`/`json.loads()` on the Python side. Documented as follow-up improvement.
+- **PyParsedURI has manual __eq__ and __hash__**: Rust ParsedURI doesn't derive Hash/PartialEq. Implemented manually using all 5 fields for value-type semantics in Python.
+- **normalize_path returns PyResult**: Errors on non-UTF-8 output paths (possible if current_dir has non-UTF-8 components). Better than silent lossy conversion with to_string_lossy().
+- **yaml_to_json propagates errors as PyResult**: Instead of silent null fallback, returns PyValueError on serialization failure. The json_to_yaml number branch uses unreachable!() for the impossible case (serde_json without arbitrary_precision always has i64 or f64).
+- **cdylib crate-type kept unconditional**: Pre-existing from Session 001. Would ideally be conditional on pyo3 feature, but Cargo doesn't support conditional crate-type. Documented as accepted cost.
+- **Criterion benchmarks use `--quick` for CI**: Full `cargo bench` runs 100+ iterations per benchmark. `--quick` runs minimal iterations for CI gate validation.
+
+### Antagonistic Review Issues Found & Fixed
+- F-077: Changed return type from `bool` to `Result<(), Option<serde_json::Error>>` (P1: bool conflated parse error and missing key)
+- F-077: Preserved serde parse error detail in async caller's warning message (P1: was discarding line/column info)
+- F-077: Fixed spurious warning on valid JSON without "bundles" key (P1: behavioral regression)
+- F-077: Added `let _ =` to sync caller for intent signal (P2)
+- F-077: Added test for wrong-type bundles value (P2)
+- F-078: Fixed clippy "approximate value of pi/e" in test float literal (P3)
+- F-078: Changed yaml_to_json from silent Null fallback to error propagation (P0)
+- F-078: Changed json_to_yaml impossible number branch from Null to unreachable!() (P0)
+- F-078: Added __eq__, __hash__ to PyParsedURI (P2)
+- F-078: Added all 5 fields to __repr__ (P2)
+- F-078: Changed normalize_path to return PyResult for non-UTF-8 (P2)
+- F-078: Added __version__ module attribute (P3)
+- F-078: Documented deep_merge JSON-string interface as v1 limitation (P1)
+- F-078: Documented parse_uri infallibility (P3)
+- F-079: No issues found (clean review)
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-077: No tracing assertion test for warning behavior — would need tracing_test crate, accepted for now
+- F-077: No test for self-healing (save + re-load after corrupt JSON) — pre-existing gap
+- F-078: cdylib unconditionally built for all consumers — pre-existing from Session 001
+- F-078: deep_merge uses JSON strings not Python dicts — v1 limitation, follow-up with pythonize
+- F-078: Tests can't run with pyo3 feature (cdylib linking requires Python) — compile-checked via cargo check
+- F-078: json_to_yaml large u64 precision loss via f64 — documented, inherent to JSON number representation
+
+### Benchmark Baseline (Apple Silicon)
+- deep_merge/session_configs: ~2.1 µs
+- from_dict/full_bundle: ~2.7 µs
+- from_dict/minimal_bundle: ~410 ns
+- compose/two_bundles: ~5.3 µs
+- parse_mentions/mixed_text: ~2.8 µs
+
+### What's Next
+- All 23 waves complete. 610 tests, 0 clippy warnings, 79 features delivered.
+- PyO3 scaffold in place: 6 functions + 1 type exposed, abi3-py39 compatible.
+- Criterion benchmarks establish performance baseline.
+- Remaining unported PreparedBundle functionality:
+  - `create_session` (bundle.py:981-1109) — depends on AmplifierSession from amplifier_core
+  - `spawn` (bundle.py:1111-1289) — depends on AmplifierSession from amplifier_core
+- Consider: Expand pyo3 bindings (Bundle, BundleRegistry, BundleValidator types)
+- Consider: Native Python dict deep_merge via `pythonize` crate
+- Consider: maturin build + PyPI publishing
+- Consider: HTTP SourceHandlerWithStatus impl (HEAD + ETag/Last-Modified)
+- Consider: to_mount_plan benchmark (currently trivial — 6 conditional clones)
+
+---
+
 ## Session 027 -- Wave 22 COMPLETE (F-074, F-075, F-076)
 
 ### Work Completed
