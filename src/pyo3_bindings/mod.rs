@@ -39,6 +39,12 @@
 //! - `get_nested(data, path)` -- get value from nested dict by path
 //! - `get_nested_with_default(data, path, default)` -- get with fallback default
 //! - `set_nested(data, path, value)` -- set value in nested dict by path
+//! - `count_turns(messages)` -- count user turns in a conversation
+//! - `get_turn_boundaries(messages)` -- get 0-indexed positions of user messages
+//! - `slice_to_turn(messages, turn, handle_orphaned_tools=None)` -- slice messages up to turn N
+//! - `find_orphaned_tool_calls(messages)` -- find tool calls without results
+//! - `add_synthetic_tool_results(messages, ids)` -- add synthetic results for orphans
+//! - `get_turn_summary(messages, turn)` -- get summary dict for a turn
 //!
 //! ## Exposed exceptions
 //!
@@ -51,6 +57,7 @@
 mod exceptions;
 mod functions;
 mod helpers;
+mod session;
 mod types;
 
 use pyo3::prelude::*;
@@ -64,6 +71,10 @@ use functions::{
     get_nested, get_nested_with_default, is_glob_pattern, merge_module_lists, normalize_path,
     parse_mentions, parse_uri, sanitize_for_json, sanitize_message, set_nested, validate_bundle,
     validate_bundle_completeness, validate_bundle_completeness_or_raise, validate_bundle_or_raise,
+};
+use session::{
+    add_synthetic_tool_results, count_turns, find_orphaned_tool_calls, get_turn_boundaries,
+    get_turn_summary, slice_to_turn,
 };
 use types::{
     PyBundle, PyDiskCache, PyParsedURI, PyProviderPreference, PyResolvedSource, PySimpleCache,
@@ -124,6 +135,14 @@ fn amplifier_foundation(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_nested, m)?)?;
     m.add_function(wrap_pyfunction!(get_nested_with_default, m)?)?;
     m.add_function(wrap_pyfunction!(set_nested, m)?)?;
+
+    // Session slice functions
+    m.add_function(wrap_pyfunction!(count_turns, m)?)?;
+    m.add_function(wrap_pyfunction!(get_turn_boundaries, m)?)?;
+    m.add_function(wrap_pyfunction!(slice_to_turn, m)?)?;
+    m.add_function(wrap_pyfunction!(find_orphaned_tool_calls, m)?)?;
+    m.add_function(wrap_pyfunction!(add_synthetic_tool_results, m)?)?;
+    m.add_function(wrap_pyfunction!(get_turn_summary, m)?)?;
     Ok(())
 }
 

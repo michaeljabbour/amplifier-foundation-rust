@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 27
-phase_name: "Wave 27 -- PyO3 decomposition, maturin packaging, path/dict utility bindings"
-epoch: 28
-next_action: "Wave 27 COMPLETE. 614 tests passing, 0 clippy warnings, cargo fmt clean. PyO3 decomposed into 5 submodules. Maturin pyproject.toml added. 22 functions + 8 types + 5 exceptions exposed via PyO3. Consider: BundleRegistry PyO3 bindings, Python-side integration tests via maturin develop, type stub (.pyi) generation, PyO3 session utility bindings."
+phase: 28
+phase_name: "Wave 28 -- PyO3 session utility bindings + parse_frontmatter binding"
+epoch: 29
+next_action: "Implement F-092 (session slice bindings), F-093 (session fork/events bindings + PyForkResult), F-094 (parse_frontmatter binding)"
 blockers: []
 
 architecture_spec:
@@ -912,12 +912,32 @@ features:
     completed_at: "2025-02-04T01:15:00Z"
     commit: "0a79162"
 
+  F-092-pyo3-session-slice:
+    name: "PyO3 bindings for session slice utilities (count_turns, get_turn_boundaries, slice_to_turn, find_orphaned_tool_calls, add_synthetic_tool_results, get_turn_summary)"
+    module: "pyo3_bindings"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-089-pyo3-decompose"]
+    started_at: "2025-02-05T00:00:00Z"
+  F-093-pyo3-session-fork:
+    name: "PyO3 bindings for session fork/events (PyForkResult type + fork_session, fork_session_in_memory, get_fork_preview, count_events, get_event_summary, list_session_forks, get_session_lineage)"
+    module: "pyo3_bindings"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-092-pyo3-session-slice"]
+  F-094-pyo3-io-frontmatter:
+    name: "PyO3 binding for parse_frontmatter (YAML frontmatter extraction)"
+    module: "pyo3_bindings"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-089-pyo3-decompose"]
+
 wave_gate:
-  current_wave: 27
+  current_wave: 28
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo clippy --features pyo3-bindings clean + cargo fmt clean"
   approval_required: false
-  approval_status: "approved"
-  notes: "Wave 27 COMPLETE: 614 tests (all passing), 0 clippy warnings, cargo fmt clean. PyO3 decomposed (1333→5 files, no file >490 lines). Maturin pyproject.toml with abi3-py39, strip. 6 new function bindings (3 path + 3 dict)."
+  approval_status: "in-progress"
+  notes: "Wave 28 IN PROGRESS: PyO3 session utility bindings + parse_frontmatter"
 
 meta:
   project: "amplifier-foundation-rs"
