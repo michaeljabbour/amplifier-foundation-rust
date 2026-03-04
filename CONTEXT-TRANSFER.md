@@ -6,6 +6,122 @@
 
 ---
 
+## Session 041 -- Health Check / Idle (No Actionable Work)
+
+### Summary
+Working session spawned, read all state files, and determined **no actionable work exists**. All 100 features (F-001 through F-100) across 30 waves are complete. No features have status "ready". No blockers present.
+
+### Health Check Results
+- **cargo test**: 614 passed, 0 failed, 1 ignored (spawn doc-test)
+- **cargo clippy --all-targets**: 0 warnings
+- **cargo clippy --all-targets --features pyo3-bindings**: 0 warnings
+- **cargo fmt --check**: Clean (0 formatting issues)
+- **Codebase is healthy and all gates pass.**
+
+### Machine Status: IDLE
+No changes from session 040. The development machine has completed all defined work. To resume, a human or spec-writing session must write new feature specs and add them to STATE.yaml with status "ready".
+
+---
+
+## Session 040 -- Health Check / Idle (No Actionable Work)
+
+### Summary
+Working session spawned, read all state files, and determined **no actionable work exists**. All 100 features (F-001 through F-100) across 30 waves are complete. No features have status "ready". No blockers present.
+
+### Health Check Results
+- **cargo test**: 614 passed, 0 failed, 1 ignored (spawn doc-test)
+- **cargo clippy --all-targets**: 0 warnings
+- **cargo clippy --all-targets --features pyo3-bindings**: 0 warnings
+- **cargo fmt --check**: Clean (0 formatting issues)
+- **Codebase is healthy and all gates pass.**
+
+### Machine Status: IDLE
+No changes from session 039. The development machine has completed all defined work. To resume, a human or spec-writing session must write new feature specs and add them to STATE.yaml with status "ready".
+
+---
+
+## Session 039 -- Health Check / Idle (No Actionable Work)
+
+### Summary
+Working session spawned, read all state files, and determined **no actionable work exists**. All 100 features (F-001 through F-100) across 30 waves are complete. No features have status "ready". No blockers present.
+
+### Health Check Results
+- **cargo test**: 614 passed, 0 failed, 1 ignored (spawn doc-test)
+- **cargo clippy --all-targets**: 0 warnings
+- **cargo clippy --all-targets --features pyo3-bindings**: 0 warnings
+- **cargo fmt --check**: Clean (0 formatting issues)
+- **Codebase is healthy and all gates pass.**
+
+### Machine Status: IDLE
+No changes from session 038. The development machine has completed all defined work. To resume, a human or spec-writing session must write new feature specs and add them to STATE.yaml with status "ready".
+
+---
+
+## Session 038 -- Health Check / Idle (No Actionable Work)
+
+### Summary
+Working session spawned, read all state files, and determined **no actionable work exists**. All 100 features (F-001 through F-100) across 30 waves are complete. No features have status "ready". No blockers present.
+
+### Health Check Results
+- **cargo test**: 614 passed, 0 failed, 1 ignored (spawn doc-test)
+- **cargo clippy --all-targets**: 0 warnings
+- **cargo clippy --all-targets --features pyo3-bindings**: 0 warnings
+- **cargo fmt --check**: Clean (0 formatting issues)
+- **Codebase is healthy and all gates pass.**
+
+### Machine Status: IDLE
+No changes from session 037. The development machine has completed all defined work. To resume, a human or spec-writing session must write new feature specs and add them to STATE.yaml with status "ready".
+
+---
+
+## Session 037 -- Health Check / Idle (No Actionable Work)
+
+### Summary
+Working session spawned, read all state files, and determined **no actionable work exists**. All 100 features (F-001 through F-100) across 30 waves are complete. No features have status "ready". No blockers present.
+
+### Health Check Results
+- **cargo test**: 614 passed, 0 failed, 1 ignored (spawn doc-test)
+- **cargo clippy --all-targets**: 0 warnings
+- **cargo clippy --all-targets --features pyo3-bindings**: 0 warnings
+- **cargo fmt --check**: Clean (0 formatting issues)
+- **Codebase is healthy and all gates pass.**
+
+### Machine Status: IDLE
+No changes from session 036. The development machine has completed all defined work. To resume, a human or spec-writing session must write new feature specs and add them to STATE.yaml with status "ready".
+
+---
+
+## Session 036 -- Health Check / Idle (No Actionable Work)
+
+### Summary
+Working session spawned, read all state files, and determined **no actionable work exists**. All 100 features (F-001 through F-100) across 30 waves are complete. No features have status "ready". No blockers present.
+
+### Health Check Results
+- **cargo test**: 614 passed, 0 failed, 1 ignored (spawn doc-test)
+- **cargo clippy --all-targets**: 0 warnings
+- **cargo clippy --all-targets --features pyo3-bindings**: 0 warnings
+- **cargo fmt --check**: Clean (0 formatting issues)
+- **Codebase is healthy and all gates pass.**
+
+### Machine Status: IDLE
+The development machine has completed all defined work. The following items from the "Consider" list require human decisions and new feature specifications before implementation can begin:
+
+1. **BundleRegistry PyO3 bindings** -- Complex async type with RwLock<IndexMap> interior. Needs careful design for Python GIL interaction. Requires a feature spec.
+2. **crates.io publish** -- Requires crates.io account, `cargo publish` credentials, and decision on package name. Not a code task.
+3. **PyPI publish via maturin** -- Requires PyPI account, `maturin publish` credentials. Not a code task.
+4. **Cargo.lock commit policy** -- Currently gitignored (library convention). Committing it would enable `--locked` in CI for reproducible builds. Policy decision.
+5. **SHA-pinned GitHub Actions** -- Currently using version tags (v4, v5). Pinning to commit SHAs improves supply chain security. Low-effort hardening.
+6. **Windows CI** -- Not tested locally. Would need platform-specific debugging for path handling, tempfile, etc.
+
+### Action Required
+To resume the machine, a human or spec-writing session must:
+1. Choose which "Consider" items to pursue
+2. Write feature specs (in `specs/features/wave-31/` or similar)
+3. Add features to `STATE.yaml` with status "ready"
+4. Update `next_action` to point to the new work
+
+---
+
 ## Session 035 -- Wave 30 COMPLETE (F-098, F-099, F-100)
 
 ### Work Completed

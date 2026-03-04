@@ -13,7 +13,7 @@
 phase: 30
 phase_name: "Wave 30 -- Publishing readiness (LICENSE, README, CI)"
 epoch: 31
-next_action: "Wave 30 COMPLETE. 100 features delivered. Publishing readiness: LICENSE, README, CI. Consider: BundleRegistry PyO3 bindings, crates.io publish, PyPI publish, Cargo.lock commit policy."
+next_action: "IDLE -- All 100 features delivered across 30 waves. No ready features remain. Awaiting new feature specs for: BundleRegistry PyO3 bindings, crates.io publish, PyPI publish, Cargo.lock commit policy, SHA-pinned GitHub Actions, Windows CI. Health verified session-041."
 blockers: []
 
 architecture_spec:
@@ -1009,5 +1009,5 @@ meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
   total_features_completed: 100
-  last_updated: "2025-02-07T00:50:00Z"
-  last_session: "session-035-wave30-publishing-readiness"
+  last_updated: "2025-07-09T00:00:00Z"
+  last_session: "session-041-health-check-idle"
