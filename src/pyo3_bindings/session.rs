@@ -32,6 +32,7 @@ use super::helpers::{json_to_pyobject, pyobject_to_json};
 /// Returns:
 ///     Number of turns (user messages) in the conversation.
 #[pyfunction]
+#[pyo3(text_signature = "(messages)")]
 pub(super) fn count_turns(messages: &Bound<'_, PyAny>) -> PyResult<usize> {
     let msgs = pyobject_to_json_list(messages)?;
     Ok(crate::session::count_turns(&msgs))
@@ -45,6 +46,7 @@ pub(super) fn count_turns(messages: &Bound<'_, PyAny>) -> PyResult<usize> {
 /// Returns:
 ///     List of 0-indexed positions where each user message starts a new turn.
 #[pyfunction]
+#[pyo3(text_signature = "(messages)")]
 pub(super) fn get_turn_boundaries(messages: &Bound<'_, PyAny>) -> PyResult<Vec<usize>> {
     let msgs = pyobject_to_json_list(messages)?;
     Ok(crate::session::get_turn_boundaries(&msgs))
@@ -71,6 +73,7 @@ pub(super) fn get_turn_boundaries(messages: &Bound<'_, PyAny>) -> PyResult<Vec<u
 ///         no user messages found, or handle_orphaned_tools="error" and
 ///         orphaned tools exist.
 #[pyfunction]
+#[pyo3(text_signature = "(messages, turn, handle_orphaned_tools=None)")]
 #[pyo3(signature = (messages, turn, handle_orphaned_tools=None))]
 pub(super) fn slice_to_turn(
     py: Python<'_>,
@@ -103,6 +106,7 @@ pub(super) fn slice_to_turn(
 /// Returns:
 ///     List of orphaned tool call ID strings.
 #[pyfunction]
+#[pyo3(text_signature = "(messages)")]
 pub(super) fn find_orphaned_tool_calls(messages: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     let msgs = pyobject_to_json_list(messages)?;
     Ok(crate::session::find_orphaned_tool_calls(&msgs))
@@ -120,6 +124,7 @@ pub(super) fn find_orphaned_tool_calls(messages: &Bound<'_, PyAny>) -> PyResult<
 /// Returns:
 ///     New list of message dicts with synthetic results appended.
 #[pyfunction]
+#[pyo3(text_signature = "(messages, orphaned_ids)")]
 pub(super) fn add_synthetic_tool_results(
     py: Python<'_>,
     messages: &Bound<'_, PyAny>,
@@ -145,6 +150,7 @@ pub(super) fn add_synthetic_tool_results(
 /// Raises:
 ///     BundleLoadError: If turn is out of range or no user messages found.
 #[pyfunction]
+#[pyo3(text_signature = "(messages, turn)")]
 pub(super) fn get_turn_summary(
     py: Python<'_>,
     messages: &Bound<'_, PyAny>,
@@ -274,6 +280,9 @@ impl PyForkResult {
 ///     BundleLoadError: If session_dir is invalid, transcript is missing,
 ///         or turn is out of range.
 #[pyfunction]
+#[pyo3(
+    text_signature = "(session_dir, turn=None, new_session_id=None, target_dir=None, include_events=True)"
+)]
 #[pyo3(signature = (session_dir, turn=None, new_session_id=None, target_dir=None, include_events=true))]
 pub(super) fn fork_session(
     session_dir: &str,
@@ -309,6 +318,7 @@ pub(super) fn fork_session(
 /// Raises:
 ///     BundleLoadError: If no user messages found or turn is out of range.
 #[pyfunction]
+#[pyo3(text_signature = "(messages, turn=None, parent_id=None)")]
 #[pyo3(signature = (messages, turn=None, parent_id=None))]
 pub(super) fn fork_session_in_memory(
     messages: &Bound<'_, PyAny>,
@@ -336,6 +346,7 @@ pub(super) fn fork_session_in_memory(
 /// Raises:
 ///     BundleLoadError: If session_dir is invalid or turn is out of range.
 #[pyfunction]
+#[pyo3(text_signature = "(session_dir, turn)")]
 pub(super) fn get_fork_preview(
     py: Python<'_>,
     session_dir: &str,
@@ -361,6 +372,7 @@ pub(super) fn get_fork_preview(
 /// Raises:
 ///     BundleLoadError: If session_dir is invalid.
 #[pyfunction]
+#[pyo3(text_signature = "(session_dir)")]
 pub(super) fn list_session_forks(py: Python<'_>, session_dir: &str) -> PyResult<PyObject> {
     let result = crate::session::list_session_forks(Path::new(session_dir))
         .map_err(bundle_error_to_pyerr)?;
@@ -382,6 +394,7 @@ pub(super) fn list_session_forks(py: Python<'_>, session_dir: &str) -> PyResult<
 /// Raises:
 ///     BundleLoadError: If session_dir is invalid.
 #[pyfunction]
+#[pyo3(text_signature = "(session_dir)")]
 pub(super) fn get_session_lineage(py: Python<'_>, session_dir: &str) -> PyResult<PyObject> {
     let result = crate::session::get_session_lineage(Path::new(session_dir))
         .map_err(bundle_error_to_pyerr)?;
@@ -402,6 +415,7 @@ pub(super) fn get_session_lineage(py: Python<'_>, session_dir: &str) -> PyResult
 /// Returns:
 ///     Number of events in the file.
 #[pyfunction]
+#[pyo3(text_signature = "(events_path)")]
 pub(super) fn count_events(events_path: &str) -> usize {
     crate::session::count_events(Path::new(events_path))
 }
@@ -423,6 +437,7 @@ pub(super) fn count_events(events_path: &str) -> usize {
 /// Raises:
 ///     BundleLoadError: If the events file exists but cannot be read or parsed.
 #[pyfunction]
+#[pyo3(text_signature = "(events_path)")]
 pub(super) fn get_event_summary(py: Python<'_>, events_path: &str) -> PyResult<PyObject> {
     let result =
         crate::session::get_event_summary(Path::new(events_path)).map_err(bundle_error_to_pyerr)?;

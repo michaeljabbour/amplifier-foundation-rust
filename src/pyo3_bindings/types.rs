@@ -51,22 +51,27 @@ impl PyParsedURI {
         &self.inner.ref_
     }
 
+    #[pyo3(text_signature = "($self)")]
     fn is_git(&self) -> bool {
         self.inner.is_git()
     }
 
+    #[pyo3(text_signature = "($self)")]
     fn is_file(&self) -> bool {
         self.inner.is_file()
     }
 
+    #[pyo3(text_signature = "($self)")]
     fn is_http(&self) -> bool {
         self.inner.is_http()
     }
 
+    #[pyo3(text_signature = "($self)")]
     fn is_zip(&self) -> bool {
         self.inner.is_zip()
     }
 
+    #[pyo3(text_signature = "($self)")]
     fn is_package(&self) -> bool {
         self.inner.is_package()
     }
@@ -120,6 +125,7 @@ pub struct PyBundle {
 impl PyBundle {
     /// Create a new empty Bundle with the given name.
     #[new]
+    #[pyo3(text_signature = "(name='')")]
     #[pyo3(signature = (name=""))]
     fn new(name: &str) -> Self {
         PyBundle {
@@ -132,6 +138,7 @@ impl PyBundle {
     /// Expects the same format as the Rust `Bundle::from_dict`:
     /// `{"bundle": {"name": "...", "providers": [...], ...}}`
     #[staticmethod]
+    #[pyo3(text_signature = "(data)")]
     fn from_dict(data: &Bound<'_, PyAny>) -> PyResult<PyBundle> {
         let yaml_val = pyobject_to_yaml(data)?;
         let bundle = crate::bundle::Bundle::from_dict(&yaml_val).map_err(bundle_error_to_pyerr)?;
@@ -140,6 +147,7 @@ impl PyBundle {
 
     /// Parse a Bundle from a Python dict with a base_path for context resolution.
     #[staticmethod]
+    #[pyo3(text_signature = "(data, base_path)")]
     fn from_dict_with_base_path(data: &Bound<'_, PyAny>, base_path: &str) -> PyResult<PyBundle> {
         let yaml_val = pyobject_to_yaml(data)?;
         let bundle = crate::bundle::Bundle::from_dict_with_base_path(
@@ -151,6 +159,7 @@ impl PyBundle {
     }
 
     /// Serialize the Bundle to a Python dict.
+    #[pyo3(text_signature = "($self)")]
     fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
         let yaml_val = self.inner.to_dict();
         yaml_to_pyobject(py, &yaml_val)
@@ -164,6 +173,7 @@ impl PyBundle {
     /// 3. dict update for agents
     /// 4. accumulate with namespace for context
     /// 5. later replaces for instruction/base_path/name
+    #[pyo3(text_signature = "($self, others)")]
     fn compose(&self, others: Vec<PyRef<'_, PyBundle>>) -> PyBundle {
         let other_refs: Vec<&crate::bundle::Bundle> = others.iter().map(|pb| &pb.inner).collect();
         let composed = self.inner.compose(&other_refs);
@@ -174,6 +184,7 @@ impl PyBundle {
     ///
     /// The mount plan contains only non-empty sections:
     /// session, providers, tools, hooks, spawn, agents.
+    #[pyo3(text_signature = "($self)")]
     fn to_mount_plan(&self, py: Python<'_>) -> PyResult<PyObject> {
         let yaml_val = self.inner.to_mount_plan();
         yaml_to_pyobject(py, &yaml_val)
@@ -347,6 +358,7 @@ impl From<crate::sources::SourceStatus> for PySourceStatus {
 impl PySourceStatus {
     /// Create a new SourceStatus for the given URI.
     #[new]
+    #[pyo3(text_signature = "(uri)")]
     fn new(uri: &str) -> Self {
         PySourceStatus {
             inner: crate::sources::SourceStatus::new(uri),
@@ -426,6 +438,7 @@ impl PySourceStatus {
     }
 
     /// Whether the cached ref is pinned (exact SHA or version tag).
+    #[pyo3(text_signature = "($self)")]
     fn is_pinned(&self) -> bool {
         self.inner.is_pinned()
     }
@@ -498,6 +511,7 @@ impl From<crate::paths::uri::ResolvedSource> for PyResolvedSource {
 impl PyResolvedSource {
     /// Create a new ResolvedSource with the given paths.
     #[new]
+    #[pyo3(text_signature = "(active_path, source_root)")]
     fn new(active_path: &str, source_root: &str) -> Self {
         PyResolvedSource {
             inner: crate::paths::uri::ResolvedSource {
@@ -520,6 +534,7 @@ impl PyResolvedSource {
     }
 
     /// Whether the active path is a subdirectory of source_root.
+    #[pyo3(text_signature = "($self)")]
     fn is_subdirectory(&self) -> bool {
         self.inner.is_subdirectory()
     }
@@ -569,6 +584,7 @@ impl From<crate::spawn::ProviderPreference> for PyProviderPreference {
 impl PyProviderPreference {
     /// Create a new ProviderPreference.
     #[new]
+    #[pyo3(text_signature = "(provider, model)")]
     fn new(provider: &str, model: &str) -> Self {
         PyProviderPreference {
             inner: crate::spawn::ProviderPreference::new(provider, model),
@@ -588,6 +604,7 @@ impl PyProviderPreference {
     }
 
     /// Serialize to a Python dict: {"provider": "...", "model": "..."}.
+    #[pyo3(text_signature = "($self)")]
     fn to_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
         let yaml_val = self.inner.to_dict();
         yaml_to_pyobject(py, &yaml_val)
@@ -595,6 +612,7 @@ impl PyProviderPreference {
 
     /// Parse from a Python dict with "provider" and "model" keys.
     #[staticmethod]
+    #[pyo3(text_signature = "(data)")]
     fn from_dict(data: &Bound<'_, PyAny>) -> PyResult<PyProviderPreference> {
         let yaml_val = pyobject_to_yaml(data)?;
         crate::spawn::ProviderPreference::from_dict(&yaml_val)
@@ -604,6 +622,7 @@ impl PyProviderPreference {
 
     /// Parse a list of provider preference dicts. Silently skips invalid entries.
     #[staticmethod]
+    #[pyo3(text_signature = "(data)")]
     fn from_list(data: &Bound<'_, PyAny>) -> PyResult<Vec<PyProviderPreference>> {
         let yaml_val = pyobject_to_yaml(data)?;
         match yaml_val {
@@ -654,6 +673,7 @@ pub struct PySimpleCache {
 impl PySimpleCache {
     /// Create a new empty SimpleCache.
     #[new]
+    #[pyo3(text_signature = "()")]
     fn new() -> Self {
         PySimpleCache {
             inner: crate::cache::memory::SimpleCache::new(),
@@ -661,6 +681,7 @@ impl PySimpleCache {
     }
 
     /// Get a value by key, returning None if not found.
+    #[pyo3(text_signature = "($self, key)")]
     fn get(&self, py: Python<'_>, key: &str) -> PyResult<Option<PyObject>> {
         use crate::cache::CacheProvider;
         match self.inner.get(key) {
@@ -670,6 +691,7 @@ impl PySimpleCache {
     }
 
     /// Set a value for the given key.
+    #[pyo3(text_signature = "($self, key, value)")]
     fn set(&mut self, key: &str, value: &Bound<'_, PyAny>) -> PyResult<()> {
         use crate::cache::CacheProvider;
         let yaml_val = pyobject_to_yaml(value)?;
@@ -678,12 +700,14 @@ impl PySimpleCache {
     }
 
     /// Check if a key exists in the cache.
+    #[pyo3(text_signature = "($self, key)")]
     fn contains(&self, key: &str) -> bool {
         use crate::cache::CacheProvider;
         self.inner.contains(key)
     }
 
     /// Clear all entries from the cache.
+    #[pyo3(text_signature = "($self)")]
     fn clear(&mut self) {
         use crate::cache::CacheProvider;
         self.inner.clear();
@@ -720,6 +744,7 @@ impl PyDiskCache {
     ///
     /// The directory is created immediately if it doesn't exist.
     #[new]
+    #[pyo3(text_signature = "(cache_dir)")]
     fn new(cache_dir: &str) -> Self {
         PyDiskCache {
             inner: crate::cache::disk::DiskCache::new(std::path::Path::new(cache_dir)),
@@ -727,6 +752,7 @@ impl PyDiskCache {
     }
 
     /// Get a value by key, returning None if not found or corrupt.
+    #[pyo3(text_signature = "($self, key)")]
     fn get(&self, py: Python<'_>, key: &str) -> PyResult<Option<PyObject>> {
         use crate::cache::CacheProvider;
         match self.inner.get(key) {
@@ -736,6 +762,7 @@ impl PyDiskCache {
     }
 
     /// Set a value for the given key (writes to disk as JSON).
+    #[pyo3(text_signature = "($self, key, value)")]
     fn set(&mut self, key: &str, value: &Bound<'_, PyAny>) -> PyResult<()> {
         use crate::cache::CacheProvider;
         let yaml_val = pyobject_to_yaml(value)?;
@@ -744,18 +771,21 @@ impl PyDiskCache {
     }
 
     /// Check if a key exists in the cache (checks file existence).
+    #[pyo3(text_signature = "($self, key)")]
     fn contains(&self, key: &str) -> bool {
         use crate::cache::CacheProvider;
         self.inner.contains(key)
     }
 
     /// Clear all entries from the cache (deletes all .json files).
+    #[pyo3(text_signature = "($self)")]
     fn clear(&mut self) {
         use crate::cache::CacheProvider;
         self.inner.clear();
     }
 
     /// Get the filesystem path for a cache key (for debugging/inspection).
+    #[pyo3(text_signature = "($self, key)")]
     fn cache_key_to_path(&self, key: &str) -> String {
         self.inner.cache_key_to_path(key).display().to_string()
     }

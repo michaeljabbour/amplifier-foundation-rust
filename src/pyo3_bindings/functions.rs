@@ -25,6 +25,7 @@ use super::types::{PyBundle, PyParsedURI, PyProviderPreference, PyValidationResu
 /// Handles git+, zip+, file://, http/https, and local paths.
 /// Always succeeds -- unrecognized URIs are treated as package names.
 #[pyfunction]
+#[pyo3(text_signature = "(uri)")]
 pub(super) fn parse_uri(uri: &str) -> PyParsedURI {
     PyParsedURI {
         inner: crate::paths::uri::parse_uri(uri),
@@ -36,6 +37,7 @@ pub(super) fn parse_uri(uri: &str) -> PyParsedURI {
 /// Uses the current working directory as the base for relative paths.
 /// Raises `UnicodeDecodeError` if the resolved path contains non-UTF-8 bytes.
 #[pyfunction]
+#[pyo3(text_signature = "(path)")]
 pub(super) fn normalize_path(path: &str) -> PyResult<String> {
     let p = crate::paths::uri::normalize_path(path, None);
     p.into_os_string().into_string().map_err(|os| {
@@ -62,6 +64,7 @@ pub(super) fn normalize_path(path: &str) -> PyResult<String> {
 ///   # result == {"a": 1, "b": {"c": 2, "d": 3}}
 ///   ```
 #[pyfunction]
+#[pyo3(text_signature = "(base, overlay)")]
 pub(super) fn deep_merge<'py>(
     py: Python<'py>,
     base: &Bound<'py, PyAny>,
@@ -90,6 +93,7 @@ pub(super) fn deep_merge<'py>(
 /// Kept for backward compatibility. Prefer `deep_merge()` which accepts
 /// native Python dicts.
 #[pyfunction]
+#[pyo3(text_signature = "(base_json, overlay_json)")]
 pub(super) fn deep_merge_json(base_json: &str, overlay_json: &str) -> PyResult<String> {
     let base: serde_yaml_ng::Value = serde_json::from_str(base_json)
         .map(json_to_yaml)
@@ -114,6 +118,7 @@ pub(super) fn deep_merge_json(base_json: &str, overlay_json: &str) -> PyResult<S
 
 /// Extract @mentions from text (excluding code blocks and emails).
 #[pyfunction]
+#[pyo3(text_signature = "(text)")]
 pub(super) fn parse_mentions(text: &str) -> Vec<String> {
     crate::mentions::parser::parse_mentions(text)
 }
@@ -125,6 +130,7 @@ pub(super) fn parse_mentions(text: &str) -> Vec<String> {
 ///   session_id: Parent session ID for lineage tracking (optional).
 ///   trace_id: Parent trace ID for W3C Trace Context (optional).
 #[pyfunction]
+#[pyo3(text_signature = "(*, agent_name=None, session_id=None, trace_id=None)")]
 #[pyo3(signature = (agent_name=None, session_id=None, trace_id=None))]
 pub(super) fn generate_sub_session_id(
     agent_name: Option<&str>,
@@ -142,6 +148,7 @@ pub(super) fn generate_sub_session_id(
 ///
 /// Returns a ValidationResult with errors and warnings.
 #[pyfunction]
+#[pyo3(text_signature = "(bundle)")]
 pub(super) fn validate_bundle(bundle: &PyBundle) -> PyValidationResult {
     let result = crate::bundle::validator::validate_bundle(&bundle.inner);
     result.into()
@@ -151,6 +158,7 @@ pub(super) fn validate_bundle(bundle: &PyBundle) -> PyValidationResult {
 ///
 /// Returns a ValidationResult with errors and warnings.
 #[pyfunction]
+#[pyo3(text_signature = "(bundle)")]
 pub(super) fn validate_bundle_completeness(bundle: &PyBundle) -> PyValidationResult {
     let result = crate::bundle::validator::validate_bundle_completeness(&bundle.inner);
     result.into()
@@ -160,6 +168,7 @@ pub(super) fn validate_bundle_completeness(bundle: &PyBundle) -> PyValidationRes
 ///
 /// Raises BundleValidationError if the bundle has validation errors.
 #[pyfunction]
+#[pyo3(text_signature = "(bundle)")]
 pub(super) fn validate_bundle_or_raise(bundle: &PyBundle) -> PyResult<()> {
     crate::bundle::validator::validate_bundle_or_raise(&bundle.inner).map_err(bundle_error_to_pyerr)
 }
@@ -168,6 +177,7 @@ pub(super) fn validate_bundle_or_raise(bundle: &PyBundle) -> PyResult<()> {
 ///
 /// Raises BundleValidationError if the bundle is incomplete for mounting.
 #[pyfunction]
+#[pyo3(text_signature = "(bundle)")]
 pub(super) fn validate_bundle_completeness_or_raise(bundle: &PyBundle) -> PyResult<()> {
     crate::bundle::validator::validate_bundle_completeness_or_raise(&bundle.inner)
         .map_err(bundle_error_to_pyerr)
@@ -185,6 +195,7 @@ pub(super) fn validate_bundle_completeness_or_raise(bundle: &PyBundle) -> PyResu
 /// This is the sync version -- does NOT resolve glob patterns. For glob
 /// resolution, use the async variant from Python directly.
 #[pyfunction]
+#[pyo3(text_signature = "(mount_plan, preferences)")]
 pub(super) fn apply_provider_preferences<'py>(
     py: Python<'py>,
     mount_plan: &Bound<'py, PyAny>,
@@ -199,6 +210,7 @@ pub(super) fn apply_provider_preferences<'py>(
 
 /// Check if a string contains glob pattern characters (*, ?, [).
 #[pyfunction]
+#[pyo3(text_signature = "(pattern)")]
 pub(super) fn is_glob_pattern(pattern: &str) -> bool {
     crate::spawn::glob::is_glob_pattern(pattern)
 }
@@ -223,6 +235,7 @@ pub(super) fn is_glob_pattern(pattern: &str) -> bool {
 ///   # result == {"a": 1, "c": {}}
 ///   ```
 #[pyfunction]
+#[pyo3(text_signature = "(data, max_depth=None)")]
 #[pyo3(signature = (data, max_depth=None))]
 pub(super) fn sanitize_for_json<'py>(
     py: Python<'py>,
@@ -246,6 +259,7 @@ pub(super) fn sanitize_for_json<'py>(
 ///
 /// Non-dict input returns an empty dict.
 #[pyfunction]
+#[pyo3(text_signature = "(message)")]
 pub(super) fn sanitize_message<'py>(
     py: Python<'py>,
     message: &Bound<'py, PyAny>,
@@ -270,6 +284,7 @@ pub(super) fn sanitize_message<'py>(
 ///   # result[0]["config"] == {"model": "gpt-4", "temperature": 0.5}
 ///   ```
 #[pyfunction]
+#[pyo3(text_signature = "(parent, child)")]
 pub(super) fn merge_module_lists<'py>(
     py: Python<'py>,
     parent: &Bound<'py, PyAny>,
@@ -325,6 +340,7 @@ pub(super) fn merge_module_lists<'py>(
 /// returned string. Callers should check for ``(permission denied)`` if
 /// error detection is needed.
 #[pyfunction]
+#[pyo3(text_signature = "(path)")]
 pub(super) fn format_directory_listing(path: &str) -> String {
     crate::mentions::utils::format_directory_listing(std::path::Path::new(path))
 }
@@ -350,6 +366,7 @@ fn pathbuf_to_pystring(p: std::path::PathBuf) -> PyResult<String> {
 /// Falls back to ``./.amplifier`` (current directory) if the home directory
 /// cannot be determined.
 #[pyfunction]
+#[pyo3(text_signature = "()")]
 pub(super) fn get_amplifier_home() -> PyResult<String> {
     pathbuf_to_pystring(crate::paths::uri::get_amplifier_home())
 }
@@ -366,6 +383,7 @@ pub(super) fn get_amplifier_home() -> PyResult<String> {
 /// Returns:
 ///     Path string to the agent file.
 #[pyfunction]
+#[pyo3(text_signature = "(base, name)")]
 pub(super) fn construct_agent_path(base: &str, name: &str) -> PyResult<String> {
     pathbuf_to_pystring(crate::paths::normalize::construct_agent_path(
         std::path::Path::new(base),
@@ -385,6 +403,7 @@ pub(super) fn construct_agent_path(base: &str, name: &str) -> PyResult<String> {
 /// Returns:
 ///     Path string to the resource.
 #[pyfunction]
+#[pyo3(text_signature = "(base, name)")]
 pub(super) fn construct_context_path(base: &str, name: &str) -> PyResult<String> {
     pathbuf_to_pystring(crate::paths::normalize::construct_context_path(
         std::path::Path::new(base),
@@ -423,6 +442,7 @@ pub(super) fn construct_context_path(base: &str, name: &str) -> PyResult<String>
 ///     >>> get_nested({"a": 1}, ["a", "b"])  # intermediate not a dict
 ///     None
 #[pyfunction]
+#[pyo3(text_signature = "(data, path)")]
 pub(super) fn get_nested(data: &Bound<'_, PyAny>, path: Vec<String>) -> PyResult<Option<PyObject>> {
     let yaml_val = pyobject_to_yaml(data)?;
     let path_refs: Vec<&str> = path.iter().map(|s| s.as_str()).collect();
@@ -450,6 +470,7 @@ pub(super) fn get_nested(data: &Bound<'_, PyAny>, path: Vec<String>) -> PyResult
 /// Returns:
 ///     The value at the path (deep copy), or ``default`` if not found.
 #[pyfunction]
+#[pyo3(text_signature = "(data, path, default)")]
 pub(super) fn get_nested_with_default(
     data: &Bound<'_, PyAny>,
     path: Vec<String>,
@@ -489,6 +510,7 @@ pub(super) fn get_nested_with_default(
 ///     >>> set_nested({"a": {}}, ["a", "b"], 42)
 ///     {'a': {'b': 42}}
 #[pyfunction]
+#[pyo3(text_signature = "(data, path, value)")]
 pub(super) fn set_nested(
     data: &Bound<'_, PyAny>,
     path: Vec<String>,
@@ -538,6 +560,7 @@ pub(super) fn set_nested(
 ///     >>> parse_frontmatter("No frontmatter here")
 ///     (None, 'No frontmatter here')
 #[pyfunction]
+#[pyo3(text_signature = "(content)")]
 pub(super) fn parse_frontmatter(
     py: Python<'_>,
     content: &str,
