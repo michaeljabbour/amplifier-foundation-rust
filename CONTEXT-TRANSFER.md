@@ -6,6 +6,86 @@
 
 ---
 
+## Session 032 -- Wave 27 COMPLETE (F-089, F-090, F-091)
+
+### Work Completed
+- **F-089-pyo3-decompose** (92f25a1): Decomposed monolithic `src/pyo3_bindings.rs` (1333 lines) into `src/pyo3_bindings/` directory with 5 focused submodules: `mod.rs` (119 lines, module definition + #[pymodule] registration), `helpers.rs` (101 lines, conversion helpers), `exceptions.rs` (75 lines, exception hierarchy), `types.rs` (778 lines, all 8 #[pyclass] types), `functions.rs` (328→487 lines, all #[pyfunction]s). Kept module name as `pyo3_bindings` (not `pyo3`) to avoid shadowing the `pyo3` crate in expression context. Updated lib.rs module declaration. Zero behavioral changes.
+- **F-090-maturin-config** (fad78ac): Added `pyproject.toml` for maturin-based Python package building. Key config: `maturin >= 1.7` build backend, explicit `module-name = "amplifier_foundation"`, `features = ["pyo3-bindings"]`, `strip = true` for smaller wheels, `requires-python >= 3.9` aligned with abi3-py39. No license or readme declared (files don't exist yet).
+- **F-091-pyo3-path-dict-utils** (0a79162): Added 6 new PyO3 function bindings. Path utilities: `get_amplifier_home()`, `construct_agent_path(base, name)`, `construct_context_path(base, name)` — all using extracted `pathbuf_to_pystring` helper. Dict utilities: `get_nested(data, path)`, `get_nested_with_default(data, path, default)`, `set_nested(data, path, value)`. Dict functions document YAML round-trip semantics (deep copy, JSON-like types only). `get_nested_with_default` returns default as-is (no YAML conversion) when path exists or missing. `set_nested` returns NEW dict (does not mutate input).
+
+### Wave 27 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- cargo clippy --all-targets --features pyo3-bindings: 0 warnings
+- cargo check --features pyo3-bindings: CLEAN
+- Tests: 614 passing, 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **Module named `pyo3_bindings` not `pyo3`**: Reviewer caught that `mod pyo3` would shadow the `pyo3` crate in expression context from crate-root modules. Naming the directory `pyo3_bindings/` (same as the original file) avoids the collision entirely and preserves git history.
+- **Maturin `module-name` explicit**: Without this, maturin implicitly derives the Python module name from `Cargo.toml [package] name` via hyphen→underscore. Explicit `module-name = "amplifier_foundation"` makes the mapping clear and robust against `[lib] name` changes.
+- **Maturin `strip = true`**: Removes debug symbols from the compiled .so in wheels. Tokio + serde + reqwest + regex produce tens of MB of debug symbols. Essential for reasonable wheel sizes on PyPI.
+- **No license in pyproject.toml**: `license = "MIT"` was removed because no LICENSE file exists in the repository. Declaring a license without the legal text is misleading.
+- **`pathbuf_to_pystring` helper extracted**: DRYs the PathBuf→String→UnicodeDecodeError pattern across 3 path functions.
+- **`get_nested_with_default` lazy default**: Reviewer caught P0 bug — eager YAML conversion of default would crash even when path exists. Fixed to return `default.clone().unbind()` directly when path is missing (preserves object identity, supports non-serializable defaults).
+- **`set_nested` returns new dict, does NOT mutate**: Clearly documented. YAML round-trip creates a new dict; the input is never mutated. Reviewer caught self-contradictory docstring that said both "in place" and "returns new dict".
+- **Dict functions document YAML round-trip semantics**: Comment block explains: deep copies, JSON-like types only, integer keys not supported. These limitations are inherent to the serde_yaml_ng::Value intermediary.
+- **`default.clone().unbind()` instead of deprecated `to_object()`**: PyO3 0.24 deprecates `ToPyObject::to_object()` in favor of `IntoPyObject`. Using `clone().unbind()` avoids the deprecation warning.
+- **get_amplifier_home docstring fixed**: Was claiming `/tmp/.amplifier` fallback, but actual implementation falls back to `./.amplifier` (current directory).
+
+### Antagonistic Review Issues Found & Fixed
+- F-089 P2: Renamed module from `pyo3` to `pyo3_bindings` to avoid crate name shadowing
+- F-089 P3: Updated mod.rs doc to list all functions including validate_*_or_raise
+- F-089 P3: Removed stale reference to nonexistent test_pyo3_helpers.rs
+- F-090 P1: Removed `license = "MIT"` — no LICENSE file exists
+- F-090 P2: Added explicit `module-name = "amplifier_foundation"`
+- F-090 P3: Removed Python 3.14 classifier (untested)
+- F-090 P3: Added `strip = true` for smaller wheels
+- F-091 P0: Fixed eager default conversion in get_nested_with_default — was crashing even when path exists
+- F-091 P0: Fixed contradictory set_nested docstring — now clearly says "returns new dict"
+- F-091 P2: Extracted pathbuf_to_pystring helper (was duplicated 3 times)
+- F-091 P2: Fixed get_amplifier_home docstring fallback path
+- F-091 P2: Added YAML round-trip limitation documentation to dict functions
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-089: `exceptions.rs` uses fully-qualified `pyo3::` paths without `use pyo3::prelude::*` — consistent with create_exception! macro pattern
+- F-089: `types.rs` at 778 lines is under 1000-line threshold — acceptable
+- F-091: Dict functions deep-copy through YAML round-trip (identity destroyed, type coercion) — inherent to serde_yaml_ng::Value approach, documented
+- F-091: Empty path on get_nested returns deep copy (not identity) — matches Rust API behavior
+- F-091: Empty path on set_nested is silent no-op with round-trip — matches Rust API behavior
+- F-091: Vec<String> path rejects integer indices — only string keys supported (matches Rust API)
+- F-091: construct_agent_path/construct_context_path don't normalize paths — matches underlying Rust functions
+- F-091: No .pyi type stubs — deferred to future wave
+- F-091: No text_signature annotations — deferred to future wave
+
+### File Size Status
+- `src/pyo3_bindings/mod.rs`: 131 lines (module definition)
+- `src/pyo3_bindings/types.rs`: 778 lines (largest — all 8 pyclass types)
+- `src/pyo3_bindings/functions.rs`: 487 lines (22 pyfunctions)
+- `src/pyo3_bindings/helpers.rs`: 101 lines (conversion helpers)
+- `src/pyo3_bindings/exceptions.rs`: 75 lines (5 exceptions)
+- No file over 778 lines (was 1333 before decomposition)
+
+### Module Registration
+- Exceptions: `BundleError`, `BundleNotFoundError`, `BundleLoadError`, `BundleValidationError`, `BundleDependencyError` (5 total, unchanged)
+- Types: `ParsedURI`, `Bundle`, `ValidationResult`, `SourceStatus`, `ResolvedSource`, `ProviderPreference`, `SimpleCache`, `DiskCache` (8 total, unchanged)
+- Functions: `parse_uri`, `normalize_path`, `deep_merge`, `deep_merge_json`, `parse_mentions`, `generate_sub_session_id`, `validate_bundle`, `validate_bundle_completeness`, `validate_bundle_or_raise`, `validate_bundle_completeness_or_raise`, `apply_provider_preferences`, `is_glob_pattern`, `sanitize_for_json`, `sanitize_message`, `merge_module_lists`, `format_directory_listing`, `get_amplifier_home`, `construct_agent_path`, `construct_context_path`, `get_nested`, `get_nested_with_default`, `set_nested` (22 total, was 16)
+
+### What's Next
+- All 27 waves complete. 614 tests, 0 clippy warnings, 91 features delivered.
+- PyO3 bindings: 8 types + 22 functions + 5 exceptions, native dict I/O via pythonize.
+- Maturin pyproject.toml in place — ready for `pip install maturin && maturin develop`.
+- Remaining architecture spec section 13 types NOT yet exposed via PyO3:
+  - `BundleRegistry` — complex type with async methods, needs careful design
+  - `BundleValidator` — already exposed as functions; class wrapper is optional
+- Consider: `maturin develop` + Python-side integration smoke tests
+- Consider: .pyi type stub generation for IDE support
+- Consider: PyO3 session utility bindings (count_turns, get_turn_summary, etc.)
+- Consider: PyO3 BundleRegistry bindings (requires async design)
+- Consider: LICENSE + README.md files for proper PyPI publishing
+
+---
+
 ## Session 031 -- Wave 26 COMPLETE (F-086, F-087, F-088)
 
 ### Work Completed
