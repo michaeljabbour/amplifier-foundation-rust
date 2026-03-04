@@ -27,6 +27,18 @@
 //! - `validate_bundle_completeness(bundle)` -- strict validation for mountable bundles
 //! - `apply_provider_preferences(mount_plan, prefs)` -- apply provider preferences
 //! - `is_glob_pattern(pattern)` -- check for glob pattern characters
+//! - `sanitize_for_json(data)` -- recursively sanitize data for JSON (removes nulls)
+//! - `sanitize_message(message)` -- sanitize a chat message for persistence
+//! - `merge_module_lists(parent, child)` -- merge module lists by module ID
+//! - `format_directory_listing(path)` -- format directory contents listing
+//!
+//! ## Exposed exceptions
+//!
+//! - `BundleError` -- base exception for all bundle operations
+//! - `BundleNotFoundError` -- bundle could not be located
+//! - `BundleLoadError` -- bundle could not be loaded
+//! - `BundleValidationError` -- bundle validation failed
+//! - `BundleDependencyError` -- dependency could not be resolved
 
 use pyo3::prelude::*;
 
@@ -970,6 +982,154 @@ fn is_glob_pattern(pattern: &str) -> bool {
 }
 
 // =============================================================================
+// JSON conversion helpers (for serialization functions)
+// =============================================================================
+
+/// Convert a Python object to serde_json::Value.
+///
+/// Uses pythonize for direct Python -> serde_json::Value conversion.
+fn pyobject_to_json(obj: &Bound<'_, PyAny>) -> PyResult<serde_json::Value> {
+    pythonize::depythonize(obj).map_err(|e| {
+        pyo3::exceptions::PyValueError::new_err(format!(
+            "Failed to convert Python object to JSON value: {e}"
+        ))
+    })
+}
+
+/// Convert a serde_json::Value to a Python object.
+fn json_to_pyobject(py: Python<'_>, v: &serde_json::Value) -> PyResult<PyObject> {
+    let bound = pythonize::pythonize(py, v).map_err(|e| {
+        pyo3::exceptions::PyValueError::new_err(format!(
+            "Failed to convert JSON value to Python object: {e}"
+        ))
+    })?;
+    Ok(bound.unbind())
+}
+
+// =============================================================================
+// Utility function bindings
+// =============================================================================
+
+/// Sanitize a value for JSON serialization.
+///
+/// Recursively processes the input:
+/// - Null values inside dicts/lists are filtered out
+/// - Nested structures are recursively sanitized
+/// - Default max depth of 50 prevents infinite recursion
+///
+/// The optional ``max_depth`` parameter limits recursion depth.
+/// At depth 0, any input returns ``None``.
+///
+/// Example:
+///   ```python
+///   result = sanitize_for_json({"a": 1, "b": None, "c": {"d": None}})
+///   # result == {"a": 1, "c": {}}
+///   ```
+#[pyfunction]
+#[pyo3(signature = (data, max_depth=None))]
+fn sanitize_for_json<'py>(
+    py: Python<'py>,
+    data: &Bound<'py, PyAny>,
+    max_depth: Option<usize>,
+) -> PyResult<PyObject> {
+    let json_val = pyobject_to_json(data)?;
+    let sanitized = match max_depth {
+        Some(depth) => crate::serialization::sanitize_for_json_with_depth(&json_val, depth),
+        None => crate::serialization::sanitize_for_json(&json_val),
+    };
+    json_to_pyobject(py, &sanitized)
+}
+
+/// Sanitize a chat message for persistence.
+///
+/// Special handling for LLM API fields:
+/// - ``thinking_block``: extracts ``.text`` as ``thinking_text``
+/// - ``content_blocks``: skipped entirely
+/// - Other fields: recursively sanitized (nulls removed)
+///
+/// Non-dict input returns an empty dict.
+#[pyfunction]
+fn sanitize_message<'py>(py: Python<'py>, message: &Bound<'py, PyAny>) -> PyResult<PyObject> {
+    let json_val = pyobject_to_json(message)?;
+    let sanitized = crate::serialization::sanitize_message(&json_val);
+    json_to_pyobject(py, &sanitized)
+}
+
+/// Merge two module lists by module ID.
+///
+/// Module lists are arrays of dicts, each with a ``module`` key. Entries with
+/// matching module IDs are deep-merged; new entries are appended.
+///
+/// Raises ``TypeError`` if arguments are not lists or contain non-dict elements.
+///
+/// Example:
+///   ```python
+///   parent = [{"module": "provider-openai", "config": {"model": "gpt-4"}}]
+///   child = [{"module": "provider-openai", "config": {"temperature": 0.5}}]
+///   result = merge_module_lists(parent, child)
+///   # result[0]["config"] == {"model": "gpt-4", "temperature": 0.5}
+///   ```
+#[pyfunction]
+fn merge_module_lists<'py>(
+    py: Python<'py>,
+    parent: &Bound<'py, PyAny>,
+    child: &Bound<'py, PyAny>,
+) -> PyResult<PyObject> {
+    // Type-check: both must be lists
+    if !parent.is_instance_of::<pyo3::types::PyList>() {
+        return Err(pyo3::exceptions::PyTypeError::new_err(
+            "merge_module_lists() parent argument must be a list",
+        ));
+    }
+    if !child.is_instance_of::<pyo3::types::PyList>() {
+        return Err(pyo3::exceptions::PyTypeError::new_err(
+            "merge_module_lists() child argument must be a list",
+        ));
+    }
+
+    let parent_yaml = pyobject_to_yaml(parent)?;
+    let child_yaml = pyobject_to_yaml(child)?;
+
+    // PyList always deserializes to Value::Sequence via pythonize
+    let parent_seq = parent_yaml
+        .as_sequence()
+        .expect("PyList always deserializes to Sequence");
+    let child_seq = child_yaml
+        .as_sequence()
+        .expect("PyList always deserializes to Sequence");
+
+    // The Rust merge_module_lists panics on non-Mapping elements.
+    // Catch the panic and convert to a clean Python TypeError.
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        crate::dicts::merge::merge_module_lists(parent_seq, child_seq)
+    }));
+
+    match result {
+        Ok(merged) => {
+            let result_yaml = serde_yaml_ng::Value::Sequence(merged);
+            yaml_to_pyobject(py, &result_yaml)
+        }
+        Err(_) => Err(pyo3::exceptions::PyTypeError::new_err(
+            "merge_module_lists() list elements must be dicts with a 'module' key",
+        )),
+    }
+}
+
+/// Format a directory listing for a given path.
+///
+/// Returns a string with one line per entry, sorted dirs-first.
+/// Each line is prefixed with ``DIR`` or ``FILE``.
+///
+/// Note: This function never raises exceptions. If the directory cannot be
+/// read (permission denied, not found), the error is embedded in the
+/// returned string. Callers should check for ``(permission denied)`` if
+/// error detection is needed.
+#[pyfunction]
+fn format_directory_listing(path: &str) -> String {
+    crate::mentions::utils::format_directory_listing(std::path::Path::new(path))
+}
+
+// =============================================================================
 // SimpleCache
 // =============================================================================
 
@@ -1157,6 +1317,10 @@ fn amplifier_foundation(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(validate_bundle_completeness_or_raise, m)?)?;
     m.add_function(wrap_pyfunction!(apply_provider_preferences, m)?)?;
     m.add_function(wrap_pyfunction!(is_glob_pattern, m)?)?;
+    m.add_function(wrap_pyfunction!(sanitize_for_json, m)?)?;
+    m.add_function(wrap_pyfunction!(sanitize_message, m)?)?;
+    m.add_function(wrap_pyfunction!(merge_module_lists, m)?)?;
+    m.add_function(wrap_pyfunction!(format_directory_listing, m)?)?;
     Ok(())
 }
 

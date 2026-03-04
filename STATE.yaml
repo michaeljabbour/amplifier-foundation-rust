@@ -856,17 +856,20 @@ features:
 
   F-086-py-exceptions:
     name: "BundleError Python exception hierarchy (create_exception!, BundleError->PyErr conversion)"
-    module: "pyo3_bindings"
-    status: "in-progress"
+    module: "pyo3_bindings, bundle/validator"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-082-pyvalidator"]
     started_at: "2025-02-03T00:00:00Z"
+    completed_at: "2025-02-03T00:30:00Z"
+    commit: "c68c2fc"
   F-087-py-utils:
     name: "PyO3 utility function bindings (sanitize_for_json, sanitize_message, merge_module_lists, format_directory_listing)"
     module: "pyo3_bindings"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-086-py-exceptions"]
+    started_at: "2025-02-03T00:35:00Z"
   F-088-http-status-handler:
     name: "Implement SourceHandlerWithStatus on HttpSourceHandler (HEAD + ETag/Last-Modified)"
     module: "sources"
