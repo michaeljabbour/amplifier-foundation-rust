@@ -6,6 +6,7 @@ use serde_yaml_ng::Value;
 use crate::bundle::Bundle;
 use crate::paths::uri::{get_amplifier_home, parse_uri};
 use crate::sources::git::GitSourceHandler;
+use crate::sources::http::HttpSourceHandler;
 use crate::sources::{SourceHandler, SourceHandlerWithStatus, SourceStatus};
 
 /// Status of a bundle and all its sources.
@@ -229,13 +230,26 @@ pub async fn check_bundle_status_for_bundle(
                 },
             }
         } else {
-            // HTTP and other remote sources: no status handler yet
-            SourceStatus {
-                uri: uri.clone(),
-                has_update: None,
-                is_cached: true, // Assume cached since bundle loaded
-                summary: "Update checking not supported for this source type".to_string(),
-                ..Default::default()
+            let http_handler = HttpSourceHandler::new();
+            if http_handler.can_handle(&parsed) {
+                match http_handler.get_status(&parsed, &cache).await {
+                    Ok(s) => s,
+                    Err(e) => SourceStatus {
+                        uri: uri.clone(),
+                        has_update: None,
+                        error: Some(e.to_string()),
+                        summary: format!("Status check failed: {e}"),
+                        ..Default::default()
+                    },
+                }
+            } else {
+                // Other remote sources: no status handler
+                SourceStatus {
+                    uri: uri.clone(),
+                    has_update: None,
+                    summary: "Update checking not supported for this source type".to_string(),
+                    ..Default::default()
+                }
             }
         };
 
@@ -268,7 +282,8 @@ pub async fn check_bundle_status_for_bundle(
 /// - `file://` and local paths: always reported as up to date
 /// - `git+https://`, `git+http://`: dispatched to [`GitSourceHandler::get_status`]
 ///   which uses `git ls-remote` to check for updates
-/// - `https://`, `http://`: reported as unknown (HTTP status checking not yet implemented)
+/// - `https://`, `http://`: dispatched to [`HttpSourceHandler::get_status`]
+///   which uses a HEAD request with ETag/Last-Modified conditional headers
 ///
 /// # Arguments
 ///
@@ -304,12 +319,17 @@ pub async fn check_bundle_status(
         if git_handler.can_handle(&parsed) {
             git_handler.get_status(&parsed, &cache).await?
         } else {
-            // HTTP and other remote sources: no status handler yet
-            SourceStatus {
-                uri: uri_owned.clone(),
-                has_update: None,
-                summary: "Update checking not supported for this source type".to_string(),
-                ..Default::default()
+            let http_handler = HttpSourceHandler::new();
+            if http_handler.can_handle(&parsed) {
+                http_handler.get_status(&parsed, &cache).await?
+            } else {
+                // Other remote sources: no status handler
+                SourceStatus {
+                    uri: uri_owned.clone(),
+                    has_update: None,
+                    summary: "Update checking not supported for this source type".to_string(),
+                    ..Default::default()
+                }
             }
         }
     };
@@ -330,7 +350,8 @@ pub async fn check_bundle_status(
 /// - `file://` and local paths: no-op (nothing to update for local files)
 /// - `git+https://`, `git+http://`: dispatched to [`GitSourceHandler::update`]
 ///   which removes the cache and re-clones
-/// - `https://`, `http://`: not yet implemented (returns error)
+/// - `https://`, `http://`: dispatched to [`HttpSourceHandler::update`]
+///   which removes the cached file and re-downloads
 ///
 /// # Arguments
 ///
@@ -359,10 +380,17 @@ pub async fn update_bundle(uri: &str, cache_dir: Option<&Path>) -> crate::error:
         return Ok(());
     }
 
-    // HTTP and other remote sources: not yet implemented
+    let http_handler = HttpSourceHandler::new();
+    if http_handler.can_handle(&parsed) {
+        // Delegate to HttpSourceHandler::update (remove cached file and re-download)
+        http_handler.update(&parsed, &cache).await?;
+        return Ok(());
+    }
+
+    // Other remote sources: not implemented
     Err(crate::error::BundleError::LoadError {
         reason: format!(
-            "Update not yet implemented for URI scheme '{}': {uri}",
+            "Update not supported for URI scheme '{}': {uri}",
             parsed.scheme
         ),
         source: None,
@@ -444,8 +472,20 @@ pub async fn update_bundle_for_bundle(
                     tracing::warn!("Failed to update {uri}: {e}");
                 }
             }
+        } else {
+            let http_handler = HttpSourceHandler::new();
+            if http_handler.can_handle(&parsed) {
+                match http_handler.update(&parsed, &cache).await {
+                    Ok(resolved) => {
+                        updated_paths.push(resolved.active_path);
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to update {uri}: {e}");
+                    }
+                }
+            }
+            // Other remote sources: silently skip
         }
-        // Non-git remote sources: silently skip (no update handler yet)
     }
 
     // Reinstall dependencies for updated modules.

@@ -954,3 +954,186 @@ async fn test_git_get_status_remote_check_failure_sets_error() {
         "remote failure should set error or leave has_update as None"
     );
 }
+
+// ===========================================================================
+// TestHttpSourceHandler — SourceHandlerWithStatus (get_status, update)
+// ===========================================================================
+
+/// Compute expected cached file path for an HTTP URL.
+fn http_cached_file_path(
+    scheme: &str,
+    host: &str,
+    path: &str,
+    cache_dir: &std::path::Path,
+) -> PathBuf {
+    let url = format!("{scheme}://{host}{path}");
+    let hash = format!("{:x}", sha2::Sha256::digest(url.as_bytes()));
+    let cache_key = &hash[..16];
+    let filename = std::path::Path::new(path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .filter(|n| !n.is_empty())
+        .unwrap_or("download");
+    cache_dir.join(format!("{filename}-{cache_key}"))
+}
+
+#[tokio::test]
+async fn test_http_get_status_not_cached() {
+    // When no cache file exists, get_status should return is_cached=false
+    // without making any network call (early return before HEAD request).
+    let cache_dir = tempdir().expect("failed to create cache dir");
+    let parsed = make_http_parsed_uri("127.0.0.1:1", "/bundle.yaml", "");
+
+    let handler = HttpSourceHandler::new();
+    let status = handler
+        .get_status(&parsed, cache_dir.path())
+        .await
+        .expect("get_status should succeed even for uncached URL");
+
+    assert!(!status.is_cached, "should not be cached");
+    assert_eq!(
+        status.has_update, None,
+        "has_update should be None when not cached"
+    );
+    assert!(
+        status.summary.contains("Not cached"),
+        "summary should mention 'Not cached': {}",
+        status.summary
+    );
+    // No network call made — no error expected for the not-cached path.
+    assert!(
+        status.error.is_none(),
+        "no error expected for not-cached status: {:?}",
+        status.error
+    );
+}
+
+#[tokio::test]
+async fn test_http_get_status_cached_no_update() {
+    // When a cache file exists alongside metadata containing an ETag, get_status
+    // sends a conditional HEAD request. With 127.0.0.1:1 (connection refused)
+    // the request fails → has_update=None, error is set.
+    // NOTE: On a real server returning 304 Not Modified, has_update would be Some(false).
+    let cache_dir = tempdir().expect("failed to create cache dir");
+    let parsed = make_http_parsed_uri("127.0.0.1:1", "/bundle.yaml", "");
+
+    // Pre-populate the cache file.
+    let cached_file =
+        http_cached_file_path("https", "127.0.0.1:1", "/bundle.yaml", cache_dir.path());
+    fs::write(&cached_file, "name: cached-bundle").expect("write cache");
+
+    // Write metadata with a fake ETag so the handler has conditional headers to send.
+    let meta_path = {
+        let mut s = cached_file.as_os_str().to_owned();
+        s.push(".meta.json");
+        PathBuf::from(s)
+    };
+    let metadata = serde_json::json!({
+        "etag": "\"abc123\"",
+        "last_modified": null,
+        "cached_at": "2025-01-01T00:00:00Z",
+        "url": "https://127.0.0.1:1/bundle.yaml",
+    });
+    fs::write(&meta_path, serde_json::to_string_pretty(&metadata).unwrap())
+        .expect("write metadata");
+
+    let handler = HttpSourceHandler::new();
+    let status = handler
+        .get_status(&parsed, cache_dir.path())
+        .await
+        .expect("get_status should not propagate errors");
+
+    assert!(
+        status.is_cached,
+        "cache file exists so is_cached should be true"
+    );
+    // With http-sources enabled, the HEAD to 127.0.0.1:1 will be refused → None.
+    // Without http-sources, the feature gate returns None + error.
+    assert_eq!(
+        status.has_update, None,
+        "has_update should be None when HEAD to unreachable host fails"
+    );
+    // cached_at should be populated from the metadata sidecar.
+    assert_eq!(
+        status.cached_at.as_deref(),
+        Some("2025-01-01T00:00:00Z"),
+        "cached_at should be read from metadata"
+    );
+    // Error should be set because the HEAD request failed.
+    assert!(
+        status.error.is_some(),
+        "error should be set when HEAD request fails or feature is disabled"
+    );
+}
+
+#[tokio::test]
+async fn test_http_update_removes_cache() {
+    // update() should remove the existing cached file before attempting a fresh
+    // download. When the download fails (127.0.0.1:1 unreachable), the cached
+    // file should still have been removed.
+    let cache_dir = tempdir().expect("failed to create cache dir");
+    let parsed = make_http_parsed_uri("127.0.0.1:1", "/bundle.yaml", "");
+
+    // Pre-populate cache file and metadata sidecar.
+    let cached_file =
+        http_cached_file_path("https", "127.0.0.1:1", "/bundle.yaml", cache_dir.path());
+    fs::write(&cached_file, "name: old-bundle").expect("write cache");
+    assert!(
+        cached_file.exists(),
+        "cache file should exist before update"
+    );
+
+    let meta_path = {
+        let mut s = cached_file.as_os_str().to_owned();
+        s.push(".meta.json");
+        PathBuf::from(s)
+    };
+    fs::write(
+        &meta_path,
+        r#"{"etag":"\"old\"","last_modified":null,"cached_at":"2025-01-01T00:00:00Z","url":"https://127.0.0.1:1/bundle.yaml"}"#,
+    )
+    .expect("write metadata");
+
+    let handler = HttpSourceHandler::new();
+    let result = handler.update(&parsed, cache_dir.path()).await;
+
+    // The update should have removed the cached file before attempting to download.
+    assert!(
+        !cached_file.exists(),
+        "cached file should be removed after update attempt"
+    );
+    // The download to 127.0.0.1:1 should fail.
+    assert!(result.is_err(), "update to unreachable host should fail");
+}
+
+#[tokio::test]
+async fn test_http_get_status_network_error() {
+    // When the cache exists but the HEAD request to the remote fails (connection
+    // refused on 127.0.0.1:1), get_status should return has_update=None and
+    // populate the error field.
+    let cache_dir = tempdir().expect("failed to create cache dir");
+    let parsed = make_http_parsed_uri("127.0.0.1:1", "/file.yaml", "");
+
+    // Pre-populate the cache so we reach the HEAD-request branch.
+    let cached_file = http_cached_file_path("https", "127.0.0.1:1", "/file.yaml", cache_dir.path());
+    fs::write(&cached_file, "name: cached").expect("write cache");
+
+    let handler = HttpSourceHandler::new();
+    let status = handler
+        .get_status(&parsed, cache_dir.path())
+        .await
+        .expect("get_status should succeed (errors go into SourceStatus, not Err variant)");
+
+    assert!(
+        status.is_cached,
+        "cache file exists so is_cached should be true"
+    );
+    assert_eq!(
+        status.has_update, None,
+        "has_update should be None when remote is unreachable"
+    );
+    assert!(
+        status.error.is_some(),
+        "error should be populated when HEAD request fails or feature is disabled"
+    );
+}
