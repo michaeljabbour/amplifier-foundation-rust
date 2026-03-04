@@ -33,6 +33,12 @@
 //! - `sanitize_message(message)` -- sanitize a chat message for persistence
 //! - `merge_module_lists(parent, child)` -- merge module lists by module ID
 //! - `format_directory_listing(path)` -- format directory contents listing
+//! - `get_amplifier_home()` -- return the Amplifier home directory
+//! - `construct_agent_path(base, name)` -- construct path to agent file
+//! - `construct_context_path(base, name)` -- construct path to bundle resource
+//! - `get_nested(data, path)` -- get value from nested dict by path
+//! - `get_nested_with_default(data, path, default)` -- get with fallback default
+//! - `set_nested(data, path, value)` -- set value in nested dict by path
 //!
 //! ## Exposed exceptions
 //!
@@ -53,10 +59,11 @@ use exceptions::{
     BundleDependencyError, BundleError, BundleLoadError, BundleNotFoundError, BundleValidationError,
 };
 use functions::{
-    apply_provider_preferences, deep_merge, deep_merge_json, format_directory_listing,
-    generate_sub_session_id, is_glob_pattern, merge_module_lists, normalize_path, parse_mentions,
-    parse_uri, sanitize_for_json, sanitize_message, validate_bundle, validate_bundle_completeness,
-    validate_bundle_completeness_or_raise, validate_bundle_or_raise,
+    apply_provider_preferences, construct_agent_path, construct_context_path, deep_merge,
+    deep_merge_json, format_directory_listing, generate_sub_session_id, get_amplifier_home,
+    get_nested, get_nested_with_default, is_glob_pattern, merge_module_lists, normalize_path,
+    parse_mentions, parse_uri, sanitize_for_json, sanitize_message, set_nested, validate_bundle,
+    validate_bundle_completeness, validate_bundle_completeness_or_raise, validate_bundle_or_raise,
 };
 use types::{
     PyBundle, PyDiskCache, PyParsedURI, PyProviderPreference, PyResolvedSource, PySimpleCache,
@@ -111,6 +118,12 @@ fn amplifier_foundation(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sanitize_message, m)?)?;
     m.add_function(wrap_pyfunction!(merge_module_lists, m)?)?;
     m.add_function(wrap_pyfunction!(format_directory_listing, m)?)?;
+    m.add_function(wrap_pyfunction!(get_amplifier_home, m)?)?;
+    m.add_function(wrap_pyfunction!(construct_agent_path, m)?)?;
+    m.add_function(wrap_pyfunction!(construct_context_path, m)?)?;
+    m.add_function(wrap_pyfunction!(get_nested, m)?)?;
+    m.add_function(wrap_pyfunction!(get_nested_with_default, m)?)?;
+    m.add_function(wrap_pyfunction!(set_nested, m)?)?;
     Ok(())
 }
 
