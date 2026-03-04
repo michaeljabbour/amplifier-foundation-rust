@@ -6,6 +6,61 @@
 
 ---
 
+## Session 029 -- Wave 24 COMPLETE (F-080, F-081, F-082)
+
+### Work Completed
+- **F-080-pythonize-deep-merge** (d7a8faf): Added `pythonize 0.24` crate (behind `pyo3-bindings` feature) for direct Python<->serde_yaml_ng::Value conversion. Eliminated JSON intermediary: `pyobject_to_yaml` uses `pythonize::depythonize::<serde_yaml_ng::Value>` directly. `yaml_to_pyobject` uses `pythonize::pythonize(py, &yaml_val)` directly. This preserves YAML-specific types (Tagged values, non-string mapping keys) that the JSON round-trip would lose. `deep_merge` now accepts native Python dicts with `TypeError` for non-dict arguments. `deep_merge_json` kept for backward compatibility. `json_to_yaml` helper retained only for legacy JSON interface -- `unreachable!()` replaced with safe fallback to 0 with tracing::warn.
+- **F-081-pybundle** (d7a8faf): `PyBundle` class wrapping Rust `Bundle` struct. `from_dict`/`from_dict_with_base_path` accept native Python dicts via pythonize. `to_dict`/`to_mount_plan` return native Python dicts. `compose()` uses `Vec<PyRef<'_, PyBundle>>` for zero-copy borrows (avoids cloning all overlay bundles). Property getters: `name`, `version`, `description`, `instruction`, `source_uri`, `provider_count`, `tool_count`, `hook_count`. Property setters: `name`, `version`. `__copy__`/`__deepcopy__` support. Mutable type -- intentionally no `__eq__`/`__hash__` (use `to_dict()` for structural comparison). `__repr__` shows name, version, counts.
+- **F-082-pyvalidator** (d7a8faf): `PyValidationResult` (frozen) with `is_valid`, `errors`, `warnings` getters and `__bool__` support (truthiness = valid). `From<ValidationResult>` conversion. Four validation functions: `validate_bundle`, `validate_bundle_completeness` (return `PyValidationResult`), `validate_bundle_or_raise`, `validate_bundle_completeness_or_raise` (raise `ValueError`).
+
+### Wave 24 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- cargo clippy --all-targets --features pyo3-bindings: 0 warnings
+- cargo check --features pyo3-bindings: CLEAN
+- Tests: 610 passing, 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **Direct pythonize conversion (no JSON intermediary)**: Antagonistic review identified P0 issues: `serde_json::to_value` fails on YAML Tagged values, and JSON intermediary coerces all mapping keys to strings. Direct `pythonize::depythonize::<serde_yaml_ng::Value>` and `pythonize::pythonize(py, &yaml_val)` eliminate both problems. The JSON helpers (`json_to_yaml`) are retained only for the legacy `deep_merge_json` interface.
+- **`unreachable!()` replaced with safe fallback**: In `json_to_yaml`, the number branch that was `unreachable!()` is now a safe fallback to 0 with `tracing::warn`. This handles the case where `serde_json` is built with `arbitrary_precision` feature (Cargo unifies features across the dependency graph).
+- **PyBundle is mutable, no `__eq__`/`__hash__`**: `Bundle` doesn't derive `PartialEq`. The initial implementation used `to_dict()` for equality, but this: (a) is O(n) serialization per comparison, (b) omits fields like `instruction`, `pending_context`, `base_path` -- making two semantically different bundles compare as equal. Removed `__eq__` entirely. PyO3 automatically sets `__hash__ = None` for mutable types.
+- **`compose()` uses `Vec<PyRef<'_, PyBundle>>`**: Avoids cloning all overlay bundles. `PyRef` borrows from the Python GC without cloning the underlying Rust data.
+- **`deep_merge` type-checks arguments**: Raises `TypeError` if base or overlay is not a dict. The Rust `deep_merge` would silently return the overlay for non-Mapping inputs, which is surprising for a function documented as "merge two dicts."
+- **`__copy__`/`__deepcopy__` on PyBundle**: Since Bundle owns all its data (no shared references), `clone()` produces a correct deep copy. `__deepcopy__` accepts the `memo` dict parameter (required by Python protocol) but ignores it since no reference cycles are possible.
+- **`PyValidationResult` is frozen**: Validation results are immutable (computed once, read many). `frozen` enables hashability and prevents accidental mutation. `__bool__` maps to `valid` for natural Python truthiness testing.
+- **`deep_merge_json` kept for backward compat**: v1 JSON string interface kept as `deep_merge_json`. `deep_merge` now accepts native dicts. Both coexist in the module.
+
+### Antagonistic Review Issues Found & Fixed
+- P0: Eliminated JSON intermediary in pyobject_to_yaml/yaml_to_pyobject -- direct pythonize prevents Tagged value errors and key type coercion
+- P0: Replaced `unreachable!()` in json_to_yaml with safe fallback + tracing::warn
+- P1: Removed `__eq__` from PyBundle -- was O(n) serialization and omitted fields
+- P1: Added TypeError checks to `deep_merge` for non-dict arguments
+- P2: Changed `compose()` from `Vec<PyBundle>` to `Vec<PyRef<'_, PyBundle>>` -- zero-copy borrows
+- P2: Added `__copy__`/`__deepcopy__` to PyBundle
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- PyValidationResult `errors`/`warnings` getters clone Vec<String> on each access -- frozen type, could cache on first access, but typical use is single access. Low priority.
+- PyBundle has no `__eq__` -- intentional for mutable types. Use `to_dict()` for comparison.
+- No Python-side tests (requires maturin build) -- compile-checked via `cargo check --features pyo3-bindings`.
+
+### Module Registration
+- Types: `ParsedURI`, `Bundle`, `ValidationResult` (3 total, was 1)
+- Functions: `parse_uri`, `normalize_path`, `deep_merge`, `deep_merge_json`, `parse_mentions`, `generate_sub_session_id`, `validate_bundle`, `validate_bundle_completeness`, `validate_bundle_or_raise`, `validate_bundle_completeness_or_raise` (10 total, was 6)
+
+### What's Next
+- All 24 waves complete. 610 tests, 0 clippy warnings, 82 features delivered.
+- PyO3 bindings expanded: 3 types + 10 functions exposed, native dict I/O via pythonize.
+- Remaining unported PreparedBundle functionality:
+  - `create_session` (bundle.py:981-1109) -- depends on AmplifierSession from amplifier_core
+  - `spawn` (bundle.py:1111-1289) -- depends on AmplifierSession from amplifier_core
+- Consider: maturin build + PyPI publishing
+- Consider: Expand pyo3 bindings (BundleRegistry, SourceStatus, ProviderPreference)
+- Consider: HTTP SourceHandlerWithStatus impl (HEAD + ETag/Last-Modified)
+- Consider: Python-side integration tests via maturin develop
+
+---
+
 ## Session 028 -- Wave 23 COMPLETE (F-077, F-078, F-079)
 
 ### Work Completed

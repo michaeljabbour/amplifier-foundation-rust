@@ -13,7 +13,7 @@
 phase: 24
 phase_name: "Wave 24 -- Expand PyO3 bindings: pythonize, PyBundle, PyBundleValidator"
 epoch: 25
-next_action: "Implementing Wave 24: F-080 (pythonize + native dict deep_merge), F-081 (PyBundle class), F-082 (PyValidationResult + PyBundleValidator)"
+next_action: "Wave 24 COMPLETE. 610 tests passing, 0 clippy warnings, cargo fmt clean. pythonize direct conversion, PyBundle class, PyValidationResult + validate functions. 3 types + 10 functions exposed. Consider: maturin build + PyPI, expand pyo3 (BundleRegistry, SourceStatus), HTTP SourceHandlerWithStatus."
 blockers: []
 
 architecture_spec:
@@ -799,35 +799,43 @@ features:
   F-080-pythonize-deep-merge:
     name: "Add pythonize crate + native Python dict deep_merge (replace JSON string interface)"
     module: "pyo3_bindings"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-078-pyo3-abi3-fix"]
     started_at: "2025-02-01T00:00:00Z"
+    completed_at: "2025-02-01T00:30:00Z"
+    commit: "d7a8faf"
 
   F-081-pybundle:
     name: "PyBundle class bindings (from_dict, to_dict, compose, to_mount_plan, properties)"
     module: "pyo3_bindings"
-    status: "ready"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-080-pythonize-deep-merge"]
+    started_at: "2025-02-01T00:30:00Z"
+    completed_at: "2025-02-01T01:00:00Z"
+    commit: "d7a8faf"
 
   F-082-pyvalidator:
     name: "PyValidationResult + PyBundleValidator bindings (validate, validate_completeness)"
     module: "pyo3_bindings"
-    status: "ready"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-081-pybundle"]
+    started_at: "2025-02-01T01:00:00Z"
+    completed_at: "2025-02-01T01:30:00Z"
+    commit: "d7a8faf"
 
 wave_gate:
   current_wave: 24
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo clippy --features pyo3-bindings clean + cargo fmt clean"
   approval_required: false
-  approval_status: "in-progress"
-  notes: "Wave 24 IN PROGRESS: Expanding PyO3 bindings with pythonize, PyBundle, PyBundleValidator."
+  approval_status: "approved"
+  notes: "Wave 24 COMPLETE: 610 tests (all passing), 0 clippy warnings, cargo fmt clean. pythonize 0.24 direct conversion, PyBundle class, PyValidationResult, 4 validate functions, type-checked deep_merge. 3 types + 10 functions exposed."
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 79
-  last_updated: "2025-01-31T01:30:00Z"
-  last_session: "session-028-wave23-dry-pyo3-benchmarks"
+  total_features_completed: 82
+  last_updated: "2025-02-01T01:30:00Z"
+  last_session: "session-029-wave24-pyo3-expansion"
