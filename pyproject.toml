@@ -1,0 +1,27 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "amplifier-foundation"
+version = "0.1.0"
+description = "Rust-powered foundation library for the Amplifier ecosystem"
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[tool.maturin]
+# Explicit module name: `pip install amplifier-foundation` -> `import amplifier_foundation`
+module-name = "amplifier_foundation"
+# Build with pyo3-bindings feature enabled (required for Python module)
+features = ["pyo3-bindings"]
+# Strip debug symbols from the .so to reduce wheel size
+strip = true

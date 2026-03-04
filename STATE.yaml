@@ -885,17 +885,20 @@ features:
   F-089-pyo3-decompose:
     name: "Decompose pyo3_bindings.rs (1333 lines) into focused submodules"
     module: "pyo3_bindings"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-088-http-status-handler"]
     started_at: "2025-02-04T00:00:00Z"
+    completed_at: "2025-02-04T00:30:00Z"
+    commit: "92f25a1"
 
   F-090-maturin-config:
     name: "Add maturin pyproject.toml for Python package building"
     module: "root"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-089-pyo3-decompose"]
+    started_at: "2025-02-04T00:30:00Z"
 
   F-091-pyo3-path-dict-utils:
     name: "PyO3 bindings for path utilities (get_amplifier_home, construct_*) and dict utilities (get_nested, set_nested)"
@@ -914,6 +917,6 @@ wave_gate:
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 88
-  last_updated: "2025-02-04T00:00:00Z"
+  total_features_completed: 89
+  last_updated: "2025-02-04T00:30:00Z"
   last_session: "session-032-wave27-decompose-maturin-utils"
