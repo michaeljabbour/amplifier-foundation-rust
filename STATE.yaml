@@ -982,16 +982,19 @@ features:
   F-099-readme:
     name: "README.md for crates.io and PyPI with usage examples and API overview"
     module: "root"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-098-license-metadata"]
     started_at: "2025-02-07T00:15:00Z"
+    completed_at: "2025-02-07T00:30:00Z"
+    commit: "b2cbe7b"
   F-100-ci-workflow:
     name: "GitHub Actions CI workflow (cargo test, clippy, fmt, maturin build, pytest)"
     module: "root"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: []
+    started_at: "2025-02-07T00:30:00Z"
 
 wave_gate:
   current_wave: 29
