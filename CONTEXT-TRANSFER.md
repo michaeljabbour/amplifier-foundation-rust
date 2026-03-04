@@ -6,6 +6,83 @@
 
 ---
 
+## Session 033 -- Wave 28 COMPLETE (F-092, F-093, F-094)
+
+### Work Completed
+- **F-092-pyo3-session-slice** (0aa585b): Created new `src/pyo3_bindings/session.rs` with 6 session slice function bindings: `count_turns`, `get_turn_boundaries`, `slice_to_turn`, `find_orphaned_tool_calls`, `add_synthetic_tool_results`, `get_turn_summary`. All use `pyobject_to_json`/`json_to_pyobject` for serde_json::Value conversions. `slice_to_turn` and `get_turn_summary` accept `isize` to catch negative Python ints with clean `BundleLoadError` instead of opaque `OverflowError`. Internal `json_list_to_pyobject` takes owned `Vec<Value>` to avoid unnecessary deep cloning.
+- **F-093-pyo3-session-fork** (f54e737): Added `PyForkResult` frozen pyclass (7 getters + `__repr__`) and 7 fork/events function bindings: `fork_session`, `fork_session_in_memory`, `get_fork_preview`, `list_session_forks`, `get_session_lineage`, `count_events`, `get_event_summary`. `PyForkResult.messages` getter documents deep-copy behavior. `PyForkResult` intentionally has no `__eq__`/`__hash__` (session_id contains random UUID). `count_events` is infallible (returns 0 on any error). Documented omitted bindings (slice_events_*, capabilities) with rationale.
+- **F-094-pyo3-io-frontmatter** (5c47488): Added `parse_frontmatter(content)` binding returning `(dict_or_None, body_string)` tuple. Uses `yaml_to_pyobject` for serde_yaml_ng::Value path (not JSON). Documents both `BundleLoadError` (malformed YAML) and `ValueError` (pythonize failure) in Raises section.
+
+### Wave 28 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- cargo clippy --all-targets --features pyo3-bindings: 0 warnings
+- cargo check --features pyo3-bindings: CLEAN
+- Tests: 614 passing, 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **New `session.rs` submodule in pyo3_bindings/**: Session bindings are in their own file (465 lines) rather than in `functions.rs`. This mirrors the Rust module structure and keeps concerns separated.
+- **`turn` parameter uses `isize` in slice_to_turn/get_turn_summary**: Catches negative Python ints at the binding layer with a clean `BundleLoadError` instead of PyO3's opaque `OverflowError`. The binding-layer guard makes the Rust `if turn < 1` guard redundant but harmless.
+- **fork functions keep `usize` for turn**: `fork_session` and `fork_session_in_memory` accept `Option<usize>`. Negative values get `OverflowError` from PyO3. This is an accepted inconsistency — fork functions are less likely to receive negative turns than slice functions.
+- **`json_list_to_pyobject` takes owned Vec**: Avoids deep-cloning `Vec<Value>` when the caller already owns the data. The Vec is moved into `Value::Array`, then pythonized.
+- **`PyForkResult` has no `__eq__`/`__hash__`**: Each ForkResult contains a unique random `session_id`. Two fork operations on the same data produce different results. Equality is meaningless.
+- **`PyForkResult.messages` clones on every access**: Frozen type can't cache. Documented in getter docstring so callers know to stash the result.
+- **Omitted session bindings documented**: `slice_events_to_timestamp`, `slice_events_for_fork`, `get_last_timestamp_for_turn` are internal fork primitives. `get_working_dir`/`set_working_dir` are trivial JSON key operations. Both documented with rationale in module docstring.
+- **`parse_frontmatter` returns `Option<PyObject>` not `Option<dict>`**: The underlying Rust function returns `serde_yaml_ng::Value` which is typically a Mapping but could be any YAML type. Docstring says "typically a dict" without promising it.
+- **`parse_frontmatter` documents two exception types**: `BundleLoadError` from malformed YAML, `ValueError` from pythonize conversion failure. Most other bindings only document one.
+
+### Antagonistic Review Issues Found & Fixed
+- F-092 P1: Changed `turn: usize` to `turn: isize` with explicit guard in slice_to_turn and get_turn_summary — negative ints now get clean BundleLoadError
+- F-092 P1: Changed `json_list_to_pyobject` from `&[Value]` to `Vec<Value>` — eliminates unnecessary deep clone
+- F-092 P2: Fixed module docstring from "events and fork" to "slice" (was claiming nonexistent bindings)
+- F-092 P2: Fixed `slice_to_turn` Raises to include `turn > max_turns` case
+- F-092 P2: Fixed mod.rs docstring to include `handle_orphaned_tools` parameter
+- F-092 P3: Fixed "truncated" to "forked" in `add_synthetic_tool_results` docstring
+- F-093 P1: Documented `messages` getter deep-copy on each access
+- F-093 P2: Fixed `count_events` docstring — returns 0 on ANY error, not just missing file
+- F-093 P2: Fixed `get_event_summary` docstring — returns zero-count summary for missing files
+- F-093 P2: Documented no `__eq__`/`__hash__` design decision on PyForkResult
+- F-093 P2: Documented omitted bindings (events slicing, capabilities) with rationale
+- F-093 P3: Fixed `__repr__` from `messages=` to `message_count=`
+- F-093 P3: Fixed "zero-copy" comment to accurately describe pythonize conversion
+- F-094 P1: Fixed docstring from "dict" to "typically a dict, but could be any YAML type"
+- F-094 P1: Documented ValueError from pythonize in Raises section
+- F-094 P1: Removed false "empty frontmatter" claim (pre-existing regex limitation)
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-092: `pyobject_to_json_list` silently accepts tuples (consistent with pythonize behavior, not just lists)
+- F-093: fork_session/fork_session_in_memory use `usize` for turn (negative → OverflowError, not BundleLoadError) — accepted inconsistency with slice functions
+- F-093: `PyForkResult.messages` deep-copies on every access — caching would require OnceCell or unsafe for frozen type
+- F-093: session.rs is 465 lines — below 1000 threshold, but split into session/{slice,fork,events}.rs when it grows
+- F-094: parse_frontmatter doesn't enforce Mapping return type — matches Rust function behavior
+
+### File Size Status
+- `src/pyo3_bindings/session.rs`: 465 lines (new file)
+- `src/pyo3_bindings/functions.rs`: 549 lines (was 503)
+- `src/pyo3_bindings/types.rs`: 778 lines (unchanged)
+- `src/pyo3_bindings/mod.rs`: 158 lines (was 133)
+- No file over 778 lines
+
+### Module Registration
+- Exceptions: BundleError, BundleNotFoundError, BundleLoadError, BundleValidationError, BundleDependencyError (5 total, unchanged)
+- Types: ParsedURI, Bundle, ValidationResult, SourceStatus, ResolvedSource, ProviderPreference, SimpleCache, DiskCache, ForkResult (9 total, was 8)
+- Functions: parse_uri, normalize_path, deep_merge, deep_merge_json, parse_mentions, generate_sub_session_id, validate_bundle, validate_bundle_completeness, validate_bundle_or_raise, validate_bundle_completeness_or_raise, apply_provider_preferences, is_glob_pattern, sanitize_for_json, sanitize_message, merge_module_lists, format_directory_listing, get_amplifier_home, construct_agent_path, construct_context_path, get_nested, get_nested_with_default, set_nested, parse_frontmatter, count_turns, get_turn_boundaries, slice_to_turn, find_orphaned_tool_calls, add_synthetic_tool_results, get_turn_summary, fork_session, fork_session_in_memory, get_fork_preview, list_session_forks, get_session_lineage, count_events, get_event_summary (36 total, was 22)
+
+### What's Next
+- All 28 waves complete. 614 tests, 0 clippy warnings, 94 features delivered.
+- PyO3 bindings: 9 types + 36 functions + 5 exceptions, native dict I/O via pythonize.
+- Session module fully bound (slice, fork, events — 14 new functions).
+- Remaining architecture spec section 13 types NOT yet exposed via PyO3:
+  - `BundleRegistry` — complex type with async methods, needs careful design
+  - `BundleValidator` — already exposed as functions; class wrapper is optional
+- Consider: .pyi type stub generation for IDE support
+- Consider: Python-side integration tests via maturin develop
+- Consider: BundleRegistry PyO3 bindings (requires async design)
+- Consider: LICENSE + README.md files for proper PyPI publishing
+
+---
+
 ## Session 032 -- Wave 27 COMPLETE (F-089, F-090, F-091)
 
 ### Work Completed
