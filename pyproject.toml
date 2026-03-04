@@ -18,6 +18,9 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
+
 [tool.maturin]
 # Explicit module name: `pip install amplifier-foundation` -> `import amplifier_foundation`
 module-name = "amplifier_foundation"

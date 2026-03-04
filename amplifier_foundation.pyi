@@ -7,7 +7,7 @@ session management, and utility functions for the Amplifier ecosystem.
 Built with PyO3 from amplifier-foundation-rs.
 """
 
-from typing import Any, ClassVar, Literal, Optional
+from typing import Any, Literal, Optional
 
 __version__: str
 
@@ -138,7 +138,6 @@ class Bundle:
     def __repr__(self) -> str: ...
     def __copy__(self) -> "Bundle": ...
     def __deepcopy__(self, memo: dict[int, Any]) -> "Bundle": ...
-    __hash__: ClassVar[None]  # type: ignore[assignment]
 
 class ValidationResult:
     """
@@ -338,7 +337,6 @@ class ForkResult:
     @property
     def events_count(self) -> int: ...
     def __repr__(self) -> str: ...
-    __hash__: ClassVar[None]  # type: ignore[assignment]
 
 # =============================================================================
 # Functions — URI & Paths
