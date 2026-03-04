@@ -8,7 +8,7 @@ description = "Rust port of the Amplifier Foundation library — bundle loading,
 repository = "https://github.com/amplifier-dev/amplifier-foundation-rust"
 readme = "README.md"
 keywords = ["amplifier", "bundle", "composition", "agent", "foundation"]
-categories = ["config", "development-tools"]
+categories = ["data-structures", "development-tools"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

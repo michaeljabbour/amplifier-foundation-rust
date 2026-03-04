@@ -973,16 +973,19 @@ features:
   F-098-license-metadata:
     name: "MIT LICENSE file + Cargo.toml/pyproject.toml license metadata"
     module: "root"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: []
     started_at: "2025-02-07T00:00:00Z"
+    completed_at: "2025-02-07T00:15:00Z"
+    commit: "bcd57fb"
   F-099-readme:
     name: "README.md for crates.io and PyPI with usage examples and API overview"
     module: "root"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-098-license-metadata"]
+    started_at: "2025-02-07T00:15:00Z"
   F-100-ci-workflow:
     name: "GitHub Actions CI workflow (cargo test, clippy, fmt, maturin build, pytest)"
     module: "root"
