@@ -45,3 +45,8 @@ serial_test = "3"
 tokio = { version = "1", features = ["full", "test-util"] }
 zip = "2"
 sha2 = "0.10"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "core_ops"
+harness = false
