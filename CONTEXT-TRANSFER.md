@@ -6,6 +6,70 @@
 
 ---
 
+## Session 030 -- Wave 25 COMPLETE (F-083, F-084, F-085)
+
+### Work Completed
+- **F-083-py-source-status** (8226299): `PySourceStatus` (frozen) wrapping Rust `SourceStatus` with all 12 field getters (`uri`, `has_update`, `is_cached`, `cached_at`, `cached_ref`, `cached_commit`, `remote_ref`, `remote_commit`, `error`, `summary`, `current_version`, `latest_version`), `is_pinned()`, `__bool__` (True only when `has_update == Some(true)`), `__repr__`, `__eq__`, `__hash__` (all 12 fields hashed for consistency with `__eq__`). `PyResolvedSource` (frozen) with `active_path`/`source_root` string getters, `is_subdirectory()`, `__repr__`, `__eq__`, `__hash__`. Added `PartialEq` derive to `ResolvedSource` struct. Fixed pre-existing `PyParsedURI.__eq__` to use derived `PartialEq` instead of manual 5-field comparison.
+- **F-084-py-provider-pref** (8226299): `PyProviderPreference` (frozen) with `provider`/`model` getters, `to_dict()` returning native Python dict, `from_dict()` parsing from Python dict, `from_list()` parsing list (silently skips invalid), `__repr__`, `__eq__`, `__hash__`. `apply_provider_preferences(mount_plan, preferences)` function: sync version accepting dict + list of `PyProviderPreference`, returns new dict with preferred provider promoted. `is_glob_pattern(pattern)` function: checks for `*`, `?`, `[` characters.
+- **F-085-py-cache** (8226299): `PySimpleCache` (mutable, not Clone) wrapping `SimpleCache` with `get(key)` returning Python object or None (via pythonize), `set(key, value)` accepting native Python objects, `contains(key)`, `clear()`, `__contains__` for `in` operator. `PyDiskCache` (mutable, not Clone) wrapping `DiskCache` with same interface plus `cache_key_to_path(key)` for debugging and `cache_dir` getter. Both use `CacheProvider` trait methods internally.
+
+### Wave 25 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- cargo clippy --all-targets --features pyo3-bindings: 0 warnings
+- cargo check --features pyo3-bindings: CLEAN
+- Tests: 610 passing, 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **SourceStatus __hash__ hashes all 12 fields**: Antagonistic review caught that initial implementation hashed only 5 fields while __eq__ (via derived PartialEq) compared all 12. Fixed for consistency: `a == b => hash(a) == hash(b)` holds in both directions.
+- **SourceStatus __bool__ returns True only for confirmed updates**: `has_update == Some(true)` maps to True, both `Some(false)` and `None` (unknown) map to False. Docstring explicitly documents this tri-state behavior so Python users know to check `has_update` property for the full picture.
+- **ResolvedSource now derives PartialEq**: Added to the Rust struct itself (not just the PyO3 wrapper). Enables `self.inner == other.inner` in the binding, matching the pattern used for SourceStatus and ParsedURI.
+- **PyParsedURI.__eq__ simplified to use derived PartialEq**: Pre-existing code manually compared 5 fields. Now uses `self.inner == other.inner`. Less fragile if fields are added.
+- **Cache types are not Clone**: `SimpleCache` and `DiskCache` don't derive Clone in their Rust implementations. PyO3 wrappers don't need Clone for mutable classes (no `__copy__`).
+- **Cache value conversion uses pythonize**: Same path as deep_merge and Bundle -- `pyobject_to_yaml` for input, `yaml_to_pyobject` for output. Values stored as `serde_yaml_ng::Value`, converted on read/write.
+- **apply_provider_preferences is sync-only**: The async `apply_provider_preferences_with_resolution` (which resolves glob patterns via callback) is NOT exposed. It would require `pyo3-asyncio` and a Python callable adapter. The sync version covers the common case. Documented in the function docstring.
+- **ProviderPreference.from_list silently skips invalid entries**: Matches Rust behavior. Documented in docstring. Python users who want strict parsing should use `from_dict` per-entry.
+- **DiskCache constructor is infallible**: Pre-existing -- `DiskCache::new` does `let _ = create_dir_all(...)`. PyO3 wrapper matches. Users get a DiskCache object even if the directory can't be created; subsequent operations will fail silently (pre-existing Rust behavior).
+
+### Antagonistic Review Issues Found & Fixed
+- P1: SourceStatus __hash__ hashed only 5 of 12 fields compared by __eq__ -- fixed to hash all 12 fields
+- P2: ResolvedSource __eq__ manually compared 2 fields -- added PartialEq derive and used `inner == other.inner`
+- P2: PyParsedURI __eq__ manually compared 5 fields when PartialEq was derived -- simplified (pre-existing issue)
+- P2: SourceStatus __bool__ docstring was misleading about unknown state -- expanded to document tri-state behavior
+- P3: Clippy redundant_closure in from_dict -- used function reference instead of closure
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- DiskCache.set() silently swallows write failures -- pre-existing Rust CacheProvider trait behavior, changing would be a breaking API change
+- DiskCache.get() deletes corrupt files and returns None -- pre-existing, matches Python json.loads behavior
+- DiskCache::new() doesn't report directory creation failure -- pre-existing
+- Cache types missing __len__/__bool__ -- SimpleCache.store is private; DiskCache len would require directory listing; skip for now
+- ResolvedSource path getters use display().to_string() (lossy on non-UTF8) -- consistent with existing codebase pattern
+- ProviderPreference not in architecture spec section 13 type list -- spec is outdated; ProviderPreference is useful to expose for spawn workflows
+- No __copy__/__deepcopy__ on frozen types -- PyO3 returns self for frozen types on copy; deepcopy works via pickle protocol if needed
+- apply_provider_preferences_with_resolution (async) not exposed -- requires pyo3-asyncio crate, deferred
+
+### Module Registration
+- Types: `ParsedURI`, `Bundle`, `ValidationResult`, `SourceStatus`, `ResolvedSource`, `ProviderPreference`, `SimpleCache`, `DiskCache` (8 total, was 3)
+- Functions: `parse_uri`, `normalize_path`, `deep_merge`, `deep_merge_json`, `parse_mentions`, `generate_sub_session_id`, `validate_bundle`, `validate_bundle_completeness`, `validate_bundle_or_raise`, `validate_bundle_completeness_or_raise`, `apply_provider_preferences`, `is_glob_pattern` (12 total, was 10)
+
+### What's Next
+- All 25 waves complete. 610 tests, 0 clippy warnings, 85 features delivered.
+- PyO3 bindings now cover: 8 types + 12 functions, native dict I/O via pythonize.
+- Remaining architecture spec section 13 types NOT yet exposed:
+  - `BundleError` (as Python exception hierarchy) -- requires custom exception classes
+  - `BundleRegistry` -- complex type with async methods, needs careful design
+  - `BundleValidator` -- already exposed as functions; class wrapper is optional
+- Remaining unported PreparedBundle functionality:
+  - `create_session` (bundle.py:981-1109) -- depends on AmplifierSession from amplifier_core
+  - `spawn` (bundle.py:1111-1289) -- depends on AmplifierSession from amplifier_core
+- Consider: maturin build + PyPI publishing
+- Consider: Expand pyo3 (BundleError exception hierarchy, BundleRegistry)
+- Consider: HTTP SourceHandlerWithStatus impl (HEAD + ETag/Last-Modified)
+- Consider: Python-side integration tests via maturin develop
+
+---
+
 ## Session 029 -- Wave 24 COMPLETE (F-080, F-081, F-082)
 
 ### Work Completed
