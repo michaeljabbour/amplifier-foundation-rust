@@ -61,6 +61,75 @@ fn yaml_to_pyobject(py: Python<'_>, v: &serde_yaml_ng::Value) -> PyResult<PyObje
 }
 
 // =============================================================================
+// Python exception hierarchy
+// =============================================================================
+//
+// NOTE: `create_exception!` puts the generated struct into this module's scope.
+// The name `BundleError` shadows `crate::error::BundleError` (the Rust enum).
+// Inside functions that need both types, alias the Rust enum:
+//   `use crate::error::BundleError as BE;`
+
+pyo3::create_exception!(
+    amplifier_foundation,
+    BundleError,
+    pyo3::exceptions::PyException,
+    "Base exception for all bundle-related errors."
+);
+pyo3::create_exception!(
+    amplifier_foundation,
+    BundleNotFoundError,
+    BundleError,
+    "Bundle could not be located at the specified source."
+);
+pyo3::create_exception!(
+    amplifier_foundation,
+    BundleLoadError,
+    BundleError,
+    "Bundle exists but could not be loaded (parse error, invalid format)."
+);
+pyo3::create_exception!(
+    amplifier_foundation,
+    BundleValidationError,
+    BundleError,
+    "Bundle loaded but validation failed (missing required fields, etc)."
+);
+pyo3::create_exception!(
+    amplifier_foundation,
+    BundleDependencyError,
+    BundleError,
+    "Bundle dependency could not be resolved (circular deps, missing deps)."
+);
+
+/// Map a `crate::error::BundleError` to the appropriate Python exception subclass.
+///
+/// - `NotFound`        → `BundleNotFoundError`
+/// - `LoadError`       → `BundleLoadError`
+/// - `ValidationError` → `BundleValidationError` (formats actual error messages)
+/// - `DependencyError` → `BundleDependencyError`
+/// - `Io` / `Yaml` / `Http` / `Git` → `BundleLoadError`
+fn bundle_error_to_pyerr(e: crate::error::BundleError) -> PyErr {
+    use crate::error::BundleError as BE;
+    match e {
+        BE::NotFound { .. } => BundleNotFoundError::new_err(e.to_string()),
+        BE::LoadError { .. } => BundleLoadError::new_err(e.to_string()),
+        BE::ValidationError(ref vr) => {
+            // Format actual error messages, not just counts.
+            // ValidationResult::Display only shows "N errors, M warnings".
+            let msg = if vr.errors.is_empty() {
+                e.to_string()
+            } else {
+                format!("validation failed: {}", vr.errors.join("; "))
+            };
+            BundleValidationError::new_err(msg)
+        }
+        BE::DependencyError(_) => BundleDependencyError::new_err(e.to_string()),
+        BE::Io(_) | BE::Yaml(_) | BE::Http(_) | BE::Git(_) => {
+            BundleLoadError::new_err(e.to_string())
+        }
+    }
+}
+
+// =============================================================================
 // ParsedURI
 // =============================================================================
 
@@ -186,9 +255,7 @@ impl PyBundle {
     #[staticmethod]
     fn from_dict(data: &Bound<'_, PyAny>) -> PyResult<PyBundle> {
         let yaml_val = pyobject_to_yaml(data)?;
-        let bundle = crate::bundle::Bundle::from_dict(&yaml_val).map_err(|e| {
-            pyo3::exceptions::PyValueError::new_err(format!("Failed to parse bundle: {e}"))
-        })?;
+        let bundle = crate::bundle::Bundle::from_dict(&yaml_val).map_err(bundle_error_to_pyerr)?;
         Ok(PyBundle { inner: bundle })
     }
 
@@ -200,9 +267,7 @@ impl PyBundle {
             &yaml_val,
             std::path::Path::new(base_path),
         )
-        .map_err(|e| {
-            pyo3::exceptions::PyValueError::new_err(format!("Failed to parse bundle: {e}"))
-        })?;
+        .map_err(bundle_error_to_pyerr)?;
         Ok(PyBundle { inner: bundle })
     }
 
@@ -505,22 +570,21 @@ fn validate_bundle_completeness(bundle: &PyBundle) -> PyValidationResult {
     result.into()
 }
 
-/// Validate a bundle, raising ValueError on failure.
+/// Validate a bundle, raising BundleValidationError on failure.
 ///
-/// Raises ValueError if the bundle has validation errors.
+/// Raises BundleValidationError if the bundle has validation errors.
 #[pyfunction]
 fn validate_bundle_or_raise(bundle: &PyBundle) -> PyResult<()> {
-    crate::bundle::validator::validate_bundle_or_raise(&bundle.inner)
-        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("{e}")))
+    crate::bundle::validator::validate_bundle_or_raise(&bundle.inner).map_err(bundle_error_to_pyerr)
 }
 
-/// Validate a bundle for completeness, raising ValueError on failure.
+/// Validate a bundle for completeness, raising BundleValidationError on failure.
 ///
-/// Raises ValueError if the bundle is incomplete for mounting.
+/// Raises BundleValidationError if the bundle is incomplete for mounting.
 #[pyfunction]
 fn validate_bundle_completeness_or_raise(bundle: &PyBundle) -> PyResult<()> {
     crate::bundle::validator::validate_bundle_completeness_or_raise(&bundle.inner)
-        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("{e}")))
+        .map_err(bundle_error_to_pyerr)
 }
 
 // =============================================================================
@@ -1053,6 +1117,22 @@ impl PyDiskCache {
 #[pymodule]
 fn amplifier_foundation(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
+
+    // Exception hierarchy
+    m.add("BundleError", m.py().get_type::<BundleError>())?;
+    m.add(
+        "BundleNotFoundError",
+        m.py().get_type::<BundleNotFoundError>(),
+    )?;
+    m.add("BundleLoadError", m.py().get_type::<BundleLoadError>())?;
+    m.add(
+        "BundleValidationError",
+        m.py().get_type::<BundleValidationError>(),
+    )?;
+    m.add(
+        "BundleDependencyError",
+        m.py().get_type::<BundleDependencyError>(),
+    )?;
 
     // Types
     m.add_class::<PyParsedURI>()?;

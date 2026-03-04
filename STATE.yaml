@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 25
-phase_name: "Wave 25 -- Expand PyO3 bindings: SourceStatus, ProviderPreference, Cache"
-epoch: 26
-next_action: "Wave 25 COMPLETE. 610 tests passing, 0 clippy warnings, cargo fmt clean. 8 types + 12 functions exposed via PyO3. Consider: maturin build + PyPI, expand pyo3 (BundleRegistry, BundleError exception hierarchy), HTTP SourceHandlerWithStatus."
+phase: 26
+phase_name: "Wave 26 -- BundleError exception hierarchy, PyO3 utility bindings, HTTP status handler"
+epoch: 27
+next_action: "Implement F-086 (BundleError exception hierarchy), F-087 (PyO3 utility bindings), F-088 (HTTP SourceHandlerWithStatus)"
 blockers: []
 
 architecture_spec:
@@ -854,8 +854,28 @@ features:
     completed_at: "2025-02-02T00:30:00Z"
     commit: "8226299"
 
+  F-086-py-exceptions:
+    name: "BundleError Python exception hierarchy (create_exception!, BundleError->PyErr conversion)"
+    module: "pyo3_bindings"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: ["F-082-pyvalidator"]
+    started_at: "2025-02-03T00:00:00Z"
+  F-087-py-utils:
+    name: "PyO3 utility function bindings (sanitize_for_json, sanitize_message, merge_module_lists, format_directory_listing)"
+    module: "pyo3_bindings"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-086-py-exceptions"]
+  F-088-http-status-handler:
+    name: "Implement SourceHandlerWithStatus on HttpSourceHandler (HEAD + ETag/Last-Modified)"
+    module: "sources"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-040-source-protocol-traits"]
+
 wave_gate:
-  current_wave: 25
+  current_wave: 26
   gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo clippy --features pyo3-bindings clean + cargo fmt clean"
   approval_required: false
   approval_status: "approved"

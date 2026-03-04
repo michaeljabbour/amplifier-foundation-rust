@@ -70,10 +70,12 @@ impl BundleValidator {
     pub fn validate_or_raise(&self, bundle: &Bundle) -> crate::error::Result<()> {
         let result = self.validate(bundle);
         if !result.valid {
-            return Err(crate::error::BundleError::LoadError {
-                reason: format!("Bundle validation failed: {}", result.errors.join("; ")),
-                source: None,
-            });
+            return Err(crate::error::BundleError::ValidationError(
+                crate::error::ValidationResult {
+                    errors: result.errors,
+                    warnings: result.warnings,
+                },
+            ));
         }
         Ok(())
     }
@@ -115,13 +117,12 @@ impl BundleValidator {
     pub fn validate_completeness_or_raise(&self, bundle: &Bundle) -> crate::error::Result<()> {
         let result = self.validate_completeness(bundle);
         if !result.valid {
-            return Err(crate::error::BundleError::LoadError {
-                reason: format!(
-                    "Bundle incomplete for mounting: {}",
-                    result.errors.join("; ")
-                ),
-                source: None,
-            });
+            return Err(crate::error::BundleError::ValidationError(
+                crate::error::ValidationResult {
+                    errors: result.errors,
+                    warnings: result.warnings,
+                },
+            ));
         }
         Ok(())
     }
