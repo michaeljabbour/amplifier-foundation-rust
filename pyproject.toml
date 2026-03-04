@@ -7,6 +7,8 @@ name = "amplifier-foundation"
 version = "0.1.0"
 description = "Rust-powered foundation library for the Amplifier ecosystem"
 requires-python = ">=3.9"
+license = "MIT"
+readme = "README.md"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Rust",
@@ -16,6 +18,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
 ]
 
 [tool.pytest.ini_options]

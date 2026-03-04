@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 29
-phase_name: "Wave 29 -- Python packaging polish (.pyi stubs, text_signature, smoke tests)"
-epoch: 30
-next_action: "Wave 29 COMPLETE. 614 Rust tests + 45 Python smoke tests. .pyi stubs generated (681 lines). 66 text_signature annotations. All bindings validated from Python 3.14. Consider: LICENSE + README.md, BundleRegistry PyO3 bindings, PyPI publishing, CI pipeline."
+phase: 30
+phase_name: "Wave 30 -- Publishing readiness (LICENSE, README, CI)"
+epoch: 31
+next_action: "Implement F-098 (LICENSE + metadata), F-099 (README.md), F-100 (CI workflow)"
 blockers: []
 
 architecture_spec:
@@ -969,6 +969,26 @@ features:
     started_at: "2025-02-06T01:05:00Z"
     completed_at: "2025-02-06T01:45:00Z"
     commit: "a971285"
+
+  F-098-license-metadata:
+    name: "MIT LICENSE file + Cargo.toml/pyproject.toml license metadata"
+    module: "root"
+    status: "in-progress"
+    spec: "specs/architecture.md"
+    depends_on: []
+    started_at: "2025-02-07T00:00:00Z"
+  F-099-readme:
+    name: "README.md for crates.io and PyPI with usage examples and API overview"
+    module: "root"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: ["F-098-license-metadata"]
+  F-100-ci-workflow:
+    name: "GitHub Actions CI workflow (cargo test, clippy, fmt, maturin build, pytest)"
+    module: "root"
+    status: "ready"
+    spec: "specs/architecture.md"
+    depends_on: []
 
 wave_gate:
   current_wave: 29
