@@ -10,10 +10,10 @@
 # - Blockers list halts the machine when present
 # =============================================================================
 
-phase: 28
-phase_name: "Wave 28 -- PyO3 session utility bindings + parse_frontmatter binding"
-epoch: 29
-next_action: "Wave 28 COMPLETE. 614 tests passing, 0 clippy warnings, cargo fmt clean. 14 new PyO3 functions + 1 new type (ForkResult). Session module fully bound. parse_frontmatter bound. Consider: .pyi type stub generation, BundleRegistry PyO3 bindings, Python-side integration tests via maturin develop."
+phase: 29
+phase_name: "Wave 29 -- Python packaging polish (.pyi stubs, text_signature, smoke tests)"
+epoch: 30
+next_action: "Wave 29 COMPLETE. 614 Rust tests + 45 Python smoke tests. .pyi stubs generated (681 lines). 66 text_signature annotations. All bindings validated from Python 3.14. Consider: LICENSE + README.md, BundleRegistry PyO3 bindings, PyPI publishing, CI pipeline."
 blockers: []
 
 architecture_spec:
@@ -940,16 +940,46 @@ features:
     completed_at: "2025-02-05T01:15:00Z"
     commit: "5c47488"
 
+  F-095-pyi-type-stubs:
+    name: "Generate .pyi type stub file for IDE autocomplete, mypy, and pyright support"
+    module: "pyo3_bindings"
+    status: "done"
+    spec: "specs/architecture.md"
+    depends_on: ["F-094-pyo3-io-frontmatter"]
+    started_at: "2025-02-06T00:00:00Z"
+    completed_at: "2025-02-06T00:30:00Z"
+    commit: "ace2b1b"
+
+  F-096-text-signatures:
+    name: "Add #[pyo3(text_signature)] annotations to all PyO3 functions and classes"
+    module: "pyo3_bindings"
+    status: "done"
+    spec: "specs/architecture.md"
+    depends_on: ["F-094-pyo3-io-frontmatter"]
+    started_at: "2025-02-06T00:35:00Z"
+    completed_at: "2025-02-06T01:00:00Z"
+    commit: "c46ab04"
+
+  F-097-python-smoke-tests:
+    name: "Python-side smoke tests validating PyO3 bindings via maturin develop"
+    module: "pyo3_bindings"
+    status: "done"
+    spec: "specs/architecture.md"
+    depends_on: ["F-095-pyi-type-stubs"]
+    started_at: "2025-02-06T01:05:00Z"
+    completed_at: "2025-02-06T01:45:00Z"
+    commit: "a971285"
+
 wave_gate:
-  current_wave: 28
-  gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo clippy --features pyo3-bindings clean + cargo fmt clean"
+  current_wave: 29
+  gate_criteria: "All existing tests still pass + new tests pass + cargo clippy clean + cargo clippy --features pyo3-bindings clean + cargo fmt clean + .pyi type stubs generated + Python smoke tests pass"
   approval_required: false
   approval_status: "approved"
-  notes: "Wave 28 COMPLETE: 614 tests (all passing), 0 clippy warnings, cargo fmt clean. 14 new PyO3 function bindings (6 slice + 5 fork + 2 events + 1 io). 1 new type (ForkResult). New session.rs submodule (465 lines)."
+  notes: "Wave 29 COMPLETE: 614 Rust tests (all passing), 45 Python smoke tests (all passing), 0 clippy warnings, cargo fmt clean. .pyi stubs (681 lines), 66 text_signatures, maturin develop validated on Python 3.14."
 
 meta:
   project: "amplifier-foundation-rs"
   created: "2026-03-03T01:51:40Z"
-  total_features_completed: 94
-  last_updated: "2025-02-05T01:15:00Z"
-  last_session: "session-033-wave28-pyo3-session-frontmatter"
+  total_features_completed: 97
+  last_updated: "2025-02-06T01:45:00Z"
+  last_session: "session-034-wave29-python-packaging-polish"

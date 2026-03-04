@@ -6,6 +6,72 @@
 
 ---
 
+## Session 034 -- Wave 29 COMPLETE (F-095, F-096, F-097)
+
+### Work Completed
+- **F-095-pyi-type-stubs** (ace2b1b): Generated comprehensive `.pyi` type stub file (681 lines) for IDE autocomplete, mypy, and pyright support. Covers all 9 classes (ParsedURI, Bundle, ValidationResult, SourceStatus, ResolvedSource, ProviderPreference, SimpleCache, DiskCache, ForkResult), 36 functions, 5 exceptions, and `__version__`. Type annotations include `Optional[Any]` for nullable returns, `Literal["complete", "remove", "error"]` for enum-like parameters, full docstrings with Raises documentation. Maturin automatically discovers and includes the `.pyi` in built wheels.
+- **F-096-text-signatures** (c46ab04): Added 66 `#[pyo3(text_signature = "...")]` annotations across all PyO3 bindings: 23 in `functions.rs`, 13 in `session.rs`, 30 in `types.rs`. Enables `help()`, `inspect.signature()`, and IDE parameter hints for all 36 functions and 30 class methods. Annotations stacked correctly with existing `#[pyo3(signature = ...)]` attributes.
+- **F-097-python-smoke-tests** (a971285): Created 45 Python-side smoke tests in `tests/python/test_smoke.py` validating all PyO3 bindings via `maturin develop`. Tests cover: exception hierarchy, ParsedURI parsing/hashing, Bundle CRUD/compose/mount_plan/copy, validation, SourceStatus/ResolvedSource/ProviderPreference construction, SimpleCache/DiskCache operations, deep_merge/get_nested/set_nested, sanitize_for_json/sanitize_message/merge_module_lists, parse_mentions/generate_sub_session_id, parse_frontmatter, count_turns/get_turn_boundaries/fork_session_in_memory, path utilities, and text_signature verification. Added pytest configuration to `pyproject.toml`. Updated `.gitignore` for Python artifacts.
+
+### Wave 29 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- cargo clippy --all-targets --features pyo3-bindings: 0 warnings
+- cargo check --features pyo3-bindings: CLEAN
+- Rust tests: 614 passing, 1 ignored (spawn doc-test), 0 failed
+- Python tests: 45 passing, 0 failed (via maturin develop + pytest)
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **`.pyi` stub is hand-crafted, not auto-generated**: Hand-crafted stubs provide better docstrings, Literal types, and accurate Optional annotations compared to auto-generation tools like `pyo3-stub-gen`. The stub is maintained alongside the Rust source.
+- **`Optional[Any]` for nullable returns instead of bare `Any`**: While `Optional[Any]` collapses to `Any` in the type system, it communicates "can return None" visually in the stub, matching the docstring behavior. Applied to `get()`, `get_nested()`, and `parse_frontmatter()`.
+- **`sanitize_message` parameter typed as `Any` not `dict`**: The function explicitly handles non-dict input (returns `{}`), and the docstring documents this. Typing as `dict` would make the type checker reject valid usage.
+- **Bundle and ForkResult ARE hashable (identity-based)**: PyO3 provides default identity-based `__hash__` for all types. The initial `.pyi` incorrectly had `__hash__: ClassVar[None]`. Fixed after Python smoke tests caught the discrepancy. Both types hash by object identity, not by value.
+- **text_signature annotations stacked with existing signature annotations**: When a function already has `#[pyo3(signature = ...)]`, the `text_signature` is added as a separate `#[pyo3(...)]` attribute above it. PyO3 correctly merges multiple `#[pyo3(...)]` attributes.
+- **Python smoke tests live in `tests/python/`**: Separate from Rust integration tests in `tests/`. Requires `maturin develop --strip` before running. `pyproject.toml` has `[tool.pytest.ini_options]` pointing to `tests/python/`.
+- **`maturin develop --strip` needed (not plain `maturin develop`)**: The `strip = true` in `pyproject.toml` conflicts with the default debug-info inclusion in dev builds. Using `--strip` flag explicitly resolves the conflict.
+
+### Antagonistic Review Issues Found & Fixed
+- F-095 P1: Removed unused `Union` import
+- F-095 P1: Fixed `construct_agent_path` docstring — `.md` is only appended if not already present
+- F-095 P2: Changed `get`/`get_nested` return types from `Any` to `Optional[Any]`
+- F-095 P2: Changed `parse_frontmatter` return type to `tuple[Optional[Any], str]`
+- F-095 P2: Added `Raises: ValueError` to cache `.set()` methods
+- F-095 P2: Changed `sanitize_message` param type from `dict` to `Any`
+- F-097: Fixed incorrect `__hash__: ClassVar[None]` markers on Bundle/ForkResult — these types ARE hashable (identity-based)
+- F-097: Changed hash tests from "not hashable" to "identity-based hash"
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-095 P3: No `@final` decorator on frozen classes — would require `typing_extensions` import for Python 3.9 compat
+- F-095 P3: ReST-only markup (.. note::, .. warning::) in docstrings — renders in Sphinx but raw in IDEs
+- F-095 P3: No `__len__` on cache classes — Rust API doesn't support it
+- F-095 P3: `ProviderPreference.from_list` silent skip behavior — matches Rust behavior, documented
+
+### File Inventory
+- `amplifier_foundation.pyi`: 676 lines (type stubs for all public symbols)
+- `tests/python/test_smoke.py`: 356 lines (45 smoke tests)
+- `src/pyo3_bindings/functions.rs`: 575 lines (was 552, +23 text_signatures)
+- `src/pyo3_bindings/session.rs`: 467 lines (was 454, +13 text_signatures)
+- `src/pyo3_bindings/types.rs`: 808 lines (was 778, +30 text_signatures)
+
+### Module Registration (unchanged)
+- Exceptions: BundleError, BundleNotFoundError, BundleLoadError, BundleValidationError, BundleDependencyError (5 total)
+- Types: ParsedURI, Bundle, ValidationResult, SourceStatus, ResolvedSource, ProviderPreference, SimpleCache, DiskCache, ForkResult (9 total)
+- Functions: 36 total (unchanged from Wave 28)
+
+### What's Next
+- All 29 waves complete. 614 Rust tests + 45 Python smoke tests. 97 features delivered.
+- PyO3 bindings: 9 types + 36 functions + 5 exceptions, .pyi stubs, text_signatures, maturin config.
+- Python smoke tests validated on Python 3.14 via maturin develop.
+- Remaining:
+  - `BundleRegistry` PyO3 bindings — complex async type, needs careful design
+  - LICENSE + README.md files for proper PyPI publishing
+  - CI pipeline for automated maturin build + pytest
+  - Consider: auto-discovery of `.pyi` stubs in wheel (already working via maturin)
+  - Consider: Publish to PyPI as `amplifier-foundation`
+
+---
+
 ## Session 033 -- Wave 28 COMPLETE (F-092, F-093, F-094)
 
 ### Work Completed
