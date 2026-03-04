@@ -37,6 +37,7 @@
 //! - `get_amplifier_home()` -- return the Amplifier home directory
 //! - `construct_agent_path(base, name)` -- construct path to agent file
 //! - `construct_context_path(base, name)` -- construct path to bundle resource
+//! - `parse_frontmatter(content)` -- parse YAML frontmatter from text
 //! - `get_nested(data, path)` -- get value from nested dict by path
 //! - `get_nested_with_default(data, path, default)` -- get with fallback default
 //! - `set_nested(data, path, value)` -- set value in nested dict by path
@@ -77,8 +78,9 @@ use functions::{
     apply_provider_preferences, construct_agent_path, construct_context_path, deep_merge,
     deep_merge_json, format_directory_listing, generate_sub_session_id, get_amplifier_home,
     get_nested, get_nested_with_default, is_glob_pattern, merge_module_lists, normalize_path,
-    parse_mentions, parse_uri, sanitize_for_json, sanitize_message, set_nested, validate_bundle,
-    validate_bundle_completeness, validate_bundle_completeness_or_raise, validate_bundle_or_raise,
+    parse_frontmatter, parse_mentions, parse_uri, sanitize_for_json, sanitize_message, set_nested,
+    validate_bundle, validate_bundle_completeness, validate_bundle_completeness_or_raise,
+    validate_bundle_or_raise,
 };
 use session::{
     add_synthetic_tool_results, count_events, count_turns, find_orphaned_tool_calls, fork_session,
@@ -144,6 +146,9 @@ fn amplifier_foundation(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_nested, m)?)?;
     m.add_function(wrap_pyfunction!(get_nested_with_default, m)?)?;
     m.add_function(wrap_pyfunction!(set_nested, m)?)?;
+
+    // IO functions
+    m.add_function(wrap_pyfunction!(parse_frontmatter, m)?)?;
 
     // Session types
     m.add_class::<PyForkResult>()?;

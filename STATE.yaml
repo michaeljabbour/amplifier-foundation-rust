@@ -924,16 +924,19 @@ features:
   F-093-pyo3-session-fork:
     name: "PyO3 bindings for session fork/events (PyForkResult type + fork_session, fork_session_in_memory, get_fork_preview, count_events, get_event_summary, list_session_forks, get_session_lineage)"
     module: "pyo3_bindings"
-    status: "in-progress"
+    status: "done"
     spec: "specs/architecture.md"
     depends_on: ["F-092-pyo3-session-slice"]
     started_at: "2025-02-05T00:30:00Z"
+    completed_at: "2025-02-05T01:00:00Z"
+    commit: "f54e737"
   F-094-pyo3-io-frontmatter:
     name: "PyO3 binding for parse_frontmatter (YAML frontmatter extraction)"
     module: "pyo3_bindings"
-    status: "ready"
+    status: "in-progress"
     spec: "specs/architecture.md"
     depends_on: ["F-089-pyo3-decompose"]
+    started_at: "2025-02-05T01:00:00Z"
 
 wave_gate:
   current_wave: 28

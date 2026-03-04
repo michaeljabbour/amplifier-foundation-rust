@@ -501,3 +501,52 @@ pub(super) fn set_nested(
     let py = data.py();
     yaml_to_pyobject(py, &yaml_val)
 }
+
+// =============================================================================
+// IO / frontmatter functions
+// =============================================================================
+
+/// Parse YAML frontmatter from a string.
+///
+/// Extracts YAML between ``---`` delimiters at the start of the text.
+/// Returns a tuple ``(frontmatter, body)`` where frontmatter is the parsed
+/// YAML value (typically a dict, but could be any YAML type) or None if
+/// no frontmatter is found. The body is the remaining content after the
+/// closing ``---`` delimiter.
+///
+/// Edge cases handled:
+///
+/// - Windows line endings (``\\r\\n``) -- normalized to ``\\n`` in both
+///   frontmatter and body
+/// - Multiple ``---`` -- only the first pair is treated as a delimiter
+/// - Trailing whitespace after delimiters
+///
+/// Args:
+///     content: The text to parse (e.g., a Markdown file with YAML frontmatter).
+///
+/// Returns:
+///     Tuple of (frontmatter_or_None, body_string).
+///
+/// Raises:
+///     BundleLoadError: If the frontmatter YAML is malformed.
+///     ValueError: If the parsed YAML cannot be converted to a Python object.
+///
+/// Example::
+///
+///     >>> parse_frontmatter("---\\ntitle: Hello\\n---\\nBody text")
+///     ({'title': 'Hello'}, 'Body text')
+///     >>> parse_frontmatter("No frontmatter here")
+///     (None, 'No frontmatter here')
+#[pyfunction]
+pub(super) fn parse_frontmatter(
+    py: Python<'_>,
+    content: &str,
+) -> PyResult<(Option<PyObject>, String)> {
+    let (fm, body) =
+        crate::io::frontmatter::parse_frontmatter(content).map_err(bundle_error_to_pyerr)?;
+    let py_fm = match fm {
+        Some(val) => Some(yaml_to_pyobject(py, &val)?),
+        None => None,
+    };
+    Ok((py_fm, body))
+}
