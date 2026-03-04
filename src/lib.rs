@@ -54,7 +54,7 @@ pub mod spawn;
 pub mod updates;
 
 #[cfg(feature = "pyo3-bindings")]
-pub mod pyo3_bindings;
+mod pyo3_bindings;
 
 // =============================================================================
 // Re-exports -- Flat public API matching Python's __init__.py __all__
