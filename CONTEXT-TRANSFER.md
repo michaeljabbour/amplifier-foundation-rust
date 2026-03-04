@@ -6,6 +6,91 @@
 
 ---
 
+## Session 035 -- Wave 30 COMPLETE (F-098, F-099, F-100)
+
+### Work Completed
+- **F-098-license-metadata** (bcd57fb): Created MIT LICENSE file (matching Python source's Microsoft Corporation copyright). Added to Cargo.toml: `license = "MIT"`, `description`, `repository`, `readme`, `keywords`, `categories`. Added to pyproject.toml: `license = "MIT"`, `readme = "README.md"`, `License :: OSI Approved :: MIT License` classifier.
+- **F-099-readme** (b2cbe7b): Created README.md (~160 lines) with: project description, features list, installation instructions (build from source), Quick Start examples for both Rust and Python, module overview table (14 modules), PyO3 bindings summary (9 types, 36 functions, 5 exceptions), building from source instructions, architecture overview, license section.
+- **F-100-ci-workflow** (8042854): Created `.github/workflows/ci.yml` with 5 jobs: `fmt` (cargo fmt --check), `clippy` (clippy with and without pyo3-bindings feature), `test` (cargo test on ubuntu + macos, including pyo3-bindings feature), `msrv` (Rust 1.80 cargo check), `python` (maturin develop + pytest on Python 3.9 and 3.13). Includes: permissions lockdown (contents: read), concurrency control, timeouts, fail-fast: false, job dependencies (fmt -> clippy -> test -> python).
+
+### Wave 30 COMPLETE
+- cargo fmt --check: CLEAN (0 formatting issues)
+- cargo clippy --all-targets: 0 warnings
+- cargo clippy --all-targets --features pyo3-bindings: 0 warnings
+- Rust tests: 614 passing, 1 ignored (spawn doc-test), 0 failed
+- MSRV: 1.80 (unchanged)
+
+### Design Decisions Made
+- **LICENSE matches Python source exactly**: MIT License, Copyright (c) Microsoft Corporation. Same text, same copyright holder.
+- **Cargo.toml categories**: `data-structures` and `development-tools`. Reviewer caught that `config` was a stretch for a bundle composition library.
+- **Cargo.toml repository URL**: `https://github.com/amplifier-dev/amplifier-foundation-rust`. Placeholder -- update when actual repo is created.
+- **README installation: "not yet on crates.io / build from source"**: Reviewer caught that `pip install amplifier-foundation` and `amplifier-foundation = "0.1"` would fail since packages aren't published. Changed to git dependency and maturin develop instructions.
+- **README removed unused import in Rust example**: `BundleError` was imported but not used. Simplified to `use amplifier_foundation::Bundle;`.
+- **README benchmark command simplified**: Reviewer found `cargo bench -- --quick` was broken (sends `--quick` to wrong binary). Simplified to just `cargo bench`.
+- **README test counts removed from comments**: Reviewer noted exact counts go stale. Removed "(614 tests)" and "(45 tests)" from command comments.
+- **README `maturin develop` without `--strip`**: pyproject.toml already has `strip = true`. Reviewer noted the flag was redundant. Removed from README (kept in pyproject.toml where it belongs).
+- **README module table includes `runtime`**: Reviewer caught the omission of the runtime traits module (AmplifierRuntime, Coordinator, etc.).
+- **CI workflow: no `--locked` flag**: Cargo.lock is in .gitignore (library convention). Using `--locked` would fail in CI because the lock file isn't committed. Library crates let consumers resolve dependencies.
+- **CI workflow: permissions: contents: read**: Reviewer caught default GITHUB_TOKEN has write permissions. Locked down to read-only.
+- **CI workflow: concurrency control**: `cancel-in-progress: true` prevents duplicate runs on push-push sequences.
+- **CI workflow: timeouts**: 5 min for fmt, 15 min for clippy/msrv/python, 20 min for test. Default 6-hour timeout is a budget drain risk.
+- **CI workflow: fail-fast: false**: Ensures all matrix jobs run to completion even if one fails. Otherwise Ubuntu failure cancels macOS results.
+- **CI workflow: job dependencies**: fmt -> clippy -> test -> python. Avoids wasting compute on expensive jobs when formatting fails.
+- **CI workflow: `cargo test --features pyo3-bindings`**: Reviewer caught that pyo3-bindings feature was linted but never tested. Added to test job.
+- **CI workflow: Python 3.9 + 3.13**: Tests the abi3-py39 minimum and current latest Python. Reviewer suggested 3.13 instead of 3.12.
+- **CI workflow: `maturin develop` without `--features`**: pyproject.toml's `[tool.maturin] features = ["pyo3-bindings"]` already specifies the feature. Redundant flag removed.
+- **CI workflow: no Windows**: Not tested locally. Adding untested platforms to CI would create failures we can't debug.
+- **CI workflow: no SHA-pinned actions**: Tags (v4, v5) used instead of commit SHAs. Easier to maintain for initial setup. Can be hardened later.
+- **CI workflow: pip install with version range**: `"maturin>=1.7,<2.0"` matches pyproject.toml build-system requires. Pytest left unpinned (test framework, low risk).
+
+### Antagonistic Review Issues Found & Fixed
+- F-098: Changed Cargo.toml categories from `config` to `data-structures` (reviewer: "config is a stretch")
+- F-099: Removed unused `BundleError` import from Rust example (reviewer: "unused import warning")
+- F-099: Changed installation instructions to "build from source" (reviewer: "packages not published yet")
+- F-099: Fixed broken `cargo bench -- --quick` command (reviewer: "sends --quick to wrong binary")
+- F-099: Removed hardcoded test counts from command comments (reviewer: "goes stale with every PR")
+- F-099: Removed redundant `--strip` from maturin develop (reviewer: "pyproject.toml already sets it")
+- F-099: Added `runtime` module to overview table (reviewer: "omitted public traits")
+- F-100: Added `permissions: contents: read` (reviewer: "default gives write tokens")
+- F-100: Added concurrency control (reviewer: "stacked pushes burn double minutes")
+- F-100: Added timeouts to all jobs (reviewer: "default 6-hour timeout")
+- F-100: Added `fail-fast: false` to matrices (reviewer: "failure cancels sibling jobs")
+- F-100: Added job dependencies (reviewer: "expensive jobs run when fmt fails")
+- F-100: Added `cargo test --features pyo3-bindings` (reviewer: "0% coverage of feature-gated code")
+- F-100: Changed Python 3.12 to 3.13 (reviewer: "3.13 is current latest")
+- F-100: Removed redundant `--features pyo3-bindings` from `maturin develop` (reviewer: "pyproject.toml already declares it")
+
+### Antagonistic Review Issues Noted (Not Fixed -- By Design)
+- F-098: No `license-file` key in Cargo.toml (cargo auto-detects LICENSE at root)
+- F-098: cdylib crate-type for all consumers (pre-existing from Session 001)
+- F-099: Cargo.toml and pyproject.toml descriptions differ slightly ("Rust port" vs "Rust-powered") -- each is appropriate for its ecosystem
+- F-100: Actions not pinned to commit SHAs -- using tags for initial setup maintainability
+- F-100: No Windows CI -- untested locally, would create unresolvable failures
+- F-100: No `--locked` flag -- Cargo.lock is gitignored (library convention)
+- F-100: MSRV check doesn't include `--features pyo3-bindings` -- PyO3 may have higher MSRV
+- F-100: No abi3 wheel validation -- `maturin develop` builds native, not abi3 wheel
+- F-100: Python tests only on Ubuntu -- macOS maturin develop requires platform-specific debugging
+
+### File Inventory
+- `LICENSE`: 21 lines (MIT, Microsoft Corporation)
+- `README.md`: ~160 lines (project README)
+- `.github/workflows/ci.yml`: ~100 lines (5-job CI pipeline)
+- `Cargo.toml`: 59 lines (was 53, +6 metadata fields)
+- `pyproject.toml`: 33 lines (was 30, +license, readme, classifier)
+
+### What's Next
+- All 30 waves complete. 614 Rust tests + 45 Python smoke tests. 100 features delivered.
+- Publishing readiness: LICENSE, README, CI workflow in place.
+- Remaining:
+  - `BundleRegistry` PyO3 bindings -- complex async type, needs careful design
+  - Publish to crates.io (requires account + `cargo publish`)
+  - Publish to PyPI via maturin (requires account + `maturin publish`)
+  - Consider: Cargo.lock commit policy for reproducible CI
+  - Consider: SHA-pinned GitHub Actions for supply chain security
+  - Consider: Windows CI support
+
+---
+
 ## Session 034 -- Wave 29 COMPLETE (F-095, F-096, F-097)
 
 ### Work Completed
