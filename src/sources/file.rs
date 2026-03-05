@@ -48,9 +48,9 @@ impl SourceHandler for FileSourceHandler {
             PathBuf::from(path_str)
         };
 
-        // Apply subpath if specified
+        // Apply subpath if specified (with traversal protection)
         let active_path = if !parsed.subpath.is_empty() {
-            resolved_path.join(&parsed.subpath)
+            super::safe_join(&resolved_path, &parsed.subpath)?
         } else {
             resolved_path.clone()
         };

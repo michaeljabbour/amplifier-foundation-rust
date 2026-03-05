@@ -45,7 +45,7 @@ impl GitSourceHandler {
         };
         let cache_input = format!("{git_url}@{ref_}");
         let hash = format!("{:x}", Sha256::digest(cache_input.as_bytes()));
-        let cache_key = &hash[..16];
+        let cache_key = &hash[..32];
 
         let repo_name = parsed
             .path
@@ -91,12 +91,14 @@ impl GitSourceHandler {
     }
 
     /// Apply subpath to a cached directory and return ResolvedSource.
+    ///
+    /// Uses `safe_join` to prevent directory traversal attacks via subpath.
     fn resolve_with_subpath(
         cache_path: PathBuf,
         subpath: &str,
     ) -> crate::error::Result<ResolvedSource> {
         if !subpath.is_empty() {
-            let result_path = cache_path.join(subpath);
+            let result_path = super::safe_join(&cache_path, subpath)?;
             if !result_path.exists() {
                 return Err(crate::error::BundleError::NotFound {
                     uri: format!("Subpath not found after clone: {subpath}"),
@@ -284,8 +286,10 @@ impl SourceHandler for GitSourceHandler {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
+            // Truncate stderr to avoid leaking internal path/network details
+            let stderr_truncated: String = stderr.chars().take(200).collect();
             return Err(crate::error::BundleError::NotFound {
-                uri: format!("Failed to clone {git_url}@{ref_}: {stderr}"),
+                uri: format!("Failed to clone {git_url}@{ref_}: {stderr_truncated}"),
             });
         }
 

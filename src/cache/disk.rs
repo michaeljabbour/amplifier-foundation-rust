@@ -28,7 +28,7 @@ impl DiskCache {
         hasher.update(key.as_bytes());
         let hash = hasher.finalize();
         let hex_hash = format!("{hash:x}");
-        let key_hash = &hex_hash[..16];
+        let key_hash = &hex_hash[..32];
 
         let safe_prefix: String = key
             .chars()

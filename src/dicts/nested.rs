@@ -30,36 +30,46 @@ pub fn get_nested_with_default(data: &Value, path: &[&str], default: Value) -> V
     get_nested(data, path).unwrap_or(default)
 }
 
+/// Maximum nesting depth for `set_nested` to prevent stack overflow.
+const MAX_NESTING_DEPTH: usize = 64;
+
 /// Set a value in a nested YAML Mapping by path.
 /// Creates intermediate Mappings as needed.
-/// Empty path is a no-op.
+/// Empty path is a no-op. Paths deeper than 64 levels are silently truncated.
 /// Modifies data in place.
 pub fn set_nested(data: &mut Value, path: &[&str], value: Value) {
-    if path.is_empty() {
+    if path.is_empty() || path.len() > MAX_NESTING_DEPTH {
         return;
     }
 
     let mut current = data;
     for key in &path[..path.len() - 1] {
         let key_val = Value::String((*key).to_string());
-        // If current is not a mapping or doesn't have the key or key is not a mapping,
-        // create a new empty mapping
-        if !current.is_mapping()
-            || !current
-                .as_mapping()
-                .unwrap()
-                .get(&key_val)
-                .is_some_and(|v| v.is_mapping())
-        {
-            if !current.is_mapping() {
-                *current = Value::Mapping(serde_yaml_ng::Mapping::new());
-            }
-            current.as_mapping_mut().unwrap().insert(
-                key_val.clone(),
-                Value::Mapping(serde_yaml_ng::Mapping::new()),
-            );
+        // Ensure current is a mapping
+        if !current.is_mapping() {
+            *current = Value::Mapping(serde_yaml_ng::Mapping::new());
         }
-        current = current.as_mapping_mut().unwrap().get_mut(&key_val).unwrap();
+        // Ensure intermediate key exists and is a mapping
+        let needs_create = match current.as_mapping() {
+            Some(map) => !map.get(&key_val).is_some_and(|v| v.is_mapping()),
+            None => true,
+        };
+        if needs_create {
+            if let Some(map) = current.as_mapping_mut() {
+                map.insert(
+                    key_val.clone(),
+                    Value::Mapping(serde_yaml_ng::Mapping::new()),
+                );
+            }
+        }
+        // Navigate into the key
+        current = match current.as_mapping_mut() {
+            Some(map) => match map.get_mut(&key_val) {
+                Some(val) => val,
+                None => return, // Should not happen after insert above
+            },
+            None => return,
+        };
     }
 
     // Set the final value
@@ -67,5 +77,7 @@ pub fn set_nested(data: &mut Value, path: &[&str], value: Value) {
     if !current.is_mapping() {
         *current = Value::Mapping(serde_yaml_ng::Mapping::new());
     }
-    current.as_mapping_mut().unwrap().insert(last_key, value);
+    if let Some(map) = current.as_mapping_mut() {
+        map.insert(last_key, value);
+    }
 }

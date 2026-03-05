@@ -479,7 +479,7 @@ async fn test_http_resolve_cache_hit() {
     // Compute expected cache filename (same logic as handler)
     let url = "https://example.com/bundles/test-bundle.yaml";
     let hash = format!("{:x}", sha2::Sha256::digest(url.as_bytes()));
-    let cache_key = &hash[..16];
+    let cache_key = &hash[..32];
     let cached_file = cache_dir
         .path()
         .join(format!("test-bundle.yaml-{cache_key}"));
@@ -509,7 +509,7 @@ async fn test_http_resolve_cache_hit_with_subpath() {
     // Compute expected cache path
     let url = "https://example.com/bundles/repo.tar.gz";
     let hash = format!("{:x}", sha2::Sha256::digest(url.as_bytes()));
-    let cache_key = &hash[..16];
+    let cache_key = &hash[..32];
     let cached_file = cache_dir.path().join(format!("repo.tar.gz-{cache_key}"));
 
     // Pre-populate cache as a directory with subpath
@@ -558,7 +558,7 @@ async fn test_http_resolve_empty_path_uses_download_filename() {
     // Compute expected cache filename for path="/"
     let url = "https://example.com/";
     let hash = format!("{:x}", sha2::Sha256::digest(url.as_bytes()));
-    let cache_key = &hash[..16];
+    let cache_key = &hash[..32];
     // Path::new("/").file_name() returns None, so filename should be "download"
     let cached_file = cache_dir.path().join(format!("download-{cache_key}"));
 
@@ -631,7 +631,7 @@ async fn test_git_resolve_cache_hit() {
     let ref_ = "main";
     let cache_input = format!("{git_url}@{ref_}");
     let hash = format!("{:x}", sha2::Sha256::digest(cache_input.as_bytes()));
-    let cache_key = &hash[..16];
+    let cache_key = &hash[..32];
     let cache_path = cache_dir.path().join(format!("repo-{cache_key}"));
 
     // Pre-populate cache with valid git repo structure
@@ -658,7 +658,7 @@ async fn test_git_resolve_cache_hit_with_subpath() {
     let ref_ = "main";
     let cache_input = format!("{git_url}@{ref_}");
     let hash = format!("{:x}", sha2::Sha256::digest(cache_input.as_bytes()));
-    let cache_key = &hash[..16];
+    let cache_key = &hash[..32];
     let cache_path = cache_dir.path().join(format!("repo-{cache_key}"));
 
     // Pre-populate cache with subpath
@@ -688,7 +688,7 @@ async fn test_git_resolve_head_ref_defaults() {
     let ref_ = "HEAD"; // Default
     let cache_input = format!("{git_url}@{ref_}");
     let hash = format!("{:x}", sha2::Sha256::digest(cache_input.as_bytes()));
-    let cache_key = &hash[..16];
+    let cache_key = &hash[..32];
     let cache_path = cache_dir.path().join(format!("repo-{cache_key}"));
 
     // Pre-populate cache
@@ -715,7 +715,7 @@ async fn test_git_resolve_invalid_cache_is_removed() {
     let ref_ = "main";
     let cache_input = format!("{git_url}@{ref_}");
     let hash = format!("{:x}", sha2::Sha256::digest(cache_input.as_bytes()));
-    let cache_key = &hash[..16];
+    let cache_key = &hash[..32];
     let cache_path = cache_dir.path().join(format!("repo-{cache_key}"));
 
     // Pre-populate cache WITHOUT .git directory (invalid)
@@ -841,7 +841,7 @@ async fn test_git_get_status_cached_with_metadata() {
     let ref_ = "main";
     let cache_input = format!("{git_url}@{ref_}");
     let hash = format!("{:x}", sha2::Sha256::digest(cache_input.as_bytes()));
-    let cache_key = &hash[..16];
+    let cache_key = &hash[..32];
     let cache_path = cache_dir.path().join(format!("myrepo-{cache_key}"));
 
     // Create valid cache structure
@@ -905,7 +905,7 @@ async fn test_git_update_removes_cache_and_reclones() {
     let git_url = "https://127.0.0.1:1/nonexistent/repo";
     let cache_input = format!("{git_url}@main");
     let hash = format!("{:x}", sha2::Sha256::digest(cache_input.as_bytes()));
-    let cache_key = &hash[..16];
+    let cache_key = &hash[..32];
     let cache_path = cache_dir.path().join(format!("repo-{cache_key}"));
     fs::create_dir_all(cache_path.join(".git")).expect("mkdir .git");
     fs::write(cache_path.join("bundle.yaml"), "name: old").expect("write bundle");
@@ -968,7 +968,7 @@ fn http_cached_file_path(
 ) -> PathBuf {
     let url = format!("{scheme}://{host}{path}");
     let hash = format!("{:x}", sha2::Sha256::digest(url.as_bytes()));
-    let cache_key = &hash[..16];
+    let cache_key = &hash[..32];
     let filename = std::path::Path::new(path)
         .file_name()
         .and_then(|n| n.to_str())

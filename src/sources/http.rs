@@ -37,7 +37,7 @@ impl HttpSourceHandler {
     /// Preserves the original filename for readability.
     fn cached_file_path(url: &str, parsed: &ParsedURI, cache_dir: &Path) -> PathBuf {
         let hash = format!("{:x}", Sha256::digest(url.as_bytes()));
-        let cache_key = &hash[..16];
+        let cache_key = &hash[..32];
 
         // Preserve file extension for proper handling
         let filename = Path::new(&parsed.path)
@@ -52,12 +52,13 @@ impl HttpSourceHandler {
     /// Apply subpath to a cached file/directory path and return ResolvedSource.
     ///
     /// Shared by cache-hit path and post-download path.
+    /// Uses `safe_join` to prevent directory traversal attacks via subpath.
     fn resolve_with_subpath(
         cached_file: PathBuf,
         subpath: &str,
     ) -> crate::error::Result<ResolvedSource> {
         if !subpath.is_empty() {
-            let sp = cached_file.join(subpath);
+            let sp = super::safe_join(&cached_file, subpath)?;
             if !sp.exists() {
                 return Err(crate::error::BundleError::NotFound {
                     uri: format!("Subpath not found: {subpath}"),
@@ -183,12 +184,21 @@ impl HttpSourceHandler {
 
         #[cfg(feature = "http-sources")]
         {
-            let response =
-                reqwest::get(url)
-                    .await
-                    .map_err(|e| crate::error::BundleError::NotFound {
-                        uri: format!("Failed to download {url}: {e}"),
-                    })?;
+            // Use a client with timeout to prevent hanging on slow/malicious servers
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(
+                    super::HTTP_DOWNLOAD_TIMEOUT_SECS,
+                ))
+                .build()
+                .unwrap_or_default();
+
+            let response = client
+                .get(url)
+                .send()
+                .await
+                .map_err(|e| crate::error::BundleError::NotFound {
+                    uri: format!("Failed to download {url}: {e}"),
+                })?;
 
             if !response.status().is_success() {
                 return Err(crate::error::BundleError::NotFound {
@@ -197,6 +207,19 @@ impl HttpSourceHandler {
                         response.status().as_u16()
                     ),
                 });
+            }
+
+            // Reject responses that are too large to prevent OOM
+            if let Some(content_length) = response.content_length() {
+                if content_length > super::MAX_DOWNLOAD_BYTES {
+                    return Err(crate::error::BundleError::LoadError {
+                        reason: format!(
+                            "Response too large ({content_length} bytes, max {} bytes): {url}",
+                            super::MAX_DOWNLOAD_BYTES
+                        ),
+                        source: None,
+                    });
+                }
             }
 
             // Capture ETag and Last-Modified from the GET response headers

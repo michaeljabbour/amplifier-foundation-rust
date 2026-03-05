@@ -1,6 +1,70 @@
 use crate::paths::uri::{ParsedURI, ResolvedSource};
 use async_trait::async_trait;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+/// Maximum allowed response body size for HTTP downloads (100 MB).
+pub const MAX_DOWNLOAD_BYTES: u64 = 100 * 1024 * 1024;
+
+/// Default timeout for HTTP GET downloads (120 seconds).
+pub const HTTP_DOWNLOAD_TIMEOUT_SECS: u64 = 120;
+
+/// Safely join a base path with a user-supplied subpath, preventing directory traversal.
+///
+/// Returns an error if the resolved path escapes the base directory (e.g., via `../`).
+/// Handles both existing and non-existing paths by normalizing components.
+pub fn safe_join(base: &Path, subpath: &str) -> crate::error::Result<PathBuf> {
+    if subpath.is_empty() {
+        return Ok(base.to_path_buf());
+    }
+
+    let joined = base.join(subpath);
+
+    // Try canonicalize for existing paths (resolves symlinks + ../)
+    let resolved = if joined.exists() {
+        joined
+            .canonicalize()
+            .unwrap_or_else(|_| normalize_components(&joined))
+    } else {
+        normalize_components(&joined)
+    };
+
+    let base_resolved = if base.exists() {
+        base.canonicalize()
+            .unwrap_or_else(|_| normalize_components(base))
+    } else {
+        normalize_components(base)
+    };
+
+    if !resolved.starts_with(&base_resolved) {
+        return Err(crate::error::BundleError::LoadError {
+            reason: format!(
+                "Subpath '{}' escapes base directory '{}'",
+                subpath,
+                base.display()
+            ),
+            source: None,
+        });
+    }
+
+    Ok(joined)
+}
+
+/// Normalize path components without touching the filesystem.
+///
+/// Resolves `.` and `..` segments purely lexically.
+fn normalize_components(path: &Path) -> PathBuf {
+    let mut result = PathBuf::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::ParentDir => {
+                result.pop();
+            }
+            std::path::Component::CurDir => {}
+            other => result.push(other),
+        }
+    }
+    result
+}
 
 pub mod file;
 pub mod git;

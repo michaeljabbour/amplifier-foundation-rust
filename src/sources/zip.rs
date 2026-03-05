@@ -73,7 +73,7 @@ impl SourceHandler for ZipSourceHandler {
         let mut hasher = Sha256::new();
         hasher.update(source_uri.as_bytes());
         let cache_key = format!("{:x}", hasher.finalize());
-        let cache_key = &cache_key[..16];
+        let cache_key = &cache_key[..32];
 
         let zip_name = Path::new(&parsed.path)
             .file_stem()
@@ -89,7 +89,7 @@ impl SourceHandler for ZipSourceHandler {
         // Check if already cached (before checking if source exists)
         if extract_path.exists() {
             let result_path = if !parsed.subpath.is_empty() {
-                extract_path.join(&parsed.subpath)
+                super::safe_join(&extract_path, &parsed.subpath)?
             } else {
                 extract_path.clone()
             };
@@ -132,9 +132,9 @@ impl SourceHandler for ZipSourceHandler {
             });
         }
 
-        // Return path with subpath if specified
+        // Return path with subpath if specified (with traversal protection)
         let result_path = if !parsed.subpath.is_empty() {
-            extract_path.join(&parsed.subpath)
+            super::safe_join(&extract_path, &parsed.subpath)?
         } else {
             extract_path.clone()
         };
