@@ -9,6 +9,9 @@ description = "Rust-powered foundation library for the Amplifier ecosystem"
 requires-python = ">=3.9"
 license = "MIT"
 readme = "README.md"
+dependencies = [
+    "pyyaml>=6.0.3",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Rust",
@@ -25,9 +28,12 @@ classifiers = [
 testpaths = ["tests/python"]
 
 [tool.maturin]
-# Explicit module name: `pip install amplifier-foundation` -> `import amplifier_foundation`
-module-name = "amplifier_foundation"
-# Build with pyo3-bindings feature enabled (required for Python module)
-features = ["pyo3-bindings"]
-# Strip debug symbols from the .so to reduce wheel size
-strip = true
+# Python package tree lives at python/
+python-source = "python"
+# .so lands inside amplifier_foundation/ as _engine
+module-name = "amplifier_foundation._engine"
+# Build only the bridge crate (not the workspace root)
+manifest-path = "bindings/python/Cargo.toml"
+bindings = "pyo3"
+# Note: strip=true conflicts with maturin develop's --include-debuginfo.
+# Use `maturin build --release --strip` for production wheels instead.

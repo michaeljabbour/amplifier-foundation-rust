@@ -5,8 +5,8 @@
 
 use pyo3::prelude::*;
 
-use super::exceptions::bundle_error_to_pyerr;
-use super::helpers::{pyobject_to_yaml, yaml_to_pyobject};
+use crate::exceptions::bundle_error_to_pyerr;
+use crate::helpers::{pyobject_to_yaml, yaml_to_pyobject};
 
 // =============================================================================
 // ParsedURI
@@ -21,7 +21,7 @@ use super::helpers::{pyobject_to_yaml, yaml_to_pyobject};
 #[pyclass(name = "ParsedURI", frozen)]
 #[derive(Clone, Debug)]
 pub struct PyParsedURI {
-    pub(super) inner: crate::paths::uri::ParsedURI,
+    pub(crate) inner: amplifier_foundation::paths::uri::ParsedURI,
 }
 
 #[pymethods]
@@ -118,7 +118,7 @@ impl PyParsedURI {
 #[pyclass(name = "Bundle")]
 #[derive(Clone, Debug)]
 pub struct PyBundle {
-    pub(super) inner: crate::bundle::Bundle,
+    pub(crate) inner: amplifier_foundation::bundle::Bundle,
 }
 
 #[pymethods]
@@ -129,7 +129,7 @@ impl PyBundle {
     #[pyo3(signature = (name=""))]
     fn new(name: &str) -> Self {
         PyBundle {
-            inner: crate::bundle::Bundle::new(name),
+            inner: amplifier_foundation::bundle::Bundle::new(name),
         }
     }
 
@@ -141,7 +141,7 @@ impl PyBundle {
     #[pyo3(text_signature = "(data)")]
     fn from_dict(data: &Bound<'_, PyAny>) -> PyResult<PyBundle> {
         let yaml_val = pyobject_to_yaml(data)?;
-        let bundle = crate::bundle::Bundle::from_dict(&yaml_val).map_err(bundle_error_to_pyerr)?;
+        let bundle = amplifier_foundation::bundle::Bundle::from_dict(&yaml_val).map_err(bundle_error_to_pyerr)?;
         Ok(PyBundle { inner: bundle })
     }
 
@@ -150,7 +150,7 @@ impl PyBundle {
     #[pyo3(text_signature = "(data, base_path)")]
     fn from_dict_with_base_path(data: &Bound<'_, PyAny>, base_path: &str) -> PyResult<PyBundle> {
         let yaml_val = pyobject_to_yaml(data)?;
-        let bundle = crate::bundle::Bundle::from_dict_with_base_path(
+        let bundle = amplifier_foundation::bundle::Bundle::from_dict_with_base_path(
             &yaml_val,
             std::path::Path::new(base_path),
         )
@@ -175,7 +175,7 @@ impl PyBundle {
     /// 5. later replaces for instruction/base_path/name
     #[pyo3(text_signature = "($self, others)")]
     fn compose(&self, others: Vec<PyRef<'_, PyBundle>>) -> PyBundle {
-        let other_refs: Vec<&crate::bundle::Bundle> = others.iter().map(|pb| &pb.inner).collect();
+        let other_refs: Vec<&amplifier_foundation::bundle::Bundle> = others.iter().map(|pb| &pb.inner).collect();
         let composed = self.inner.compose(&other_refs);
         PyBundle { inner: composed }
     }
@@ -288,8 +288,8 @@ pub struct PyValidationResult {
     warnings: Vec<String>,
 }
 
-impl From<crate::bundle::validator::ValidationResult> for PyValidationResult {
-    fn from(r: crate::bundle::validator::ValidationResult) -> Self {
+impl From<amplifier_foundation::bundle::validator::ValidationResult> for PyValidationResult {
+    fn from(r: amplifier_foundation::bundle::validator::ValidationResult) -> Self {
         PyValidationResult {
             valid: r.valid,
             errors: r.errors,
@@ -345,11 +345,11 @@ impl PyValidationResult {
 #[pyclass(name = "SourceStatus", frozen)]
 #[derive(Clone, Debug)]
 pub struct PySourceStatus {
-    inner: crate::sources::SourceStatus,
+    inner: amplifier_foundation::sources::SourceStatus,
 }
 
-impl From<crate::sources::SourceStatus> for PySourceStatus {
-    fn from(s: crate::sources::SourceStatus) -> Self {
+impl From<amplifier_foundation::sources::SourceStatus> for PySourceStatus {
+    fn from(s: amplifier_foundation::sources::SourceStatus) -> Self {
         PySourceStatus { inner: s }
     }
 }
@@ -361,7 +361,7 @@ impl PySourceStatus {
     #[pyo3(text_signature = "(uri)")]
     fn new(uri: &str) -> Self {
         PySourceStatus {
-            inner: crate::sources::SourceStatus::new(uri),
+            inner: amplifier_foundation::sources::SourceStatus::new(uri),
         }
     }
 
@@ -498,11 +498,11 @@ impl PySourceStatus {
 #[pyclass(name = "ResolvedSource", frozen)]
 #[derive(Clone, Debug)]
 pub struct PyResolvedSource {
-    inner: crate::paths::uri::ResolvedSource,
+    inner: amplifier_foundation::paths::uri::ResolvedSource,
 }
 
-impl From<crate::paths::uri::ResolvedSource> for PyResolvedSource {
-    fn from(r: crate::paths::uri::ResolvedSource) -> Self {
+impl From<amplifier_foundation::paths::uri::ResolvedSource> for PyResolvedSource {
+    fn from(r: amplifier_foundation::paths::uri::ResolvedSource) -> Self {
         PyResolvedSource { inner: r }
     }
 }
@@ -514,7 +514,7 @@ impl PyResolvedSource {
     #[pyo3(text_signature = "(active_path, source_root)")]
     fn new(active_path: &str, source_root: &str) -> Self {
         PyResolvedSource {
-            inner: crate::paths::uri::ResolvedSource {
+            inner: amplifier_foundation::paths::uri::ResolvedSource {
                 active_path: std::path::PathBuf::from(active_path),
                 source_root: std::path::PathBuf::from(source_root),
             },
@@ -571,11 +571,11 @@ impl PyResolvedSource {
 #[pyclass(name = "ProviderPreference", frozen)]
 #[derive(Clone, Debug)]
 pub struct PyProviderPreference {
-    pub(super) inner: crate::spawn::ProviderPreference,
+    pub(crate) inner: amplifier_foundation::spawn::ProviderPreference,
 }
 
-impl From<crate::spawn::ProviderPreference> for PyProviderPreference {
-    fn from(p: crate::spawn::ProviderPreference) -> Self {
+impl From<amplifier_foundation::spawn::ProviderPreference> for PyProviderPreference {
+    fn from(p: amplifier_foundation::spawn::ProviderPreference) -> Self {
         PyProviderPreference { inner: p }
     }
 }
@@ -587,7 +587,7 @@ impl PyProviderPreference {
     #[pyo3(text_signature = "(provider, model)")]
     fn new(provider: &str, model: &str) -> Self {
         PyProviderPreference {
-            inner: crate::spawn::ProviderPreference::new(provider, model),
+            inner: amplifier_foundation::spawn::ProviderPreference::new(provider, model),
         }
     }
 
@@ -615,7 +615,7 @@ impl PyProviderPreference {
     #[pyo3(text_signature = "(data)")]
     fn from_dict(data: &Bound<'_, PyAny>) -> PyResult<PyProviderPreference> {
         let yaml_val = pyobject_to_yaml(data)?;
-        crate::spawn::ProviderPreference::from_dict(&yaml_val)
+        amplifier_foundation::spawn::ProviderPreference::from_dict(&yaml_val)
             .map(|p| PyProviderPreference { inner: p })
             .map_err(pyo3::exceptions::PyValueError::new_err)
     }
@@ -627,7 +627,7 @@ impl PyProviderPreference {
         let yaml_val = pyobject_to_yaml(data)?;
         match yaml_val {
             serde_yaml_ng::Value::Sequence(seq) => {
-                let prefs = crate::spawn::ProviderPreference::from_list(&seq);
+                let prefs = amplifier_foundation::spawn::ProviderPreference::from_list(&seq);
                 Ok(prefs.into_iter().map(PyProviderPreference::from).collect())
             }
             _ => Err(pyo3::exceptions::PyTypeError::new_err(
@@ -666,7 +666,7 @@ impl PyProviderPreference {
 /// Mutable -- supports set/clear operations.
 #[pyclass(name = "SimpleCache")]
 pub struct PySimpleCache {
-    inner: crate::cache::memory::SimpleCache,
+    inner: amplifier_foundation::cache::memory::SimpleCache,
 }
 
 #[pymethods]
@@ -676,14 +676,14 @@ impl PySimpleCache {
     #[pyo3(text_signature = "()")]
     fn new() -> Self {
         PySimpleCache {
-            inner: crate::cache::memory::SimpleCache::new(),
+            inner: amplifier_foundation::cache::memory::SimpleCache::new(),
         }
     }
 
     /// Get a value by key, returning None if not found.
     #[pyo3(text_signature = "($self, key)")]
     fn get(&self, py: Python<'_>, key: &str) -> PyResult<Option<PyObject>> {
-        use crate::cache::CacheProvider;
+        use amplifier_foundation::cache::CacheProvider;
         match self.inner.get(key) {
             Some(val) => Ok(Some(yaml_to_pyobject(py, &val)?)),
             None => Ok(None),
@@ -693,7 +693,7 @@ impl PySimpleCache {
     /// Set a value for the given key.
     #[pyo3(text_signature = "($self, key, value)")]
     fn set(&mut self, key: &str, value: &Bound<'_, PyAny>) -> PyResult<()> {
-        use crate::cache::CacheProvider;
+        use amplifier_foundation::cache::CacheProvider;
         let yaml_val = pyobject_to_yaml(value)?;
         self.inner.set(key, yaml_val);
         Ok(())
@@ -702,20 +702,20 @@ impl PySimpleCache {
     /// Check if a key exists in the cache.
     #[pyo3(text_signature = "($self, key)")]
     fn contains(&self, key: &str) -> bool {
-        use crate::cache::CacheProvider;
+        use amplifier_foundation::cache::CacheProvider;
         self.inner.contains(key)
     }
 
     /// Clear all entries from the cache.
     #[pyo3(text_signature = "($self)")]
     fn clear(&mut self) {
-        use crate::cache::CacheProvider;
+        use amplifier_foundation::cache::CacheProvider;
         self.inner.clear();
     }
 
     /// Python `key in cache` support.
     fn __contains__(&self, key: &str) -> bool {
-        use crate::cache::CacheProvider;
+        use amplifier_foundation::cache::CacheProvider;
         self.inner.contains(key)
     }
 
@@ -735,7 +735,7 @@ impl PySimpleCache {
 /// Mutable -- supports set/clear operations.
 #[pyclass(name = "DiskCache")]
 pub struct PyDiskCache {
-    inner: crate::cache::disk::DiskCache,
+    inner: amplifier_foundation::cache::disk::DiskCache,
 }
 
 #[pymethods]
@@ -747,14 +747,14 @@ impl PyDiskCache {
     #[pyo3(text_signature = "(cache_dir)")]
     fn new(cache_dir: &str) -> Self {
         PyDiskCache {
-            inner: crate::cache::disk::DiskCache::new(std::path::Path::new(cache_dir)),
+            inner: amplifier_foundation::cache::disk::DiskCache::new(std::path::Path::new(cache_dir)),
         }
     }
 
     /// Get a value by key, returning None if not found or corrupt.
     #[pyo3(text_signature = "($self, key)")]
     fn get(&self, py: Python<'_>, key: &str) -> PyResult<Option<PyObject>> {
-        use crate::cache::CacheProvider;
+        use amplifier_foundation::cache::CacheProvider;
         match self.inner.get(key) {
             Some(val) => Ok(Some(yaml_to_pyobject(py, &val)?)),
             None => Ok(None),
@@ -764,7 +764,7 @@ impl PyDiskCache {
     /// Set a value for the given key (writes to disk as JSON).
     #[pyo3(text_signature = "($self, key, value)")]
     fn set(&mut self, key: &str, value: &Bound<'_, PyAny>) -> PyResult<()> {
-        use crate::cache::CacheProvider;
+        use amplifier_foundation::cache::CacheProvider;
         let yaml_val = pyobject_to_yaml(value)?;
         self.inner.set(key, yaml_val);
         Ok(())
@@ -773,14 +773,14 @@ impl PyDiskCache {
     /// Check if a key exists in the cache (checks file existence).
     #[pyo3(text_signature = "($self, key)")]
     fn contains(&self, key: &str) -> bool {
-        use crate::cache::CacheProvider;
+        use amplifier_foundation::cache::CacheProvider;
         self.inner.contains(key)
     }
 
     /// Clear all entries from the cache (deletes all .json files).
     #[pyo3(text_signature = "($self)")]
     fn clear(&mut self) {
-        use crate::cache::CacheProvider;
+        use amplifier_foundation::cache::CacheProvider;
         self.inner.clear();
     }
 
@@ -798,7 +798,7 @@ impl PyDiskCache {
 
     /// Python `key in cache` support.
     fn __contains__(&self, key: &str) -> bool {
-        use crate::cache::CacheProvider;
+        use amplifier_foundation::cache::CacheProvider;
         self.inner.contains(key)
     }
 

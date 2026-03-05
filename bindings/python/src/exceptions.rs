@@ -8,12 +8,12 @@
 // =============================================================================
 //
 // NOTE: `create_exception!` puts the generated struct into this module's scope.
-// The name `BundleError` shadows `crate::error::BundleError` (the Rust enum).
+// The name `BundleError` shadows `amplifier_foundation::error::BundleError` (the Rust enum).
 // Inside functions that need both types, alias the Rust enum:
-//   `use crate::error::BundleError as BE;`
+//   `use amplifier_foundation::error::BundleError as BE;`
 
-// First argument is the Python module name (not the Rust module path).
-// The Python module is registered as `amplifier_foundation` in mod.rs.
+// First argument is the Python module name for exception __module__ attr.
+// Kept as `amplifier_foundation` so tracebacks show the user-facing path.
 pyo3::create_exception!(
     amplifier_foundation,
     BundleError,
@@ -45,15 +45,15 @@ pyo3::create_exception!(
     "Bundle dependency could not be resolved (circular deps, missing deps)."
 );
 
-/// Map a `crate::error::BundleError` to the appropriate Python exception subclass.
+/// Map a `amplifier_foundation::error::BundleError` to the appropriate Python exception subclass.
 ///
 /// - `NotFound`        → `BundleNotFoundError`
 /// - `LoadError`       → `BundleLoadError`
 /// - `ValidationError` → `BundleValidationError` (formats actual error messages)
 /// - `DependencyError` → `BundleDependencyError`
 /// - `Io` / `Yaml` / `Http` / `Git` → `BundleLoadError`
-pub(super) fn bundle_error_to_pyerr(e: crate::error::BundleError) -> pyo3::PyErr {
-    use crate::error::BundleError as BE;
+pub(crate) fn bundle_error_to_pyerr(e: amplifier_foundation::error::BundleError) -> pyo3::PyErr {
+    use amplifier_foundation::error::BundleError as BE;
     match e {
         BE::NotFound { .. } => BundleNotFoundError::new_err(e.to_string()),
         BE::LoadError { .. } => BundleLoadError::new_err(e.to_string()),

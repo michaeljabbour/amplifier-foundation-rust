@@ -14,8 +14,8 @@ use std::path::Path;
 
 use pyo3::prelude::*;
 
-use super::exceptions::bundle_error_to_pyerr;
-use super::helpers::{json_to_pyobject, pyobject_to_json};
+use crate::exceptions::bundle_error_to_pyerr;
+use crate::helpers::{json_to_pyobject, pyobject_to_json};
 
 // =============================================================================
 // Session slice functions
@@ -33,9 +33,9 @@ use super::helpers::{json_to_pyobject, pyobject_to_json};
 ///     Number of turns (user messages) in the conversation.
 #[pyfunction]
 #[pyo3(text_signature = "(messages)")]
-pub(super) fn count_turns(messages: &Bound<'_, PyAny>) -> PyResult<usize> {
+pub(crate) fn count_turns(messages: &Bound<'_, PyAny>) -> PyResult<usize> {
     let msgs = pyobject_to_json_list(messages)?;
-    Ok(crate::session::count_turns(&msgs))
+    Ok(amplifier_foundation::session::count_turns(&msgs))
 }
 
 /// Return 0-indexed positions of each turn boundary (user message positions).
@@ -47,9 +47,9 @@ pub(super) fn count_turns(messages: &Bound<'_, PyAny>) -> PyResult<usize> {
 ///     List of 0-indexed positions where each user message starts a new turn.
 #[pyfunction]
 #[pyo3(text_signature = "(messages)")]
-pub(super) fn get_turn_boundaries(messages: &Bound<'_, PyAny>) -> PyResult<Vec<usize>> {
+pub(crate) fn get_turn_boundaries(messages: &Bound<'_, PyAny>) -> PyResult<Vec<usize>> {
     let msgs = pyobject_to_json_list(messages)?;
-    Ok(crate::session::get_turn_boundaries(&msgs))
+    Ok(amplifier_foundation::session::get_turn_boundaries(&msgs))
 }
 
 /// Slice messages to include only up to turn N (1-indexed).
@@ -75,7 +75,7 @@ pub(super) fn get_turn_boundaries(messages: &Bound<'_, PyAny>) -> PyResult<Vec<u
 #[pyfunction]
 #[pyo3(text_signature = "(messages, turn, handle_orphaned_tools=None)")]
 #[pyo3(signature = (messages, turn, handle_orphaned_tools=None))]
-pub(super) fn slice_to_turn(
+pub(crate) fn slice_to_turn(
     py: Python<'_>,
     messages: &Bound<'_, PyAny>,
     turn: isize,
@@ -83,14 +83,14 @@ pub(super) fn slice_to_turn(
 ) -> PyResult<PyObject> {
     if turn < 1 {
         return Err(bundle_error_to_pyerr(
-            crate::error::BundleError::LoadError {
+            amplifier_foundation::error::BundleError::LoadError {
                 reason: format!("Turn must be >= 1, got {turn}"),
                 source: None,
             },
         ));
     }
     let msgs = pyobject_to_json_list(messages)?;
-    let result = crate::session::slice_to_turn(&msgs, turn as usize, handle_orphaned_tools)
+    let result = amplifier_foundation::session::slice_to_turn(&msgs, turn as usize, handle_orphaned_tools)
         .map_err(bundle_error_to_pyerr)?;
     json_list_to_pyobject(py, result)
 }
@@ -107,9 +107,9 @@ pub(super) fn slice_to_turn(
 ///     List of orphaned tool call ID strings.
 #[pyfunction]
 #[pyo3(text_signature = "(messages)")]
-pub(super) fn find_orphaned_tool_calls(messages: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
+pub(crate) fn find_orphaned_tool_calls(messages: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
     let msgs = pyobject_to_json_list(messages)?;
-    Ok(crate::session::find_orphaned_tool_calls(&msgs))
+    Ok(amplifier_foundation::session::find_orphaned_tool_calls(&msgs))
 }
 
 /// Add synthetic tool result messages for orphaned tool calls.
@@ -125,13 +125,13 @@ pub(super) fn find_orphaned_tool_calls(messages: &Bound<'_, PyAny>) -> PyResult<
 ///     New list of message dicts with synthetic results appended.
 #[pyfunction]
 #[pyo3(text_signature = "(messages, orphaned_ids)")]
-pub(super) fn add_synthetic_tool_results(
+pub(crate) fn add_synthetic_tool_results(
     py: Python<'_>,
     messages: &Bound<'_, PyAny>,
     orphaned_ids: Vec<String>,
 ) -> PyResult<PyObject> {
     let msgs = pyobject_to_json_list(messages)?;
-    let result = crate::session::add_synthetic_tool_results(&msgs, &orphaned_ids);
+    let result = amplifier_foundation::session::add_synthetic_tool_results(&msgs, &orphaned_ids);
     json_list_to_pyobject(py, result)
 }
 
@@ -151,14 +151,14 @@ pub(super) fn add_synthetic_tool_results(
 ///     BundleLoadError: If turn is out of range or no user messages found.
 #[pyfunction]
 #[pyo3(text_signature = "(messages, turn)")]
-pub(super) fn get_turn_summary(
+pub(crate) fn get_turn_summary(
     py: Python<'_>,
     messages: &Bound<'_, PyAny>,
     turn: isize,
 ) -> PyResult<PyObject> {
     if turn < 1 {
         return Err(bundle_error_to_pyerr(
-            crate::error::BundleError::LoadError {
+            amplifier_foundation::error::BundleError::LoadError {
                 reason: format!("Turn must be >= 1, got {turn}"),
                 source: None,
             },
@@ -166,7 +166,7 @@ pub(super) fn get_turn_summary(
     }
     let msgs = pyobject_to_json_list(messages)?;
     let result =
-        crate::session::get_turn_summary(&msgs, turn as usize).map_err(bundle_error_to_pyerr)?;
+        amplifier_foundation::session::get_turn_summary(&msgs, turn as usize).map_err(bundle_error_to_pyerr)?;
     json_to_pyobject(py, &result)
 }
 
@@ -185,8 +185,8 @@ pub(super) fn get_turn_summary(
 /// No __eq__/__hash__: each ForkResult contains a unique random session_id,
 /// so two results are never semantically equal unless they're the same object.
 #[pyclass(name = "ForkResult", frozen)]
-pub(super) struct PyForkResult {
-    inner: crate::session::ForkResult,
+pub(crate) struct PyForkResult {
+    inner: amplifier_foundation::session::ForkResult,
 }
 
 #[pymethods]
@@ -284,14 +284,14 @@ impl PyForkResult {
     text_signature = "(session_dir, turn=None, new_session_id=None, target_dir=None, include_events=True)"
 )]
 #[pyo3(signature = (session_dir, turn=None, new_session_id=None, target_dir=None, include_events=true))]
-pub(super) fn fork_session(
+pub(crate) fn fork_session(
     session_dir: &str,
     turn: Option<usize>,
     new_session_id: Option<&str>,
     target_dir: Option<&str>,
     include_events: bool,
 ) -> PyResult<PyForkResult> {
-    let result = crate::session::fork_session(
+    let result = amplifier_foundation::session::fork_session(
         Path::new(session_dir),
         turn,
         new_session_id,
@@ -320,13 +320,13 @@ pub(super) fn fork_session(
 #[pyfunction]
 #[pyo3(text_signature = "(messages, turn=None, parent_id=None)")]
 #[pyo3(signature = (messages, turn=None, parent_id=None))]
-pub(super) fn fork_session_in_memory(
+pub(crate) fn fork_session_in_memory(
     messages: &Bound<'_, PyAny>,
     turn: Option<usize>,
     parent_id: Option<&str>,
 ) -> PyResult<PyForkResult> {
     let msgs = pyobject_to_json_list(messages)?;
-    let result = crate::session::fork_session_in_memory(&msgs, turn, parent_id)
+    let result = amplifier_foundation::session::fork_session_in_memory(&msgs, turn, parent_id)
         .map_err(bundle_error_to_pyerr)?;
     Ok(PyForkResult { inner: result })
 }
@@ -347,12 +347,12 @@ pub(super) fn fork_session_in_memory(
 ///     BundleLoadError: If session_dir is invalid or turn is out of range.
 #[pyfunction]
 #[pyo3(text_signature = "(session_dir, turn)")]
-pub(super) fn get_fork_preview(
+pub(crate) fn get_fork_preview(
     py: Python<'_>,
     session_dir: &str,
     turn: usize,
 ) -> PyResult<PyObject> {
-    let result = crate::session::get_fork_preview(Path::new(session_dir), turn)
+    let result = amplifier_foundation::session::get_fork_preview(Path::new(session_dir), turn)
         .map_err(bundle_error_to_pyerr)?;
     json_to_pyobject(py, &result)
 }
@@ -373,8 +373,8 @@ pub(super) fn get_fork_preview(
 ///     BundleLoadError: If session_dir is invalid.
 #[pyfunction]
 #[pyo3(text_signature = "(session_dir)")]
-pub(super) fn list_session_forks(py: Python<'_>, session_dir: &str) -> PyResult<PyObject> {
-    let result = crate::session::list_session_forks(Path::new(session_dir))
+pub(crate) fn list_session_forks(py: Python<'_>, session_dir: &str) -> PyResult<PyObject> {
+    let result = amplifier_foundation::session::list_session_forks(Path::new(session_dir))
         .map_err(bundle_error_to_pyerr)?;
     let json_arr = serde_json::Value::Array(result);
     json_to_pyobject(py, &json_arr)
@@ -395,8 +395,8 @@ pub(super) fn list_session_forks(py: Python<'_>, session_dir: &str) -> PyResult<
 ///     BundleLoadError: If session_dir is invalid.
 #[pyfunction]
 #[pyo3(text_signature = "(session_dir)")]
-pub(super) fn get_session_lineage(py: Python<'_>, session_dir: &str) -> PyResult<PyObject> {
-    let result = crate::session::get_session_lineage(Path::new(session_dir))
+pub(crate) fn get_session_lineage(py: Python<'_>, session_dir: &str) -> PyResult<PyObject> {
+    let result = amplifier_foundation::session::get_session_lineage(Path::new(session_dir))
         .map_err(bundle_error_to_pyerr)?;
     json_to_pyobject(py, &result)
 }
@@ -416,8 +416,8 @@ pub(super) fn get_session_lineage(py: Python<'_>, session_dir: &str) -> PyResult
 ///     Number of events in the file.
 #[pyfunction]
 #[pyo3(text_signature = "(events_path)")]
-pub(super) fn count_events(events_path: &str) -> usize {
-    crate::session::count_events(Path::new(events_path))
+pub(crate) fn count_events(events_path: &str) -> usize {
+    amplifier_foundation::session::count_events(Path::new(events_path))
 }
 
 /// Get a summary of events in an events.jsonl file.
@@ -438,9 +438,9 @@ pub(super) fn count_events(events_path: &str) -> usize {
 ///     BundleLoadError: If the events file exists but cannot be read or parsed.
 #[pyfunction]
 #[pyo3(text_signature = "(events_path)")]
-pub(super) fn get_event_summary(py: Python<'_>, events_path: &str) -> PyResult<PyObject> {
+pub(crate) fn get_event_summary(py: Python<'_>, events_path: &str) -> PyResult<PyObject> {
     let result =
-        crate::session::get_event_summary(Path::new(events_path)).map_err(bundle_error_to_pyerr)?;
+        amplifier_foundation::session::get_event_summary(Path::new(events_path)).map_err(bundle_error_to_pyerr)?;
     json_to_pyobject(py, &result)
 }
 

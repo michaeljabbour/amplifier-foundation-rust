@@ -41,8 +41,6 @@ dependencies = [
  "glob",
  "indexmap",
  "mockall",
- "pyo3",
- "pythonize",
  "regex",
  "reqwest",
  "serde",
@@ -58,6 +56,20 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "zip",
+]
+
+[[package]]
+name = "amplifier-foundation-py"
+version = "0.1.0"
+dependencies = [
+ "amplifier-foundation",
+ "indexmap",
+ "pyo3",
+ "pythonize",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "tracing",
 ]
 
 [[package]]

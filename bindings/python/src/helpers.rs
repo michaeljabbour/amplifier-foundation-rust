@@ -14,7 +14,7 @@ use pyo3::prelude::*;
 /// Uses pythonize to deserialize directly into serde_yaml_ng::Value.
 /// No JSON intermediary -- preserves YAML-specific types (Tagged values,
 /// non-string mapping keys) through the conversion.
-pub(super) fn pyobject_to_yaml(obj: &Bound<'_, PyAny>) -> PyResult<serde_yaml_ng::Value> {
+pub(crate) fn pyobject_to_yaml(obj: &Bound<'_, PyAny>) -> PyResult<serde_yaml_ng::Value> {
     pythonize::depythonize(obj).map_err(|e| {
         pyo3::exceptions::PyValueError::new_err(format!(
             "Failed to convert Python object to Rust value: {e}"
@@ -26,7 +26,7 @@ pub(super) fn pyobject_to_yaml(obj: &Bound<'_, PyAny>) -> PyResult<serde_yaml_ng
 ///
 /// Uses pythonize to serialize directly from serde_yaml_ng::Value to Python.
 /// No JSON intermediary -- supports all YAML value types including Tagged values.
-pub(super) fn yaml_to_pyobject(py: Python<'_>, v: &serde_yaml_ng::Value) -> PyResult<PyObject> {
+pub(crate) fn yaml_to_pyobject(py: Python<'_>, v: &serde_yaml_ng::Value) -> PyResult<PyObject> {
     let bound = pythonize::pythonize(py, v).map_err(|e| {
         pyo3::exceptions::PyValueError::new_err(format!(
             "Failed to convert Rust value to Python object: {e}"
@@ -43,7 +43,7 @@ pub(super) fn yaml_to_pyobject(py: Python<'_>, v: &serde_yaml_ng::Value) -> PyRe
 ///
 /// Used only by `deep_merge_json` (legacy JSON string interface).
 /// The main conversion path uses pythonize directly (no JSON intermediary).
-pub(super) fn json_to_yaml(v: serde_json::Value) -> serde_yaml_ng::Value {
+pub(crate) fn json_to_yaml(v: serde_json::Value) -> serde_yaml_ng::Value {
     match v {
         serde_json::Value::Null => serde_yaml_ng::Value::Null,
         serde_json::Value::Bool(b) => serde_yaml_ng::Value::Bool(b),
@@ -82,7 +82,7 @@ pub(super) fn json_to_yaml(v: serde_json::Value) -> serde_yaml_ng::Value {
 /// Convert a Python object to serde_json::Value.
 ///
 /// Uses pythonize for direct Python -> serde_json::Value conversion.
-pub(super) fn pyobject_to_json(obj: &Bound<'_, PyAny>) -> PyResult<serde_json::Value> {
+pub(crate) fn pyobject_to_json(obj: &Bound<'_, PyAny>) -> PyResult<serde_json::Value> {
     pythonize::depythonize(obj).map_err(|e| {
         pyo3::exceptions::PyValueError::new_err(format!(
             "Failed to convert Python object to JSON value: {e}"
@@ -91,7 +91,7 @@ pub(super) fn pyobject_to_json(obj: &Bound<'_, PyAny>) -> PyResult<serde_json::V
 }
 
 /// Convert a serde_json::Value to a Python object.
-pub(super) fn json_to_pyobject(py: Python<'_>, v: &serde_json::Value) -> PyResult<PyObject> {
+pub(crate) fn json_to_pyobject(py: Python<'_>, v: &serde_json::Value) -> PyResult<PyObject> {
     let bound = pythonize::pythonize(py, v).map_err(|e| {
         pyo3::exceptions::PyValueError::new_err(format!(
             "Failed to convert JSON value to Python object: {e}"

@@ -93,8 +93,11 @@ use types::{
 };
 
 /// Python module definition.
+///
+/// The function name `_engine` matches the crate's lib name and the
+/// `module-name = "amplifier_foundation._engine"` setting in pyproject.toml.
 #[pymodule]
-fn amplifier_foundation(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
 
     // Exception hierarchy

@@ -1,0 +1,19 @@
+[package]
+name = "amplifier-foundation-py"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "_engine"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+amplifier-foundation = { path = "../../crates/amplifier-foundation" }
+pyo3 = { version = "0.24", features = ["extension-module", "abi3-py39"] }
+pythonize = "0.24"
+serde_yaml_ng = "0.10"
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+indexmap = { version = "2", features = ["serde"] }
+tracing = "0.1"

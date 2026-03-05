@@ -10,11 +10,11 @@
 
 use pyo3::prelude::*;
 
-use super::exceptions::bundle_error_to_pyerr;
-use super::helpers::{
+use crate::exceptions::bundle_error_to_pyerr;
+use crate::helpers::{
     json_to_pyobject, json_to_yaml, pyobject_to_json, pyobject_to_yaml, yaml_to_pyobject,
 };
-use super::types::{PyBundle, PyParsedURI, PyProviderPreference, PyValidationResult};
+use crate::types::{PyBundle, PyParsedURI, PyProviderPreference, PyValidationResult};
 
 // =============================================================================
 // URI / path functions
@@ -26,9 +26,9 @@ use super::types::{PyBundle, PyParsedURI, PyProviderPreference, PyValidationResu
 /// Always succeeds -- unrecognized URIs are treated as package names.
 #[pyfunction]
 #[pyo3(text_signature = "(uri)")]
-pub(super) fn parse_uri(uri: &str) -> PyParsedURI {
+pub(crate) fn parse_uri(uri: &str) -> PyParsedURI {
     PyParsedURI {
-        inner: crate::paths::uri::parse_uri(uri),
+        inner: amplifier_foundation::paths::uri::parse_uri(uri),
     }
 }
 
@@ -38,8 +38,8 @@ pub(super) fn parse_uri(uri: &str) -> PyParsedURI {
 /// Raises `UnicodeDecodeError` if the resolved path contains non-UTF-8 bytes.
 #[pyfunction]
 #[pyo3(text_signature = "(path)")]
-pub(super) fn normalize_path(path: &str) -> PyResult<String> {
-    let p = crate::paths::uri::normalize_path(path, None);
+pub(crate) fn normalize_path(path: &str) -> PyResult<String> {
+    let p = amplifier_foundation::paths::uri::normalize_path(path, None);
     p.into_os_string().into_string().map_err(|os| {
         pyo3::exceptions::PyUnicodeDecodeError::new_err(format!(
             "Path contains non-UTF-8 bytes: {:?}",
@@ -65,7 +65,7 @@ pub(super) fn normalize_path(path: &str) -> PyResult<String> {
 ///   ```
 #[pyfunction]
 #[pyo3(text_signature = "(base, overlay)")]
-pub(super) fn deep_merge<'py>(
+pub(crate) fn deep_merge<'py>(
     py: Python<'py>,
     base: &Bound<'py, PyAny>,
     overlay: &Bound<'py, PyAny>,
@@ -84,7 +84,7 @@ pub(super) fn deep_merge<'py>(
 
     let base_yaml = pyobject_to_yaml(base)?;
     let overlay_yaml = pyobject_to_yaml(overlay)?;
-    let merged = crate::dicts::merge::deep_merge(&base_yaml, &overlay_yaml);
+    let merged = amplifier_foundation::dicts::merge::deep_merge(&base_yaml, &overlay_yaml);
     yaml_to_pyobject(py, &merged)
 }
 
@@ -94,7 +94,7 @@ pub(super) fn deep_merge<'py>(
 /// native Python dicts.
 #[pyfunction]
 #[pyo3(text_signature = "(base_json, overlay_json)")]
-pub(super) fn deep_merge_json(base_json: &str, overlay_json: &str) -> PyResult<String> {
+pub(crate) fn deep_merge_json(base_json: &str, overlay_json: &str) -> PyResult<String> {
     let base: serde_yaml_ng::Value = serde_json::from_str(base_json)
         .map(json_to_yaml)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid base JSON: {e}")))?;
@@ -104,7 +104,7 @@ pub(super) fn deep_merge_json(base_json: &str, overlay_json: &str) -> PyResult<S
             pyo3::exceptions::PyValueError::new_err(format!("Invalid overlay JSON: {e}"))
         })?;
 
-    let merged = crate::dicts::merge::deep_merge(&base, &overlay);
+    let merged = amplifier_foundation::dicts::merge::deep_merge(&base, &overlay);
 
     let json_str = serde_json::to_string(&merged).map_err(|e| {
         pyo3::exceptions::PyValueError::new_err(format!("Failed to serialize result: {e}"))
@@ -119,8 +119,8 @@ pub(super) fn deep_merge_json(base_json: &str, overlay_json: &str) -> PyResult<S
 /// Extract @mentions from text (excluding code blocks and emails).
 #[pyfunction]
 #[pyo3(text_signature = "(text)")]
-pub(super) fn parse_mentions(text: &str) -> Vec<String> {
-    crate::mentions::parser::parse_mentions(text)
+pub(crate) fn parse_mentions(text: &str) -> Vec<String> {
+    amplifier_foundation::mentions::parser::parse_mentions(text)
 }
 
 /// Generate a sub-session ID for agent delegation.
@@ -132,12 +132,12 @@ pub(super) fn parse_mentions(text: &str) -> Vec<String> {
 #[pyfunction]
 #[pyo3(text_signature = "(*, agent_name=None, session_id=None, trace_id=None)")]
 #[pyo3(signature = (agent_name=None, session_id=None, trace_id=None))]
-pub(super) fn generate_sub_session_id(
+pub(crate) fn generate_sub_session_id(
     agent_name: Option<&str>,
     session_id: Option<&str>,
     trace_id: Option<&str>,
 ) -> String {
-    crate::tracing_utils::generate_sub_session_id(agent_name, session_id, trace_id)
+    amplifier_foundation::tracing_utils::generate_sub_session_id(agent_name, session_id, trace_id)
 }
 
 // =============================================================================
@@ -149,8 +149,8 @@ pub(super) fn generate_sub_session_id(
 /// Returns a ValidationResult with errors and warnings.
 #[pyfunction]
 #[pyo3(text_signature = "(bundle)")]
-pub(super) fn validate_bundle(bundle: &PyBundle) -> PyValidationResult {
-    let result = crate::bundle::validator::validate_bundle(&bundle.inner);
+pub(crate) fn validate_bundle(bundle: &PyBundle) -> PyValidationResult {
+    let result = amplifier_foundation::bundle::validator::validate_bundle(&bundle.inner);
     result.into()
 }
 
@@ -159,8 +159,8 @@ pub(super) fn validate_bundle(bundle: &PyBundle) -> PyValidationResult {
 /// Returns a ValidationResult with errors and warnings.
 #[pyfunction]
 #[pyo3(text_signature = "(bundle)")]
-pub(super) fn validate_bundle_completeness(bundle: &PyBundle) -> PyValidationResult {
-    let result = crate::bundle::validator::validate_bundle_completeness(&bundle.inner);
+pub(crate) fn validate_bundle_completeness(bundle: &PyBundle) -> PyValidationResult {
+    let result = amplifier_foundation::bundle::validator::validate_bundle_completeness(&bundle.inner);
     result.into()
 }
 
@@ -169,8 +169,8 @@ pub(super) fn validate_bundle_completeness(bundle: &PyBundle) -> PyValidationRes
 /// Raises BundleValidationError if the bundle has validation errors.
 #[pyfunction]
 #[pyo3(text_signature = "(bundle)")]
-pub(super) fn validate_bundle_or_raise(bundle: &PyBundle) -> PyResult<()> {
-    crate::bundle::validator::validate_bundle_or_raise(&bundle.inner).map_err(bundle_error_to_pyerr)
+pub(crate) fn validate_bundle_or_raise(bundle: &PyBundle) -> PyResult<()> {
+    amplifier_foundation::bundle::validator::validate_bundle_or_raise(&bundle.inner).map_err(bundle_error_to_pyerr)
 }
 
 /// Validate a bundle for completeness, raising BundleValidationError on failure.
@@ -178,8 +178,8 @@ pub(super) fn validate_bundle_or_raise(bundle: &PyBundle) -> PyResult<()> {
 /// Raises BundleValidationError if the bundle is incomplete for mounting.
 #[pyfunction]
 #[pyo3(text_signature = "(bundle)")]
-pub(super) fn validate_bundle_completeness_or_raise(bundle: &PyBundle) -> PyResult<()> {
-    crate::bundle::validator::validate_bundle_completeness_or_raise(&bundle.inner)
+pub(crate) fn validate_bundle_completeness_or_raise(bundle: &PyBundle) -> PyResult<()> {
+    amplifier_foundation::bundle::validator::validate_bundle_completeness_or_raise(&bundle.inner)
         .map_err(bundle_error_to_pyerr)
 }
 
@@ -196,23 +196,23 @@ pub(super) fn validate_bundle_completeness_or_raise(bundle: &PyBundle) -> PyResu
 /// resolution, use the async variant from Python directly.
 #[pyfunction]
 #[pyo3(text_signature = "(mount_plan, preferences)")]
-pub(super) fn apply_provider_preferences<'py>(
+pub(crate) fn apply_provider_preferences<'py>(
     py: Python<'py>,
     mount_plan: &Bound<'py, PyAny>,
     preferences: Vec<PyRef<'_, PyProviderPreference>>,
 ) -> PyResult<PyObject> {
     let yaml_plan = pyobject_to_yaml(mount_plan)?;
-    let pref_refs: Vec<crate::spawn::ProviderPreference> =
+    let pref_refs: Vec<amplifier_foundation::spawn::ProviderPreference> =
         preferences.iter().map(|p| p.inner.clone()).collect();
-    let result = crate::spawn::apply_provider_preferences(&yaml_plan, &pref_refs);
+    let result = amplifier_foundation::spawn::apply_provider_preferences(&yaml_plan, &pref_refs);
     yaml_to_pyobject(py, &result)
 }
 
 /// Check if a string contains glob pattern characters (*, ?, [).
 #[pyfunction]
 #[pyo3(text_signature = "(pattern)")]
-pub(super) fn is_glob_pattern(pattern: &str) -> bool {
-    crate::spawn::glob::is_glob_pattern(pattern)
+pub(crate) fn is_glob_pattern(pattern: &str) -> bool {
+    amplifier_foundation::spawn::glob::is_glob_pattern(pattern)
 }
 
 // =============================================================================
@@ -237,15 +237,15 @@ pub(super) fn is_glob_pattern(pattern: &str) -> bool {
 #[pyfunction]
 #[pyo3(text_signature = "(data, max_depth=None)")]
 #[pyo3(signature = (data, max_depth=None))]
-pub(super) fn sanitize_for_json<'py>(
+pub(crate) fn sanitize_for_json<'py>(
     py: Python<'py>,
     data: &Bound<'py, PyAny>,
     max_depth: Option<usize>,
 ) -> PyResult<PyObject> {
     let json_val = pyobject_to_json(data)?;
     let sanitized = match max_depth {
-        Some(depth) => crate::serialization::sanitize_for_json_with_depth(&json_val, depth),
-        None => crate::serialization::sanitize_for_json(&json_val),
+        Some(depth) => amplifier_foundation::serialization::sanitize_for_json_with_depth(&json_val, depth),
+        None => amplifier_foundation::serialization::sanitize_for_json(&json_val),
     };
     json_to_pyobject(py, &sanitized)
 }
@@ -260,12 +260,12 @@ pub(super) fn sanitize_for_json<'py>(
 /// Non-dict input returns an empty dict.
 #[pyfunction]
 #[pyo3(text_signature = "(message)")]
-pub(super) fn sanitize_message<'py>(
+pub(crate) fn sanitize_message<'py>(
     py: Python<'py>,
     message: &Bound<'py, PyAny>,
 ) -> PyResult<PyObject> {
     let json_val = pyobject_to_json(message)?;
-    let sanitized = crate::serialization::sanitize_message(&json_val);
+    let sanitized = amplifier_foundation::serialization::sanitize_message(&json_val);
     json_to_pyobject(py, &sanitized)
 }
 
@@ -285,7 +285,7 @@ pub(super) fn sanitize_message<'py>(
 ///   ```
 #[pyfunction]
 #[pyo3(text_signature = "(parent, child)")]
-pub(super) fn merge_module_lists<'py>(
+pub(crate) fn merge_module_lists<'py>(
     py: Python<'py>,
     parent: &Bound<'py, PyAny>,
     child: &Bound<'py, PyAny>,
@@ -316,7 +316,7 @@ pub(super) fn merge_module_lists<'py>(
     // The Rust merge_module_lists panics on non-Mapping elements.
     // Catch the panic and convert to a clean Python TypeError.
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        crate::dicts::merge::merge_module_lists(parent_seq, child_seq)
+        amplifier_foundation::dicts::merge::merge_module_lists(parent_seq, child_seq)
     }));
 
     match result {
@@ -341,8 +341,8 @@ pub(super) fn merge_module_lists<'py>(
 /// error detection is needed.
 #[pyfunction]
 #[pyo3(text_signature = "(path)")]
-pub(super) fn format_directory_listing(path: &str) -> String {
-    crate::mentions::utils::format_directory_listing(std::path::Path::new(path))
+pub(crate) fn format_directory_listing(path: &str) -> String {
+    amplifier_foundation::mentions::utils::format_directory_listing(std::path::Path::new(path))
 }
 
 // =============================================================================
@@ -367,8 +367,8 @@ fn pathbuf_to_pystring(p: std::path::PathBuf) -> PyResult<String> {
 /// cannot be determined.
 #[pyfunction]
 #[pyo3(text_signature = "()")]
-pub(super) fn get_amplifier_home() -> PyResult<String> {
-    pathbuf_to_pystring(crate::paths::uri::get_amplifier_home())
+pub(crate) fn get_amplifier_home() -> PyResult<String> {
+    pathbuf_to_pystring(amplifier_foundation::paths::uri::get_amplifier_home())
 }
 
 /// Construct the path to an agent file.
@@ -384,8 +384,8 @@ pub(super) fn get_amplifier_home() -> PyResult<String> {
 ///     Path string to the agent file.
 #[pyfunction]
 #[pyo3(text_signature = "(base, name)")]
-pub(super) fn construct_agent_path(base: &str, name: &str) -> PyResult<String> {
-    pathbuf_to_pystring(crate::paths::normalize::construct_agent_path(
+pub(crate) fn construct_agent_path(base: &str, name: &str) -> PyResult<String> {
+    pathbuf_to_pystring(amplifier_foundation::paths::normalize::construct_agent_path(
         std::path::Path::new(base),
         name,
     ))
@@ -404,8 +404,8 @@ pub(super) fn construct_agent_path(base: &str, name: &str) -> PyResult<String> {
 ///     Path string to the resource.
 #[pyfunction]
 #[pyo3(text_signature = "(base, name)")]
-pub(super) fn construct_context_path(base: &str, name: &str) -> PyResult<String> {
-    pathbuf_to_pystring(crate::paths::normalize::construct_context_path(
+pub(crate) fn construct_context_path(base: &str, name: &str) -> PyResult<String> {
+    pathbuf_to_pystring(amplifier_foundation::paths::normalize::construct_context_path(
         std::path::Path::new(base),
         name,
     ))
@@ -443,10 +443,10 @@ pub(super) fn construct_context_path(base: &str, name: &str) -> PyResult<String>
 ///     None
 #[pyfunction]
 #[pyo3(text_signature = "(data, path)")]
-pub(super) fn get_nested(data: &Bound<'_, PyAny>, path: Vec<String>) -> PyResult<Option<PyObject>> {
+pub(crate) fn get_nested(data: &Bound<'_, PyAny>, path: Vec<String>) -> PyResult<Option<PyObject>> {
     let yaml_val = pyobject_to_yaml(data)?;
     let path_refs: Vec<&str> = path.iter().map(|s| s.as_str()).collect();
-    match crate::dicts::nested::get_nested(&yaml_val, &path_refs) {
+    match amplifier_foundation::dicts::nested::get_nested(&yaml_val, &path_refs) {
         Some(v) => {
             let py = data.py();
             let obj = yaml_to_pyobject(py, &v)?;
@@ -471,14 +471,14 @@ pub(super) fn get_nested(data: &Bound<'_, PyAny>, path: Vec<String>) -> PyResult
 ///     The value at the path (deep copy), or ``default`` if not found.
 #[pyfunction]
 #[pyo3(text_signature = "(data, path, default)")]
-pub(super) fn get_nested_with_default(
+pub(crate) fn get_nested_with_default(
     data: &Bound<'_, PyAny>,
     path: Vec<String>,
     default: &Bound<'_, PyAny>,
 ) -> PyResult<PyObject> {
     let yaml_val = pyobject_to_yaml(data)?;
     let path_refs: Vec<&str> = path.iter().map(|s| s.as_str()).collect();
-    match crate::dicts::nested::get_nested(&yaml_val, &path_refs) {
+    match amplifier_foundation::dicts::nested::get_nested(&yaml_val, &path_refs) {
         Some(v) => {
             let py = data.py();
             yaml_to_pyobject(py, &v)
@@ -511,7 +511,7 @@ pub(super) fn get_nested_with_default(
 ///     {'a': {'b': 42}}
 #[pyfunction]
 #[pyo3(text_signature = "(data, path, value)")]
-pub(super) fn set_nested(
+pub(crate) fn set_nested(
     data: &Bound<'_, PyAny>,
     path: Vec<String>,
     value: &Bound<'_, PyAny>,
@@ -519,7 +519,7 @@ pub(super) fn set_nested(
     let mut yaml_val = pyobject_to_yaml(data)?;
     let yaml_value = pyobject_to_yaml(value)?;
     let path_refs: Vec<&str> = path.iter().map(|s| s.as_str()).collect();
-    crate::dicts::nested::set_nested(&mut yaml_val, &path_refs, yaml_value);
+    amplifier_foundation::dicts::nested::set_nested(&mut yaml_val, &path_refs, yaml_value);
     let py = data.py();
     yaml_to_pyobject(py, &yaml_val)
 }
@@ -561,12 +561,12 @@ pub(super) fn set_nested(
 ///     (None, 'No frontmatter here')
 #[pyfunction]
 #[pyo3(text_signature = "(content)")]
-pub(super) fn parse_frontmatter(
+pub(crate) fn parse_frontmatter(
     py: Python<'_>,
     content: &str,
 ) -> PyResult<(Option<PyObject>, String)> {
     let (fm, body) =
-        crate::io::frontmatter::parse_frontmatter(content).map_err(bundle_error_to_pyerr)?;
+        amplifier_foundation::io::frontmatter::parse_frontmatter(content).map_err(bundle_error_to_pyerr)?;
     let py_fm = match fm {
         Some(val) => Some(yaml_to_pyobject(py, &val)?),
         None => None,
