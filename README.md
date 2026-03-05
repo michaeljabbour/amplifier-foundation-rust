@@ -57,29 +57,46 @@ These stay as their original Python implementations because they're async orches
 - `SimpleSourceResolver` / `GitSourceHandler` -- async source resolution
 - `check_bundle_status` / `update_bundle` -- async update checking
 
-## Installation
+## Using It with Your Existing Amplifier Setup
 
-### As a Python package (drop-in replacement)
+If you already have Amplifier installed and working, swapping in the Rust-accelerated foundation takes two commands:
 
 ```bash
+# 1. Clone this repo
+git clone https://github.com/michaeljabbour/amplifier-foundation-rust.git
+cd amplifier-foundation-rust
+
+# 2. Build and install into your Amplifier environment
 pip install maturin
 maturin develop
 ```
 
-This builds the Rust code and installs the package into your active Python environment. Use it exactly like the original:
+That's it. The Rust version installs as `amplifier-foundation` -- the same package name as the Python original. It replaces the pure Python version in your environment. The next time you run `amplifier run`, `amplifier resume`, or any Amplifier session, the Rust-accelerated functions are active automatically.
 
-```python
-from amplifier_foundation import Bundle, deep_merge, parse_uri
-from amplifier_foundation.bundle import PreparedBundle
-from amplifier_foundation.session import fork_session, ForkResult
-from amplifier_foundation.exceptions import BundleError
+Nothing else changes. Your bundles, agents, modules, configs, and sessions all work exactly as before. The only difference is speed.
+
+To go back to the pure Python version:
+
+```bash
+pip install amplifier-foundation
 ```
 
-### As a Rust crate
+### Verifying it's working
+
+```bash
+python3 -c "
+from amplifier_foundation._engine import deep_merge
+print('Rust engine active')
+"
+```
+
+If you see `Rust engine active`, the Rust code is running. If you get an ImportError, only the Python fallback is in use.
+
+### As a Rust crate (for Rust projects)
 
 ```toml
 [dependencies]
-amplifier-foundation = { git = "https://github.com/microsoft/amplifier-foundation-rust" }
+amplifier-foundation = { git = "https://github.com/michaeljabbour/amplifier-foundation-rust" }
 ```
 
 ## Project Structure
