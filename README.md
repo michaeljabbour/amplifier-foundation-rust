@@ -96,40 +96,77 @@ These stay as their original Python implementations because they're async orches
 - `SimpleSourceResolver` / `GitSourceHandler` -- async source resolution
 - `check_bundle_status` / `update_bundle` -- async update checking
 
-## Using It with Your Existing Amplifier Setup
+## Why the Package Name Is `amplifier-foundation` (Not `amplifier-foundation-rust`)
 
-If you already have Amplifier installed and working, swapping in the Rust-accelerated foundation takes two commands:
+This installs as `amplifier-foundation` -- the same package name as the Python original. That's intentional. Everything in the ecosystem does `from amplifier_foundation import Bundle`. If we named it differently, nothing would find it.
+
+When you install the Rust version, it replaces the Python version in that environment. That's the whole point -- drop-in replacement.
+
+## Testing It Safely
+
+Use an isolated virtual environment so your main Amplifier installation is never touched.
+
+### Test with amplifier-app-cli
 
 ```bash
-# 1. Clone this repo
-git clone https://github.com/michaeljabbour/amplifier-foundation-rust.git
-cd amplifier-foundation-rust
+# Create a throwaway test environment
+cd ~/dev/amplifier-app-cli
+uv venv .venv-rust-test
+source .venv-rust-test/bin/activate
 
-# 2. Build and install into your Amplifier environment
+# Install app-cli (pulls in Python foundation + core as deps)
+uv pip install -e .
+
+# Now swap foundation with the Rust version (overwrites the Python one)
+cd ~/dev/amplifier-foundation-rust
 pip install maturin
 maturin develop
+
+# Verify Rust is active
+python -c "from amplifier_foundation._engine import deep_merge; print('Rust engine active')"
+
+# Run app-cli tests
+cd ~/dev/amplifier-app-cli
+python -m pytest tests/
+
+# Try a real session
+amplifier run
+
+# When done, just delete the test env
+deactivate
+rm -rf ~/dev/amplifier-app-cli/.venv-rust-test
 ```
 
-That's it. The Rust version installs as `amplifier-foundation` -- the same package name as the Python original. It replaces the pure Python version in your environment. The next time you run `amplifier run`, `amplifier resume`, or any Amplifier session, the Rust-accelerated functions are active automatically.
-
-Nothing else changes. Your bundles, agents, modules, configs, and sessions all work exactly as before. The only difference is speed.
-
-To go back to the pure Python version:
+### Test with Kepler (amplifier-distro-kepler)
 
 ```bash
-pip install amplifier-foundation
+# Create a throwaway test environment
+cd ~/dev/amplifier-distro-kepler/sidecar
+uv venv .venv-rust-test
+source .venv-rust-test/bin/activate
+
+# Install sidecar (pulls in amplifier-distro which pulls in foundation)
+uv pip install -e .
+
+# Swap foundation with Rust version
+cd ~/dev/amplifier-foundation-rust
+maturin develop
+
+# Verify
+python -c "from amplifier_foundation._engine import deep_merge; print('Rust engine active')"
+
+# Run sidecar tests
+cd ~/dev/amplifier-distro-kepler/sidecar
+python -m pytest tests/
+
+# Clean up
+deactivate
+rm -rf ~/dev/amplifier-distro-kepler/sidecar/.venv-rust-test
 ```
 
-### Verifying it's working
+### Going back to normal
 
-```bash
-python3 -c "
-from amplifier_foundation._engine import deep_merge
-print('Rust engine active')
-"
-```
-
-If you see `Rust engine active`, the Rust code is running. If you get an ImportError, only the Python fallback is in use.
+Your real Amplifier installation is untouched. The test venvs are isolated. Delete them and nothing changes. If you ever want to permanently switch, just run `maturin develop` in your real environment instead of a test one.
 
 ### As a Rust crate (for Rust projects)
 
