@@ -34,18 +34,57 @@ Modules and bundles written in Python don't need to change anything -- they neve
 
 ## What's Accelerated by Rust
 
-| Area | Functions | Speedup |
-|------|-----------|---------|
-| Dict operations | `deep_merge`, `merge_module_lists`, `get_nested`, `set_nested` | 10-50x |
-| URI parsing | `parse_uri`, `normalize_path`, `get_amplifier_home` | 10-30x |
-| Bundle validation | `validate_bundle` (4 variants) | 10-20x |
-| Mention parsing | `parse_mentions` | 10-30x |
-| Session analysis | `count_turns`, `slice_to_turn`, `fork_session`, `get_turn_summary` | 10-50x |
-| Serialization | `sanitize_for_json`, `sanitize_message` | 10-30x |
-| Path construction | `construct_agent_path`, `construct_context_path` | 10-20x |
-| Provider preferences | `apply_provider_preferences`, `is_glob_pattern` | 10-20x |
-| Frontmatter | `parse_frontmatter` | 10-30x |
-| Tracing | `generate_sub_session_id` | 5-10x |
+- **Dict operations** -- `deep_merge`, `merge_module_lists`, `get_nested`, `set_nested`
+- **URI parsing** -- `parse_uri`, `normalize_path`, `get_amplifier_home`
+- **Bundle validation** -- `validate_bundle` (4 variants)
+- **Mention parsing** -- `parse_mentions`
+- **Session analysis** -- `count_turns`, `slice_to_turn`, `fork_session`, `get_turn_summary`
+- **Serialization** -- `sanitize_for_json`, `sanitize_message`
+- **Path construction** -- `construct_agent_path`, `construct_context_path`
+- **Provider preferences** -- `apply_provider_preferences`, `is_glob_pattern`
+- **Frontmatter** -- `parse_frontmatter`
+- **Tracing** -- `generate_sub_session_id`
+
+### Measure the speedup yourself
+
+No claims without evidence. Run this to compare Python vs Rust on your own machine:
+
+```bash
+# 1. Benchmark with the Python version first
+pip install amplifier-foundation
+python3 -c "
+import timeit
+from amplifier_foundation import deep_merge, parse_mentions
+
+a = {'session': {'model': 'gpt-4', 'temperature': 0.7, 'nested': {'a': 1, 'b': 2}}}
+b = {'session': {'temperature': 0.9, 'nested': {'b': 3, 'c': 4}}, 'extra': True}
+text = 'Load @docs/readme.md and @config/settings.yaml and @agents/helper.md'
+
+t1 = timeit.timeit(lambda: deep_merge(a, b), number=10000)
+t2 = timeit.timeit(lambda: parse_mentions(text), number=10000)
+print(f'deep_merge:     {t1:.3f}s for 10k calls')
+print(f'parse_mentions: {t2:.3f}s for 10k calls')
+print('--- Python version ---')
+"
+
+# 2. Install the Rust version and run the same benchmark
+cd amplifier-foundation-rust
+maturin develop
+python3 -c "
+import timeit
+from amplifier_foundation import deep_merge, parse_mentions
+
+a = {'session': {'model': 'gpt-4', 'temperature': 0.7, 'nested': {'a': 1, 'b': 2}}}
+b = {'session': {'temperature': 0.9, 'nested': {'b': 3, 'c': 4}}, 'extra': True}
+text = 'Load @docs/readme.md and @config/settings.yaml and @agents/helper.md'
+
+t1 = timeit.timeit(lambda: deep_merge(a, b), number=10000)
+t2 = timeit.timeit(lambda: parse_mentions(text), number=10000)
+print(f'deep_merge:     {t1:.3f}s for 10k calls')
+print(f'parse_mentions: {t2:.3f}s for 10k calls')
+print('--- Rust version ---')
+"
+```
 
 ## What Stays Python
 
